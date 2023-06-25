@@ -747,6 +747,70 @@ ifeq ($(PLATFORM),freebsd)
       BASE_CFLAGS += -m64
     endif
   endif
+else
+
+ifeq ($(PLATFORM),js)
+  CC=$(EMSCRIPTEN)/emcc
+  RANLIB=$(EMSCRIPTEN)/emranlib
+  ARCH=js
+
+# debug optimize flags: --closure 0 --minify 0 -g
+
+  OPTIMIZEVM += -O2
+  OPTIMIZE = $(OPTIMIZEVM)
+
+  BUILD_STANDALONE=1
+
+  HAVE_VM_COMPILED=true
+
+  USE_CURL=0
+  USE_CODEC_VORBIS=0
+  USE_CODEC_OPUS=1
+  USE_MUMBLE=0
+  USE_VOIP=0
+  USE_OPENAL_DLOPEN=0
+  USE_RENDERER_DLOPEN=0
+  USE_LOCAL_HEADERS=0
+
+  LIBSYSCOMMON=$(SYSDIR)/sys_common.js
+  LIBSYSBROWSER=$(SYSDIR)/sys_browser.js
+  LIBSYSNODE=$(SYSDIR)/sys_node.js
+  LIBVMJS=$(CMDIR)/vm_js.js
+
+  CLIENT_LDFLAGS += --js-library $(LIBSYSCOMMON) \
+    --js-library $(LIBSYSBROWSER) \
+    --js-library $(LIBVMJS) \
+    -s INVOKE_RUN=0 \
+    -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_VM_GetCurrent', '_VM_SetCurrent']" \
+    -s LEGACY_GL_EMULATION=1 \
+    -s RESERVED_FUNCTION_POINTERS=1 \
+    -s TOTAL_MEMORY=234881024 \
+    -s EXPORT_NAME=\"ioq3\" \
+    $(OPTIMIZE)
+
+  SERVER_LDFLAGS += --js-library $(LIBSYSCOMMON) \
+    --js-library $(LIBSYSNODE) \
+    --js-library $(LIBVMJS) \
+    -s INVOKE_RUN=1 \
+    -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_CON_SetIsTTY', '_VM_GetCurrent', '_VM_SetCurrent']" \
+    -s LEGACY_GL_EMULATION=1 \
+    -s RESERVED_FUNCTION_POINTERS=1 \
+    -s TOTAL_MEMORY=234881024 \
+    -s EXPORT_NAME=\"ioq3ded\" \
+    $(OPTIMIZE)
+
+  SHLIBEXT=js
+  SHLIBNAME=.$(SHLIBEXT)
+  SHLIBLDFLAGS=$(LDFLAGS) \
+    -s INVOKE_RUN=0 \
+    -s EXPORTED_FUNCTIONS="['_vmMain', '_dllEntry']" \
+    -s SIDE_MODULE=1 \
+    $(OPTIMIZE)
+
+  CLIENT_CFLAGS += -s USE_SDL=1
+  CLIENT_LIBS += -lidbfs.js
+  SHLIBCFLAGS=-fPIC
+
 else # ifeq freebsd
 
 #############################################################################
@@ -763,6 +827,7 @@ endif #Linux
 endif #darwin
 endif #MINGW
 endif #FreeBSD
+endif #js
 
 ifndef CC
   CC=gcc
