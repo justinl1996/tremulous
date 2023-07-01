@@ -347,6 +347,25 @@ extern "C" {
 
 #endif
 
+//================================================================== Q3JS ===
+
+#ifdef EMSCRIPTEN
+
+#define OS_STRING "emscripten"
+#define ID_INLINE
+#define PATH_SEP '/'
+
+#define ARCH_STRING ""
+
+#define DLL_EXT ".js"
+
+#define Q3_LITTLE_ENDIAN
+
+#define DLL_EXT ".wasm"
+#define EXE_EXT
+
+#endif
+
 //===========================================================================
 
 //catch missing defines in above blocks

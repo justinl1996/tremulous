@@ -751,6 +751,7 @@ else
 
 ifeq ($(PLATFORM),js)
   CC=$(EMSCRIPTEN)/emcc
+  CXX=$(EMSCRIPTEN)/emcc
   RANLIB=$(EMSCRIPTEN)/emranlib
   ARCH=js
 
@@ -2476,7 +2477,7 @@ endif
 
 $(B)/$(SERVERBIN)$(FULLBINEXT): $(Q3DOBJ)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(Q3DOBJ) $(LIBS)
+	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(Q3DOBJ) -v $(LIBS)
 
 #############################################################################
 ## TREMULOUS CGAME
