@@ -2413,6 +2413,7 @@ Q3DOBJ = \
   $(B)/ded/crypto.o \
   $(B)/ded/cvar.o \
   $(B)/ded/files.o \
+  $(B)/ded/json.o \
   $(B)/ded/md4.o \
   $(B)/ded/msg.o \
   $(B)/ded/net_chan.o \

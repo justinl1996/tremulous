@@ -17,7 +17,7 @@
 
 // It's quite possible this is _way over the top_ but I've been toying
 // with several ideas. -Victor
-
+#ifndef EMSCRIPTEN
 #ifndef __cplusplus
 #error __file__ " is only available to C++"
 #endif
@@ -62,4 +62,5 @@ namespace script
     };
 };
 
+#endif
 #endif

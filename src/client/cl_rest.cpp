@@ -3,7 +3,7 @@
 // -wtfbbqhax
 //
 // TODO Verify sha256 of file if exists
-
+#ifndef EMSCRIPTEN
 #include "cl_rest.h"
 
 #include <unistd.h>
@@ -114,3 +114,4 @@ bool GetTremulousPk3s(const char* destdir, const char* basegame)
 
     return true;
 }
+#endif

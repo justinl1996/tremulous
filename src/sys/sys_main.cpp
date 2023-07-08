@@ -790,7 +790,7 @@ int main( int argc, char **argv )
 #ifndef DEDICATED
     script::client::init(std::move(lua));
     script::keybind::init(std::move(lua));
-    script::http_client::init(std::move(lua));
+    //script::http_client::init(std::move(lua));
 #endif
 
     for ( ;; )
