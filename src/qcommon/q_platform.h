@@ -244,6 +244,12 @@ extern "C" {
  
 #endif
 
+#ifdef EMSCRIPTEN
+    #define RELEASE_PACKAGE_NAME ( "release-js-" ARCH_STRING ".zip" )
+    #define RELEASE_SIGNATURE_NAME ( "release-js-" ARCH_STRING ".zip.sig" )
+    #define GRANGER_EXE ( "granger.js" )
+#endif
+
 //=================================================================== BSD ===
 
 #if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)

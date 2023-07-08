@@ -37,7 +37,9 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 static cvar_t *in_keyboardDebug     = NULL;
 
+#ifndef EMSCRIPTEN
 static SDL_GameController *gamepad = NULL;
+#endif
 static SDL_Joystick *stick = NULL;
 
 static bool mouseAvailable = false;
@@ -490,13 +492,14 @@ static int hat_keys[16] = {
 
 struct
 {
-	bool buttons[SDL_CONTROLLER_BUTTON_MAX + 1]; // +1 because old max was 16, current SDL_CONTROLLER_BUTTON_MAX is 15
+	bool buttons[16]; // +1 because old max was 16, current SDL_CONTROLLER_BUTTON_MAX is 15
 	unsigned int oldaxes;
 	int oldaaxes[MAX_JOYSTICK_AXIS];
 	unsigned int oldhats;
 } stick_state;
 
 
+#ifndef EMSCRIPTEN
 /*
 ===============
 IN_InitJoystick
@@ -619,7 +622,7 @@ static void IN_ShutdownJoystick( void )
 	SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
 }
-
+#endif
 
 static bool KeyToAxisAndSign(int keynum, int *outAxis, int *outSign)
 {
@@ -687,6 +690,7 @@ static bool KeyToAxisAndSign(int keynum, int *outAxis, int *outSign)
 	return *outSign != 0;
 }
 
+#ifndef EMSCRIPTEN
 /*
 ===============
 IN_GamepadMove
@@ -1025,6 +1029,7 @@ static void IN_JoyMove( void )
 	/* Save for future generations. */
 	stick_state.oldaxes = axes;
 }
+#endif
 
 /*
 ===============
@@ -1155,13 +1160,13 @@ static void IN_ProcessEvents( void )
 					Com_QueueEvent(in_eventTime, SE_KEY, K_MWHEELDOWN, false, 0, NULL );
 				}
 				break;
-
+#ifndef EMSCRIPTEN
 			case SDL_CONTROLLERDEVICEADDED:
 			case SDL_CONTROLLERDEVICEREMOVED:
 				if (in_joystick->integer)
 					IN_InitJoystick();
 				break;
-
+#endif
 			case SDL_QUIT:
 				Cbuf_ExecuteText(EXEC_NOW, "quit \"Closed window\"\n");
 				break;
@@ -1220,9 +1225,9 @@ void IN_Frame( void )
 	bool loading;
 	bool cursorShowing;
 	int x, y;
-
+#ifndef EMSCRIPTEN
 	IN_JoyMove( );
-
+#endif
 	// If not DISCONNECTED (main menu) or ACTIVE (in game), we're loading
 	loading = ( clc.state != CA_DISCONNECTED && clc.state != CA_ACTIVE );
 	cursorShowing = Key_GetCatcher( ) & KEYCATCH_UI;
@@ -1305,8 +1310,9 @@ void IN_Init( void *windowData )
 	appState = SDL_GetWindowFlags( SDL_window );
 	Cvar_SetValue( "com_unfocused",	!( appState & SDL_WINDOW_INPUT_FOCUS ) );
 	Cvar_SetValue( "com_minimized", appState & SDL_WINDOW_MINIMIZED );
-
+#ifndef EMSCRIPTEN
 	IN_InitJoystick( );
+#endif
 	Com_DPrintf( "------------------------------------\n" );
 }
 
@@ -1322,7 +1328,9 @@ void IN_Shutdown( void )
 	IN_DeactivateMouse( );
 	mouseAvailable = false;
 
+#ifndef EMSCRIPTEN
 	IN_ShutdownJoystick( );
+#endif
 
 	SDL_window = NULL;
 }
@@ -1334,6 +1342,8 @@ IN_Restart
 */
 void IN_Restart( void )
 {
+#ifndef EMSCRIPTEN
 	IN_ShutdownJoystick( );
+#endif
 	IN_Init( SDL_window );
 }

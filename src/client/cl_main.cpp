@@ -34,7 +34,10 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include "sys/sys_loadlib.h"
 #include "sys/sys_local.h"
 
+#ifndef EMSCRIPTEN
 #include "cl_updates.h"
+#endif
+
 #ifdef USE_MUMBLE
 #include "libmumblelink.h"
 #endif
@@ -168,6 +171,7 @@ void hA3Dg_ExportRenderGeom(refexport_t *incoming_re);
 
 static bool noGameRestart = false;
 
+#ifndef EMSCRIPTEN
 static void CL_DownloadUpdate_f() { CL_DownloadRelease(); }
 
 static void CL_InstallUpdate_f()
@@ -179,6 +183,7 @@ static void CL_InstallUpdate_f()
 }
 
 static void CL_CheckForUpdate_f() { CL_GetLatestRelease(); }
+#endif
 
 static void CL_BrowseHomepath_f() { FS_BrowseHomepath(); }
 
@@ -1887,7 +1892,7 @@ Called when all downloading has been completed
 static void CL_DownloadsComplete(void)
 {
     Com_Printf("Downloads complete\n");
-
+#ifdef USE_CURL
     // if we downloaded with cURL
     if (clc.cURLUsed)
     {
@@ -1905,7 +1910,7 @@ static void CL_DownloadsComplete(void)
             return;
         }
     }
-
+#endif
     // if we downloaded files we need to restart the file system
     if (clc.downloadRestart)
     {
@@ -2010,7 +2015,11 @@ void CL_NextDownload(void)
     int remaining;
 
     // A download has finished, check whether this matches a referenced checksum
+#ifdef USE_CURL
     if (*clc.downloadName && !clc.activeCURLNotGameRelated)
+#else
+    if (*clc.downloadName)
+#endif
     {
         char *zippath = FS_BuildOSPath(Cvar_VariableString("fs_homepath"), clc.downloadName, "");
         zippath[strlen(zippath) - 1] = '\0';
@@ -2144,7 +2153,7 @@ void CL_NextDownload(void)
             *s++ = 0;
         else
             s = localName + strlen(localName);  // point at the nul byte
-
+#ifdef USE_CURL
         if (((cl_allowDownload->integer & DLF_ENABLE) && !(cl_allowDownload->integer & DLF_NO_REDIRECT)) ||
             prompt == DLP_CURL)
         {
@@ -2184,6 +2193,7 @@ void CL_NextDownload(void)
                 "configuration (cl_allowDownload is %d)\n",
                 cl_allowDownload->integer);
         }
+#endif
         if (!useCURL)
         {
             Com_Printf("Trying UDP download: %s; %s\n", localName, remoteName);
@@ -2964,6 +2974,7 @@ void CL_Frame(int msec)
         }
     }
 
+#if USE_CURL
     if (clc.downloadCURLM)
     {
         CL_cURL_PerformDownload();
@@ -2983,6 +2994,7 @@ void CL_Frame(int msec)
             return;
         }
     }
+#endif
 
     if (clc.state == CA_DISCONNECTED && !(Key_GetCatcher() & KEYCATCH_UI) && !com_sv_running->integer && cls.ui)
     {
@@ -3153,7 +3165,9 @@ void CL_ShutdownAll(bool shutdownRef)
 
     if (clc.demorecording) CL_StopRecord_f();
 
+#ifdef USE_CURL
     CL_cURL_Shutdown();
+#endif
 
     // clear sounds
     S_DisableSounds();
@@ -5012,9 +5026,11 @@ void CL_Init(void)
     Cmd_AddCommand("model", CL_SetModel_f);
     Cmd_AddCommand("video", CL_Video_f);
     Cmd_AddCommand("stopvideo", CL_StopVideo_f);
+#ifndef EMSCRIPTEN
     Cmd_AddCommand("downloadUpdate", CL_DownloadUpdate_f);
     Cmd_AddCommand("installUpdate", CL_InstallUpdate_f);
     Cmd_AddCommand("checkForUpdate", CL_CheckForUpdate_f);
+#endif
     Cmd_AddCommand("browseHomepath", CL_BrowseHomepath_f);
     Cmd_AddCommand("browseDemos", CL_BrowseDemos_f);
     Cmd_AddCommand("browseScreenShots", CL_BrowseScreenShots_f);

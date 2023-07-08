@@ -46,7 +46,9 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include "sys/sys_shared.h"
 #include "ui/ui_public.h"
 
+#ifdef USE_CURL
 #include "cl_curl.h"
+#endif
 #include "keys.h"
 #include "snd_public.h"
 
@@ -267,11 +269,16 @@ struct clientConnection_t {
     int lastExecutedServerCommand;  // last server command grabbed or executed with CL_GetServerCommand
     char serverCommands[MAX_RELIABLE_COMMANDS][MAX_STRING_CHARS];
 
+#if EMSCRIPTEN
+	char fs_cdn[MAX_OSPATH];
+	char fs_manifest[BIG_INFO_STRING];
+#endif
+
     // file transfer from server
     fileHandle_t download;
     char downloadTempName[MAX_OSPATH];
     char downloadName[MAX_OSPATH];
-
+#ifdef USE_CURL
     // XXX Refactor this -vjr
     bool cURLEnabled;
     bool cURLUsed;
@@ -281,7 +288,7 @@ struct clientConnection_t {
     CURL *downloadCURL;
     CURLM *downloadCURLM;
     bool activeCURLNotGameRelated;
-
+#endif
     int sv_allowDownload;
     char sv_dlURL[MAX_CVAR_VALUE_STRING];
     int downloadNumber;  // Unused ??

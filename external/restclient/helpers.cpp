@@ -3,7 +3,7 @@
  * @brief implementation of the restclient helpers
  * @author Daniel Schauenberg <d@unwiredcouch.com>
  */
-
+#ifndef EMSCRIPTEN
 #include "restclient/helpers.h"
 
 #ifdef USE_LOCAL_HEADERS
@@ -94,3 +94,4 @@ size_t RestClient::Helpers::read_callback(void *data, size_t size,
   /** return copied size */
   return copy_size;
 }
+#endif

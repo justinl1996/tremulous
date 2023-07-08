@@ -697,9 +697,9 @@ const char *Sys_StripAppBundle( const char *dir )
 
 void SDLVersionCheck()
 {
-#if !SDL_VERSION_ATLEAST(MINSDL_MAJOR,MINSDL_MINOR,MINSDL_PATCH)
-#error A more recent version of SDL is required
-#endif
+//#if !SDL_VERSION_ATLEAST(MINSDL_MAJOR,MINSDL_MINOR,MINSDL_PATCH)
+//#error A more recent version of SDL is required
+//#endif
     SDL_version ver;
     SDL_GetVersion( &ver );
 #define MINSDL_VERSION XSTRING(MINSDL_MAJOR) "." \

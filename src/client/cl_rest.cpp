@@ -106,7 +106,6 @@ bool GetTremulousPk3s(const char* destdir, const char* basegame)
             std::cerr << "Error " << strerror(errno) << "\n";
             continue;
         }
-
         RestClient::Response resp = RestClient::get(baseuri + f);
 
         dl << resp.body;

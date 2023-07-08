@@ -96,6 +96,7 @@ GetNews
 */
 static bool GetNews(bool begin)
 {
+#if USECURL
     bool finished = false;
     fileHandle_t fileIn;
     int readSize;
@@ -131,6 +132,7 @@ static bool GetNews(bool begin)
     if (!finished) strcpy(clc.newsString, "Retrieving...");
     Cvar_Set("cl_newsString", clc.newsString);
     return finished;
+#endif
     Cvar_Set("cl_newsString", "^1You must compile your client with CURL support to use this feature");
     return true;
 }
@@ -877,12 +879,14 @@ intptr_t CL_UISystemCalls(intptr_t *args)
                 }
             }
 
+#ifndef EMSCRIPTEN
             //  TODO: Do this better
             if (!strncmp((const char *)VMA(2), "checkForUpdate", 14))
             {
                 CL_GetLatestRelease();
                 return 0;
             }
+#endif
 
             Cbuf_ExecuteText(args[1], (const char *)VMA(2));
             return 0;

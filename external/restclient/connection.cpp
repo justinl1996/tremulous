@@ -3,7 +3,7 @@
  * @brief implementation of the connection class
  * @author Daniel Schauenberg <d@unwiredcouch.com>
  */
-
+#ifndef EMSCRIPTEN
 #include "restclient/connection.h"
 
 #include "../../src/client/cl_curl.h"
@@ -360,4 +360,4 @@ RestClient::Connection::del(const std::string& url) {
 
   return this->performCurlRequest(url);
 }
-
+#endif

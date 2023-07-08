@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 #include "cl_updates.h"
 
 #include <libgen.h>
@@ -474,3 +475,4 @@ void UpdateManager::execute()
 void CL_GetLatestRelease() { UpdateManager::refresh(); }
 void CL_DownloadRelease() { UpdateManager::download(); }
 void CL_ExecuteInstaller() { UpdateManager::execute(); }
+#endif

@@ -193,6 +193,7 @@ extern	int		vm_debugLevel;
 extern "C" {
 	void VM_Compile( vm_t *vm, vmHeader_t *header );
 	int	VM_CallCompiled( vm_t *vm, int *args );
+	extern void VM_Test();
 }
 
 void VM_PrepareInterpreter( vm_t *vm, vmHeader_t *header );

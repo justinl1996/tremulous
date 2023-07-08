@@ -397,6 +397,11 @@ void S_ClearSoundBuffer( void );
 
 void SCR_DebugGraph (float value);	// FIXME: move logging to common?
 
+#if EMSCRIPTEN
+const char *CL_GetCDN(void);
+const char *CL_GetManifest(void);
+#endif
+
 //
 // server interface
 //

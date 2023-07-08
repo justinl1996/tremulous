@@ -11,6 +11,7 @@
  * @author Daniel Schauenberg <d@unwiredcouch.com>
  */
 
+#ifndef EMSCRIPTEN
 #include "restclient/restclient.h"
 
 #include "../../src/client/cl_curl.h"
@@ -116,3 +117,4 @@ RestClient::Response RestClient::del(const std::string& url) {
   return ret;
 }
 
+#endif

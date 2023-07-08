@@ -959,3 +959,23 @@ void CL_ParseServerMessage( msg_t *msg ) {
 		}
 	}
 }
+
+#ifdef EMSCRIPTEN
+/*
+==================
+CL_GetCDN
+==================
+*/
+const char *CL_GetCDN(void) {
+	return clc.fs_cdn;
+}
+
+/*
+==================
+CL_GetManifest
+==================
+*/
+const char *CL_GetManifest(void) {
+	return clc.fs_manifest;
+}
+#endif
