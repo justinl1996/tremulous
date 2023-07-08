@@ -36,6 +36,22 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #endif
 #endif
 
+//============================================================================
+
+//
+// generic callback support
+//
+#if EMSCRIPTEN
+struct cb_context_s;
+
+typedef void (*result_cb)(struct cb_context_s *req, int status);
+
+typedef struct cb_context_s {
+	void *data;
+	result_cb cb;
+} cb_context_t;
+#endif
+
 struct netadr_t;
 struct msg_t;
 
@@ -282,15 +298,19 @@ temp file loading
 #define Z_TagMalloc(size, tag)			Z_TagMallocDebug(size, tag, #size, __FILE__, __LINE__)
 #define Z_Malloc(size)					Z_MallocDebug(size, #size, __FILE__, __LINE__)
 #define S_Malloc(size)					S_MallocDebug(size, #size, __FILE__, __LINE__)
-void *Z_TagMallocDebug( int size, int tag, const char *label, const char *file, int line );	// NOT 0 filled memory
-void *Z_MallocDebug( int size, const char *label, const char *file, int line );			// returns 0 filled memory
-void *S_MallocDebug( int size, const char *label, const char *file, int line );			// returns 0 filled memory
+extern "C" {
+	void *Z_TagMallocDebug( int size, int tag, const char *label, const char *file, int line );	// NOT 0 filled memory
+	void *Z_MallocDebug( int size, const char *label, const char *file, int line );			// returns 0 filled memory
+	void *S_MallocDebug( int size, const char *label, const char *file, int line );			// returns 0 filled memory
+}
 #else
-void *Z_TagMalloc( int size, int tag );	// NOT 0 filled memory
-void *Z_Malloc( int size );			// returns 0 filled memory
-void *S_Malloc( int size );			// NOT 0 filled memory only for small allocations
+extern "C" {
+	void *Z_TagMalloc( int size, int tag );	// NOT 0 filled memory
+	void *Z_Malloc( int size );			// returns 0 filled memory
+	void *S_Malloc( int size );			// NOT 0 filled memory only for small allocations
+}
 #endif
-void Z_Free( void *ptr );
+extern "C" void Z_Free( void *ptr );
 void Z_FreeTags( int tag );
 int Z_AvailableMemory( void );
 void Z_LogHeap( void );
@@ -431,5 +451,11 @@ void         Com_Bucket_Remove_Item_From_Bucket(
 void*        Com_Bucket_Select_A_Random_Item(unsigned int bucket_handle);
 void         Com_Bucket_Select_A_Specific_Item(
 	unsigned int bucket_handle, void* item);
+
+#if EMSCRIPTEN
+extern "C" void Com_ProxyCallback(cb_context_t *context);
+extern "C" const char *Com_GetCDN(void);
+extern "C" const char *Com_GetManifest(void);
+#endif
 
 #endif // _QCOMMON_H_

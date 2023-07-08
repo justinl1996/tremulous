@@ -361,7 +361,6 @@ extern "C" {
 
 #define Q3_LITTLE_ENDIAN
 
-#define DLL_EXT ".wasm"
 #define EXE_EXT
 
 #endif

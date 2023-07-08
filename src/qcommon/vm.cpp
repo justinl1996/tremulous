@@ -58,8 +58,6 @@ vm_t	vmTable[MAX_VM];
 void VM_VmInfo_f( void );
 void VM_VmProfile_f( void );
 
-
-
 #if 0 // 64bit!
 // converts a VM pointer to a C pointer and
 // checks to make sure that the range is acceptable
@@ -1018,3 +1016,13 @@ void VM_BlockCopy(unsigned int dest, unsigned int src, size_t n)
 
 	::memcpy(currentVM->dataBase + dest, currentVM->dataBase + src, n);
 }
+
+#if EMSCRIPTEN
+extern "C" vm_t *VM_GetCurrent() {
+	return currentVM;
+}
+
+extern "C" void VM_SetCurrent(vm_t *vm) {
+	currentVM = vm;
+}
+#endif

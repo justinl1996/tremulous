@@ -550,3 +550,23 @@ void CON_Print( const char *msg )
 		ttycon_show_overdue++;
 	}
 }
+
+#if EMSCRIPTEN
+/*
+==================
+CON_IsTTY
+==================
+*/
+extern "C" bool CON_IsTTY() {
+	return stdinIsATTY;
+}
+
+/*
+==================
+CON_SetIsTTY
+==================
+*/
+extern "C" void CON_SetIsTTY(bool isTTY) {
+	stdinIsATTY = isTTY;
+}
+#endif

@@ -124,7 +124,7 @@ void Cvar_Register(vmCvar_t *vmCvar, const char *varName, const char *defaultVal
 void Cvar_Update(vmCvar_t *vmCvar);
 // updates an interpreted modules' version of a cvar
 
-void Cvar_Set(const char *var_name, const char *value);
+extern "C" void Cvar_Set(const char *var_name, const char *value);
 // will create the variable with no flags if it doesn't exist
 
 cvar_t *Cvar_Set2(const char *var_name, const char *value, bool force);
@@ -150,7 +150,7 @@ float Cvar_VariableValue(const char *var_name);
 int Cvar_VariableIntegerValue(const char *var_name);
 // returns 0 if not defined or non numeric
 
-const char *Cvar_VariableString(const char *var_name);
+extern "C" const char *Cvar_VariableString(const char *var_name);
 void Cvar_VariableStringBuffer(const char *var_name, char *buffer, int bufsize);
 // returns an empty string if not defined
 

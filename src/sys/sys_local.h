@@ -40,6 +40,11 @@ void CON_Init( void );
 char *CON_Input( void );
 void CON_Print( const char *message );
 
+#if EMSCRIPTEN
+extern "C" bool CON_IsTTY();
+extern "C" void CON_SetIsTTY(bool isTTY);
+#endif
+
 unsigned int CON_LogSize( void );
 unsigned int CON_LogWrite( const char *in );
 unsigned int CON_LogRead( char *out, unsigned int outSize );

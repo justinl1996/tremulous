@@ -958,7 +958,7 @@ int Z_AvailableMemory( void )
 Z_Free
 ========================
 */
-void Z_Free( void *ptr )
+extern "C" void Z_Free( void *ptr )
 {
     memblock_t *block, *other;
     memzone_t *zone;
@@ -1175,12 +1175,12 @@ void *Z_Malloc( int size )
 }
 
 #ifdef ZONE_DEBUG
-void *S_MallocDebug( int size, const char *label, const char *file, int line )
+extern "C" void *S_MallocDebug( int size, const char *label, const char *file, int line )
 {
     return Z_TagMallocDebug( size, TAG_SMALL, label, file, line );
 }
 #else
-void *S_Malloc( int size )
+extern "C" void *S_Malloc( int size )
 {
     return Z_TagMalloc( size, TAG_SMALL );
 }
@@ -3890,3 +3890,63 @@ void* Com_Bucket_Select_A_Random_Item(unsigned int bucket_handle) {
 void Com_Bucket_Select_A_Specific_Item(unsigned int bucket_handle, void* item) {
     Q_Bucket_Select_A_Specific_Item(bucket_handle, item);
 }
+
+#if EMSCRIPTEN
+/*
+===================
+Com_ProxyCallback
+
+If a callback function is passed to our JS layer and its invocation
+is deferred (e.g. it's called as the result of a setTimeout), there
+will be no stack to unwind to if a longjmp is called. For this reason,
+callbacks passed to the JS layer should be proxied through this when
+invoked.
+===================
+*/
+extern "C" void Com_ProxyCallback(cb_context_t *context) {
+	int jmpval;
+
+	jmpval = setjmp(abortframe);
+	if (jmpval) {
+		return;
+	}
+    context->cb(context, 0);
+}
+
+
+/*
+==================
+Com_GetCDN
+==================
+*/
+extern "C" const char *Com_GetCDN(void) {
+#ifndef DEDICATED
+	const char *cdn = CL_GetCDN();
+
+	if (strlen(cdn)) {
+		return cdn;
+	}
+#endif
+
+	return Cvar_VariableString("fs_cdn");
+}
+
+/*
+==================
+Com_GetManifest
+==================
+*/
+extern "C" const char *Com_GetManifest(void) {
+#ifndef DEDICATED
+	const char *manifest = CL_GetManifest();
+
+	if (strlen(manifest)) {
+		return manifest;
+	}
+#endif
+
+	return Cvar_VariableString("fs_manifest");
+}
+
+
+#endif

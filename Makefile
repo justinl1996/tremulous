@@ -5,6 +5,7 @@
 #
 COMPILE_PLATFORM=$(shell uname | sed -e 's/_.*//' | tr '[:upper:]' '[:lower:]' | sed -e 's/\//_/g')
 COMPILE_ARCH=$(shell uname -m | sed -e 's/i.86/x86/' | sed -e 's/^arm.*/arm/')
+EMSCRIPTEN=/home/justin/coding/emsdk/upstream/emscripten
 
 ifeq ($(COMPILE_PLATFORM),sunos)
   # Solaris uname and GNU uname differ
@@ -751,7 +752,7 @@ else
 
 ifeq ($(PLATFORM),js)
   CC=$(EMSCRIPTEN)/emcc
-  CXX=$(EMSCRIPTEN)/emcc
+  CXX=$(EMSCRIPTEN)/em++
   RANLIB=$(EMSCRIPTEN)/emranlib
   ARCH=js
 
@@ -786,7 +787,7 @@ ifeq ($(PLATFORM),js)
     -s LEGACY_GL_EMULATION=1 \
     -s RESERVED_FUNCTION_POINTERS=1 \
     -s TOTAL_MEMORY=234881024 \
-    -s EXPORT_NAME=\"ioq3\" \
+    -s EXPORT_NAME=\"tremulous\" \
     $(OPTIMIZE)
 
   SERVER_LDFLAGS += --js-library $(LIBSYSCOMMON) \
@@ -797,7 +798,7 @@ ifeq ($(PLATFORM),js)
     -s LEGACY_GL_EMULATION=1 \
     -s RESERVED_FUNCTION_POINTERS=1 \
     -s TOTAL_MEMORY=234881024 \
-    -s EXPORT_NAME=\"ioq3ded\" \
+    -s EXPORT_NAME=\"tremded\" \
     $(OPTIMIZE)
 
   SHLIBEXT=js
@@ -812,6 +813,7 @@ ifeq ($(PLATFORM),js)
   CLIENT_LIBS += -lidbfs.js
   SHLIBCFLAGS=-fPIC
 
+  BINEXT=.js
 else # ifeq freebsd
 
 #############################################################################
@@ -1281,6 +1283,12 @@ endif
 	@echo ""
 	@echo "  LDFLAGS:"
 	$(call print_wrapped, $(LDFLAGS))
+	@echo ""
+	@echo "  CLIENT_LDFLAGS:"
+	$(call print_wrapped, $(CLIENT_LDFLAGS))
+	@echo ""
+	@echo "  SERVER_LDFLAGS:"
+	$(call print_wrapped, $(SERVER_LDFLAGS))
 	@echo ""
 	@echo "  LIBS:"
 	$(call print_wrapped, $(LIBS))
@@ -2475,9 +2483,9 @@ ifeq ($(PLATFORM),darwin)
     $(B)/ded/sys_osx.o
 endif
 
-$(B)/$(SERVERBIN)$(FULLBINEXT): $(Q3DOBJ)
-	$(echo_cmd) "LD $@"
-	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(Q3DOBJ) -v $(LIBS)
+$(B)/$(SERVERBIN)$(FULLBINEXT): $(Q3DOBJ) $(LIBSYSCOMMON) $(LIBSYSNODE) $(LIBVMJS)
+	$(echo_cmd) "LD $@" 
+	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) $(SERVER_LDFLAGS) -o $@ $(Q3DOBJ) -v $(LIBS)
 
 #############################################################################
 ## TREMULOUS CGAME
