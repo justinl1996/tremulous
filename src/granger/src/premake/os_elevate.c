@@ -166,7 +166,7 @@ static int do_elevate(lua_State *L)
 }
 #endif
 
-#if defined(PLATFORM_LINUX) || defined(PLATFORM_BSD)
+#if defined(PLATFORM_LINUX) || defined(PLATFORM_BSD) || defined(PLATFORM_JS)
 static int do_elevate(lua_State *L)
 {
 	char *pkexec, *display;

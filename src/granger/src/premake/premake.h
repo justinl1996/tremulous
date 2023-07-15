@@ -27,6 +27,9 @@
 #elif defined(__HAIKU__)
 #define PLATFORM_HAIKU    (1)
 #define PLATFORM_STRING   "haiku"
+#elif defined(__EMSCRIPTEN__)
+#define PLATFORM_JS       (1)
+#define PLATFORM_STRING   "js"
 #else
 #define PLATFORM_WINDOWS  (1)
 #define PLATFORM_STRING   "windows"

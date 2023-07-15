@@ -750,6 +750,10 @@ ifeq ($(PLATFORM),freebsd)
   endif
 else
 
+#############################################################################
+# SETUP AND BUILD -- EMSCRIPTEN
+#############################################################################
+
 ifeq ($(PLATFORM),js)
   CC=$(EMSCRIPTEN)/emcc
   CXX=$(EMSCRIPTEN)/em++
@@ -762,6 +766,7 @@ ifeq ($(PLATFORM),js)
   OPTIMIZE = $(OPTIMIZEVM)
 
   BUILD_STANDALONE=1
+  BUILD_RENDERER_OPENGL2 = 1
 
   HAVE_VM_COMPILED=true
 
@@ -868,7 +873,9 @@ ifneq ($(BUILD_CLIENT),0)
   else
     TARGETS += $(B)/$(CLIENTBIN)$(FULLBINEXT)
     ifneq ($(BUILD_RENDERER_OPENGL2),0)
-      TARGETS += $(B)/$(CLIENTBIN)_opengl2$(FULLBINEXT)
+      ifneq ($(PLATFORM), js)
+        TARGETS += $(B)/$(CLIENTBIN)_opengl2$(FULLBINEXT)
+      endif
     endif
   endif
 endif
@@ -2369,7 +2376,10 @@ $(B)/$(CLIENTBIN)$(FULLBINEXT): $(Q3OBJ) $(Q3ROBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIB
 		-o $@ $(Q3OBJ) $(Q3ROBJ) $(JPGOBJ) \
 		$(LIBSDLMAIN) $(CLIENT_LIBS) $(RENDERER_LIBS) $(LIBS)
 else
-$(B)/$(CLIENTBIN)$(FULLBINEXT): $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIBSYSCOMMON) $(LIBSYSBROWSER) $(LIBVMJS)
+ifneq ($(PLATFORM), js)
+  SUFFIX=_opengl2
+endif
+$(B)/$(CLIENTBIN)${SUFFIX}$(FULLBINEXT): $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIBSYSCOMMON) $(LIBSYSBROWSER) $(LIBVMJS)
 	$(echo_cmd) "LD $@"
 	$(Q)$(CXX) -std=c++1y $(CXXFLAGS) $(CLIENT_CFLAGS) $(CFLAGS) $(CLIENT_LDFLAGS) $(LDFLAGS) \
 		-o $@ $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) \
