@@ -276,14 +276,14 @@ var LibrarySys = {
 	},
 	Sys_GLimpSafeInit: function () {
 	},
-	Sys_FS_Startup__deps: ['$Browser', '$FS', '$IDBFS', '$SYSC'],
-	Sys_FS_Startup: function (context) {
-		var name = allocate(intArrayFromString('fs_homepath'), 'i8', ALLOC_STACK);
-		var fs_homepath = Pointer_stringify(_Cvar_VariableString(name));
-
+	Sys_FS_Startup__deps: ['$Browser', '$FS', '$IDBFS', '$SYSC', '$ERRNO_CODES'],
+	Sys_FS_Startup: function () {
+		var name = Module.allocate(intArrayFromString('fs_homepath'), 'i8', Module.ALLOC_STACK);
+		var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(name));
 		// mount a persistable filesystem into base
 		var dir;
 		try {
+			// will fail if any directory in the path does not exist
 			dir = FS.mkdir(fs_homepath);
 		} catch (e) {
 			if (!(e instanceof FS.ErrnoError) || e.errno !== ERRNO_CODES.EEXIST) {
@@ -300,23 +300,23 @@ var LibrarySys = {
 		}
 
 		var start = Date.now();
-
 		FS.syncfs(true, function (err) {
 			if (err) {
+				console.log("sync error", err)
 				return SYSC.Error('fatal', err.message);
 			}
 
 			SYSC.Print('initial sync completed in ' + ((Date.now() - start) / 1000).toFixed(2) + ' seconds');
 
-			SYSC.FS_Startup(Browser.safeCallback(function (err) {
+			SYSC.FS_Startup(function (err) {
 				if (err) {
 					// FIXME cb_free_context(context)
 					SYSC.Error('fatal', err);
 					return;
 				}
-
-				SYSC.ProxyCallback(context);
-			}));
+				//No need to invoke callback because there is none
+				//SYSC.ProxyCallback(context);
+			});
 		});
 	},
 	Sys_FS_Shutdown__deps: ['$Browser', '$FS', '$SYSC'],

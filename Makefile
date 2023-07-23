@@ -762,7 +762,7 @@ ifeq ($(PLATFORM),js)
 
 # debug optimize flags: --closure 0 --minify 0 -g
 
-  OPTIMIZEVM += -O2
+  OPTIMIZEVM += -O1
   OPTIMIZE = $(OPTIMIZEVM)
 
   BUILD_STANDALONE=1
@@ -789,6 +789,8 @@ ifeq ($(PLATFORM),js)
     --js-library $(LIBVMJS) \
     -s INVOKE_RUN=0 \
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_VM_GetCurrent', '_VM_SetCurrent']" \
+    -s EXPORTED_RUNTIME_METHODS="['allocate', 'UTF8ToString', 'stringToUTF8']" \
+    -s DEFAULT_LIBRARY_FUNCS_TO_INCLUDE="['\$$ERRNO_CODES']" \
     -s LEGACY_GL_EMULATION=1 \
     -s RESERVED_FUNCTION_POINTERS=1 \
     -s TOTAL_MEMORY=234881024 \
@@ -814,7 +816,7 @@ ifeq ($(PLATFORM),js)
     -s SIDE_MODULE=1 \
     $(OPTIMIZE)
 
-  CLIENT_CFLAGS += -s USE_SDL=2
+  CLIENT_CFLAGS += -s USE_SDL=2 -sWASM=0
   CLIENT_LIBS += -lidbfs.js
   SHLIBCFLAGS=-fPIC
 
@@ -2381,7 +2383,7 @@ ifneq ($(PLATFORM), js)
 endif
 $(B)/$(CLIENTBIN)${SUFFIX}$(FULLBINEXT): $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIBSYSCOMMON) $(LIBSYSBROWSER) $(LIBVMJS)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CXX) -std=c++1y $(CXXFLAGS) $(CLIENT_CFLAGS) $(CFLAGS) $(CLIENT_LDFLAGS) $(LDFLAGS) \
+	$(Q)$(CXX) -std=c++1y $(CXXFLAGS) $(CLIENT_CFLAGS) $(CFLAGS) $(CLIENT_LDFLAGS) $(LDFLAGS) --emrun \
 		-o $@ $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) \
 		$(LIBSDLMAIN) $(CLIENT_LIBS) $(RENDERER_LIBS) $(LIBS)
 endif

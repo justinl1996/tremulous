@@ -56,6 +56,10 @@ using namespace std;
 #define MAX_SEARCH_PATHS 4096
 #define MAX_FILEHASH_SIZE 1024
 
+#if EMSCRIPTEN
+extern "C" void Sys_FS_Startup();
+#endif
+
 static bool FS_IsDemoExt(const char *filename);
 static bool FS_IsExt(const char *filename, const char *ext, int namelen);
 
@@ -111,6 +115,12 @@ static cvar_t *fs_basegame;
 static cvar_t *fs_apppath;  // Also search the .app bundle for .pk3 files
 #endif
 static cvar_t *fs_gamedirvar;
+
+#if EMSCRIPTEN
+static cvar_t *fs_cdn;
+static cvar_t *fs_manifest;
+static cvar_t *fs_completeManifest;
+#endif
 
 static searchpath_t *fs_searchpaths;
 static int fs_readCount;  // total bytes read
@@ -3336,6 +3346,13 @@ static void FS_Startup(const char *gameName)
     fs_packFiles = 0;
 
     fs_debug = Cvar_Get("fs_debug", "0", 0);
+
+#if EMSCRIPTEN
+	fs_cdn = Cvar_Get("fs_cdn", "test.com", CVAR_INIT | CVAR_SERVERINFO);
+	fs_manifest = Cvar_Get("fs_manifest", "", CVAR_ROM | CVAR_SERVERINFO);
+	fs_completeManifest = Cvar_Get("fs_completeManifest", "", CVAR_ROM);
+#endif
+
     fs_basepath = Cvar_Get("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT | CVAR_PROTECTED);
     fs_basegame = Cvar_Get("fs_basegame", BASEGAME, CVAR_INIT);
 
@@ -3347,7 +3364,9 @@ static void FS_Startup(const char *gameName)
 
     fs_homepath = Cvar_Get("fs_homepath", homePath, CVAR_INIT | CVAR_PROTECTED);
     fs_gamedirvar = Cvar_Get("fs_game", BASEGAME, CVAR_INIT | CVAR_SYSTEMINFO);
-
+#if EMSCRIPTEN
+    Sys_FS_Startup();
+#endif
 #ifdef DEDICATED
     // add search path elements in reverse priority order
     if (fs_basepath->string[0])
@@ -3426,7 +3445,6 @@ static void FS_Startup(const char *gameName)
         FS_CreatePath(fs_homepath->string);
         FS_AddGameDirectory(fs_homepath->string, gameName);
     }
-
     // add search path elements in reverse priority order
     if (fs_basepath->string[0])
     {

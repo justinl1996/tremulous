@@ -95,7 +95,7 @@ var LibrarySys = {
 	Sys_PlatformExit: function () {
 	},
 	Sys_FS_Startup__deps: ['$Browser', '$FS', '$PATH', '$SYSC'],
-	Sys_FS_Startup: function (context) {
+	Sys_FS_Startup: function () {
 		// mount a persistable fs into base if not already mounted
 		var name = allocate(intArrayFromString('fs_homepath'), 'i8', ALLOC_STACK);
 		var fs_homepath = Pointer_stringify(_Cvar_VariableString(name));
@@ -155,7 +155,7 @@ var LibrarySys = {
 				return;
 			}
 
-			SYSC.ProxyCallback(context);
+			//SYSC.ProxyCallback(context);
 		}));
 	},
 	Sys_FS_Shutdown__deps: ['$Browser', '$SYSC'],

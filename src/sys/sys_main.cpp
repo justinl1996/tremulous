@@ -42,6 +42,9 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <cstring>
 #include <cstring>
 #include <iostream>
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
 
 #include "lua.hpp"
 #include "sol.hpp"
@@ -724,6 +727,7 @@ main
 */
 int main( int argc, char **argv )
 {
+
 #ifndef DEDICATED
     SDLVersionCheck();
 #endif
@@ -804,6 +808,5 @@ int main( int argc, char **argv )
             Com_Printf(S_COLOR_YELLOW "%s\n", e.what());
         }
     }
-
     return 0;
 }
