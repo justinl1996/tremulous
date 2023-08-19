@@ -3939,12 +3939,10 @@ Com_GetManifest
 extern "C" const char *Com_GetManifest(void) {
 #ifndef DEDICATED
 	const char *manifest = CL_GetManifest();
-
 	if (strlen(manifest)) {
 		return manifest;
 	}
 #endif
-
 	return Cvar_VariableString("fs_manifest");
 }
 

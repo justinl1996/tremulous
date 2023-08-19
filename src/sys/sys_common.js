@@ -84,29 +84,6 @@ var LibrarySysCommon = {
 			'7.         U.S. Government Restricted Rights. To the extent applicable, the United States Government shall only have those rights to use the Software as expressly stated and expressly limited and restricted in this Agreement, as provided in 48 C.F.R. §§ 227.7201 through 227.7204, inclusive.\n\n\n\n' +
 			'8.         General Provisions.  Neither this Agreement nor any part or portion hereof shall be assigned or sublicensed by you.  ID may assign its rights under this Agreement in ID\'s sole discretion.  Should any provision of this Agreement be held to be void, invalid, unenforceable or illegal by a court of competent jurisdiction, the validity and enforceability of the other provisions shall not be affected thereby.  If any provision is determined to be unenforceable by a court of competent jurisdiction, you agree to a modification of such provision to provide for enforcement of the provision\'s intent, to the extent permitted by applicable law. Failure of ID to enforce any provision of this Agreement shall not constitute or be construed as a waiver of such provision or of the right to enforce such provision.  Immediately upon your failure to comply with or breach of any term or provision of this Agreement, THIS AGREEMENT AND YOUR LICENSE SHALL AUTOMATICALLY TERMINATE, WITHOUT NOTICE, AND ID MAY PURSUE ALL RELIEF AND REMEDIES AGAINST YOU WHICH ARE AVAILABLE UNDER APPLICABLE LAW AND/OR THIS AGREEMENT.   In the event this Agreement is terminated, you shall have no right to use the Software, in any manner, and you shall immediately destroy all copies of the Software in your possession, custody or control.\n\n\n\n' +
 			'YOU ACKNOWLEDGE THAT YOU HAVE READ THIS AGREEMENT, YOU UNDERSTAND THIS AGREEMENT, AND UNDERSTAND THAT BY CONTINUING THE INSTALLATION OF THE SOFTWARE, BY LOADING OR RUNNING THE SOFTWARE, OR BY PLACING OR COPYING THE SOFTWARE ONTO YOUR COMPUTER HARD DRIVE OR RAM, YOU AGREE TO BE BOUND BY THE TERMS AND CONDITIONS OF THIS AGREEMENT.  YOU FURTHER AGREE THAT, EXCEPT FOR WRITTEN SEPARATE AGREEMENTS BETWEEN ID AND YOU, THIS AGREEMENT IS A COMPLETE AND EXCLUSIVE STATEMENT OF THE RIGHTS AND LIABILITIES OF THE PARTIES HERETO.  THIS AGREEMENT SUPERSEDES ALL PRIOR ORAL AGREEMENTS, PROPOSALS OR UNDERSTANDINGS, AND ANY OTHER COMMUNICATIONS BETWEEN ID AND YOU RELATING TO THE SUBJECT MATTER OF THIS AGREEMENT.',
-		installers: [
-			{
-				name: 'linuxq3ademo-1.11-6.x86.gz.sh',
-				offset: 5468,
-				paks: [
-					{ src: 'demoq3/pak0.pk3', dest: 'baseq3/pak0.pk3', checksum: 2483777038 }
-				]
-			},
-			{
-				name: 'linuxq3apoint-1.32b-3.x86.run',
-				offset: 8251,
-				paks: [
-					{ src: 'baseq3/pak1.pk3', dest: 'baseq3/pak1.pk3', checksum: 1635885364 },
-					{ src: 'baseq3/pak2.pk3', dest: 'baseq3/pak2.pk3', checksum: 2142044321 },
-					{ src: 'baseq3/pak3.pk3', dest: 'baseq3/pak3.pk3', checksum: 682311620 },
-					{ src: 'baseq3/pak4.pk3', dest: 'baseq3/pak4.pk3', checksum: 4113726565 },
-					{ src: 'baseq3/pak5.pk3', dest: 'baseq3/pak5.pk3', checksum: 590466266 },
-					{ src: 'baseq3/pak6.pk3', dest: 'baseq3/pak6.pk3', checksum: 231612509 },
-					{ src: 'baseq3/pak7.pk3', dest: 'baseq3/pak7.pk3', checksum: 3663817674 },
-					{ src: 'baseq3/pak8.pk3', dest: 'baseq3/pak8.pk3', checksum: 136401958 }
-				]
-			}
-		],
 		manifest: null,
 		Print: function (str) {
 			str = allocate(intArrayFromString(str + '\n'), 'i8', ALLOC_STACK);
@@ -152,7 +129,7 @@ var LibrarySysCommon = {
 			var start = Date.now();
 
 			try {
-				var slab = {{{ getHeapForType('i8') }}};
+				var slab = { getHeapForType('i8') };
 				var n = 0;
 				var pos = 0;
 				var stream = FS.open(path, 'r', 0666);
@@ -173,15 +150,14 @@ var LibrarySysCommon = {
 			return CRC32.Finish(crc);
 		},
 		GetCDN: function () {
-			return Pointer_stringify(_Com_GetCDN());
+			return Module.UTF8ToString(_Com_GetCDN());
 		},
 		GetManifest: function () {
-			var manifest = Pointer_stringify(_Com_GetManifest());
-
+			var manifest = Module.UTF8ToString(Module._Com_GetManifest());
 			if (!manifest) {
 				return [];
 			}
-
+			
 			return manifest.split(' ').map(function (entry) {
 				var split = entry.split('@');
 
@@ -196,7 +172,7 @@ var LibrarySysCommon = {
 			var root = SYSC.GetCDN();
 			var name = asset.name.replace(/(.+\/|)(.+?)$/, '$1' + asset.checksum + '-$2');
 			var url = 'http://' + root + '/assets/' + name;
-
+			
 			SYS.DoXHR(url, {
 				dataType: 'arraybuffer',
 				onprogress: onprogress,
@@ -243,56 +219,46 @@ var LibrarySysCommon = {
 			nextDownload();
 		},
 		UpdateManifest: function (callback) {
-			var fs_cdn = Pointer_stringify(_Cvar_VariableString(allocate(intArrayFromString('fs_cdn'), 'i8', ALLOC_STACK)));
-			var fs_game = Pointer_stringify(_Cvar_VariableString(allocate(intArrayFromString('fs_game'), 'i8', ALLOC_STACK)));
-			var com_basegame = Pointer_stringify(_Cvar_VariableString(allocate(intArrayFromString('com_basegame'), 'i8', ALLOC_STACK)));
-			var mapname = Pointer_stringify(_Cvar_VariableString(allocate(intArrayFromString('mapname'), 'i8', ALLOC_STACK)));
-			var url = 'http://' + fs_cdn + '/assets/manifest.json';
-
-			function isInstaller(name) {
-				return SYSC.installers.some(function (installer) {
-					return installer.name === name;
-				});
-			}
-
-			function isCommon(name) {
-				var basepakRx = RegExp('(' + com_basegame + (fs_game ? '|' + fs_game : '') + ')\/pak.+\.pk3$');
-				return name.match(basepakRx);
-			}
+			var fs_cdn = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_cdn'), 'i8', ALLOC_STACK)));
+			var fs_game = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_game'), 'i8', ALLOC_STACK)));
+			var com_basegame = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('com_basegame'), 'i8', ALLOC_STACK)));
+			var mapname = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('mapname'), 'i8', ALLOC_STACK)));
+			//var url = 'http://' + fs_cdn + '/assets/manifest.json';
+			var url = "http://localhost:5000/get_manifest"
 
 			function isMapPak(name) {
 				return PATH.basename(name) === (mapname + '.pk3');
 			}
 
 			function activePaks(entry) {
-				return isInstaller(entry.name) || isCommon(entry.name) || isMapPak(entry.name);
+				return isCommon(entry.name) || isMapPak(entry.name);
 			}
 
 			function formatManifestString(manifest) {
 				return manifest.map(function (entry) {
-					return entry.name + '@' + entry.checksum + '@' + entry.compressed;
+					return entry.name + '@' + entry.checksum + '@' + entry.size;
 				}).join(' ');
 			}
 
 			SYS.DoXHR(url, {
 				dataType: 'json',
-				onload: function (err, manifest) {
+				onload: function (err, data) {
+					manifest = data['result'];
 					if (err) return callback(new Error('Failed to download and parse manifest, ' + err.message));
-
 					var fs_manifestName = allocate(intArrayFromString('fs_manifest'), 'i8', ALLOC_STACK);
-					var fs_manifest = allocate(intArrayFromString(formatManifestString(manifest.filter(activePaks))), 'i8', ALLOC_STACK);
+					var fs_manifest = allocate(intArrayFromString(formatManifestString(manifest), 'i8', ALLOC_STACK));
 					_Cvar_Set(fs_manifestName, fs_manifest);
 
 					var fs_completeManifestName = allocate(intArrayFromString('fs_completeManifest'), 'i8', ALLOC_STACK);
 					var fs_completeManifest = allocate(intArrayFromString(formatManifestString(manifest)), 'i8', ALLOC_STACK);
 					_Cvar_Set(fs_completeManifestName, fs_completeManifest);
-
+					
 					return callback();
 				}
 			});
 		},
 		SavePak: function (name, buffer, callback) {
-			var fs_homepath = Pointer_stringify(_Cvar_VariableString(allocate(intArrayFromString('fs_homepath'), 'i8', ALLOC_STACK)));
+			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(allocate(intArrayFromString('fs_homepath'), 'i8', ALLOC_STACK)));
 			var localPath = PATH.join(fs_homepath, name);
 
 			try {
@@ -306,50 +272,6 @@ var LibrarySysCommon = {
 			FS.writeFile(localPath, new Uint8Array(buffer), { encoding: 'binary', flags: 'w', canOwn: true });
 
 			FS.syncfs(callback);
-		},
-		ValidateInstaller: function (installer) {
-			var fs_homepath = Pointer_stringify(_Cvar_VariableString(allocate(intArrayFromString('fs_homepath'), 'i8', ALLOC_STACK)));
-
-			for (var i = 0; i < installer.paks.length; i++) {
-				var pak = installer.paks[i];
-				var localPath = PATH.join(fs_homepath, pak.dest);
-				var crc = SYSC.CRC32File(localPath);
-
-				if (crc !== pak.checksum) {
-					return false;
-				}
-			}
-
-			return true;
-		},
-		DirtyInstallers: function () {
-			var installers = [];
-			var assets = SYSC.GetManifest();
-
-			for (var i = 0; i < SYSC.installers.length; i++) {
-				var installer = SYSC.installers[i];
-
-				var asset;
-				for (var j = 0; j < assets.length; j++) {
-					if (assets[j].name === installer.name) {
-						asset = assets[j];
-						break;
-					}
-				}
-
-				if (!asset) {
-					return callback(new Error('Failed to find "' + installer.name + '" in manifest'));
-				}
-
-				if (!SYSC.ValidateInstaller(installer)) {
-					// append the installer info to the asset
-					asset.installer = installer;
-
-					installers.push(asset);
-				}
-			}
-
-			return installers;
 		},
 		ExtractInstaller: function (data, paks, callback) {
 			var gunzip = new Zlib.Gunzip(data);
@@ -380,16 +302,15 @@ var LibrarySysCommon = {
 			nextEntry();
 		},
 		SyncInstallers: function (callback) {
-			var downloads = SYSC.DirtyInstallers();
-
-			if (!downloads.length) {
+			var manifest = SYSC.GetManifest();
+			if (!manifest.length) {
 				return callback();
 			}
 
 			SYS.PromptEULA(function (err) {
 				if (err) return callback(err);
 
-				SYSC.DownloadAssets(downloads, function (asset) {
+				SYSC.DownloadAssets(manifest, function (asset) {
 					SYS.LoadingDescription('loading ' + asset.name);
 				}, function (loaded, total) {
 					SYS.LoadingProgress(loaded / total);
@@ -405,7 +326,7 @@ var LibrarySysCommon = {
 			});
 		},
 		ValidatePak: function (asset) {
-			var fs_homepath = Pointer_stringify(_Cvar_VariableString(allocate(intArrayFromString('fs_homepath'), 'i8', ALLOC_STACK)));
+			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(allocate(intArrayFromString('fs_homepath'), 'i8', ALLOC_STACK)));
 			var localPath = PATH.join(fs_homepath, asset.name);
 			var crc = SYSC.CRC32File(localPath);
 
@@ -462,14 +383,14 @@ var LibrarySysCommon = {
 	},
 	Sys_Basename__deps: ['$PATH'],
 	Sys_Basename: function (path) {
-		path = Pointer_stringify(path);
+		path = Module.UTF8ToString(path);
 		path = PATH.basename(path);
 		var basename = allocate(intArrayFromString(path), 'i8', ALLOC_STACK);
 		return basename;
 	},
 	Sys_Dirname__deps: ['$PATH'],
 	Sys_Dirname: function (path) {
-		path = Pointer_stringify(path);
+		path = Module.UTF8ToString(path);
 		path = PATH.dirname(path);
 		var dirname = allocate(intArrayFromString(path), 'i8', ALLOC_STACK);
 		return dirname;
@@ -479,8 +400,8 @@ var LibrarySysCommon = {
 	},
 	Sys_ListFiles__deps: ['$PATH', 'Z_Malloc', 'S_Malloc'],
 	Sys_ListFiles: function (directory, ext, filter, numfiles, dironly) {
-		directory = Pointer_stringify(directory);
-		ext = Pointer_stringify(ext);
+		directory = Module.UTF8ToString(directory);
+		ext = Module.UTF8ToString(ext);
 		if (ext === '/') {
 			ext = null;
 			dironly = true;
@@ -542,7 +463,7 @@ var LibrarySysCommon = {
 
 		var ptr;
 
-		for (var i = 0; (ptr = {{{ makeGetValue('list', 'i*4', 'i32') }}}); i++) {
+		for (var i = 0; (ptr = { makeGetValue('list', 'i*4', 'i32') }); i++) {
 			_Z_Free(ptr);
 		}
 
@@ -552,7 +473,7 @@ var LibrarySysCommon = {
 		return _fopen(ospath, mode);
 	},
 	Sys_Mkdir: function (directory) {
-		directory = Pointer_stringify(directory);
+		directory = Module.UTF8ToString(directory);
 		try {
 			FS.mkdir(directory, 0777);
 		} catch (e) {
@@ -570,8 +491,8 @@ var LibrarySysCommon = {
 	Sys_Sleep: function () {
 	},
 	Sys_SetEnv: function (name, value) {
-		name = Pointer_stringify(name);
-		value = Pointer_stringify(value);
+		name = Module.UTF8ToString(name);
+		value = Module.UTF8ToString(value);
 	},
 	Sys_PID: function () {
 		return 0;

@@ -126,26 +126,25 @@ var LibrarySys = {
 			if (!url) {
 				return opts.onload(new Error('Must provide a URL'));
 			}
-
 			var req = new XMLHttpRequest();
-			req.open('GET', url, true);
-			if (opts.dataType &&
+			req.open('GET', url);
+			/*if (opts.dataType &&
 				// responseType json not implemented in webkit, we'll do it manually later on
 				opts.dataType !== 'json') {
 				req.responseType = opts.dataType;
-			}
+			}*/
+			req.responseType = 'json';
 			req.onprogress = function (ev) {
 				if (opts.onprogress) {
 					opts.onprogress(ev.loaded, ev.total);
 				}
 			};
-			req.onload = function () {
+			req.onload = function (ev) {
 				var err = null;
 				var data = req.response;
-
 				if (!(req.status >= 200 && req.status < 300 || req.status === 304)) {
 					err = new Error('Couldn\'t load ' + url + '. Status: ' + req.statusCode);
-				} else {
+				} /*else {
 					// manually parse out a request expecting a JSON response
 					if (opts.dataType === 'json') {
 						try {
@@ -154,7 +153,7 @@ var LibrarySys = {
 							err = e;
 						}
 					}
-				}
+				}*/
 
 				if (opts.onload) {
 					opts.onload(err, data);
@@ -298,7 +297,7 @@ var LibrarySys = {
 				SYSC.Error('fatal', e.message);
 			}
 		}
-
+		
 		var start = Date.now();
 		FS.syncfs(true, function (err) {
 			if (err) {
@@ -307,16 +306,15 @@ var LibrarySys = {
 			}
 
 			SYSC.Print('initial sync completed in ' + ((Date.now() - start) / 1000).toFixed(2) + ' seconds');
-
-			SYSC.FS_Startup(function (err) {
-				if (err) {
-					// FIXME cb_free_context(context)
-					SYSC.Error('fatal', err);
-					return;
-				}
-				//No need to invoke callback because there is none
-				//SYSC.ProxyCallback(context);
-			});
+		});
+		SYSC.FS_Startup(function (err) {
+			if (err) {
+				// FIXME cb_free_context(context)
+				SYSC.Error('fatal', err);
+				return;
+			}
+			//No need to invoke callback because there is none
+			//SYSC.ProxyCallback(context);
 		});
 	},
 	Sys_FS_Shutdown__deps: ['$Browser', '$FS', '$SYSC'],
