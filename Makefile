@@ -5,6 +5,7 @@
 #
 COMPILE_PLATFORM=$(shell uname | sed -e 's/_.*//' | tr '[:upper:]' '[:lower:]' | sed -e 's/\//_/g')
 COMPILE_ARCH=$(shell uname -m | sed -e 's/i.86/x86/' | sed -e 's/^arm.*/arm/')
+EMSCRIPTEN=/home/justin/coding/emsdk/upstream/emscripten
 
 ifeq ($(COMPILE_PLATFORM),sunos)
   # Solaris uname and GNU uname differ
@@ -750,6 +751,79 @@ ifeq ($(PLATFORM),freebsd)
 else # ifeq freebsd
 
 #############################################################################
+# SETUP AND BUILD -- JS
+#############################################################################
+
+ifeq ($(PLATFORM),js)
+  CC=$(EMSCRIPTEN)/emcc
+  RANLIB=$(EMSCRIPTEN)/emranlib
+  ARCH=js
+
+# debug optimize flags: --closure 0 --minify 0 -g
+
+  OPTIMIZEVM += -O0 -g
+  OPTIMIZE = $(OPTIMIZEVM)
+
+  BUILD_STANDALONE=1
+
+  HAVE_VM_COMPILED=false
+
+  USE_CURL=0
+  USE_CODEC_VORBIS=0
+  USE_CODEC_OPUS=1
+  USE_MUMBLE=0
+  USE_VOIP=0
+  USE_OPENAL_DLOPEN=0
+  USE_RENDERER_DLOPEN=0
+  USE_LOCAL_HEADERS=0
+
+  LIBSYSCOMMON=$(SYSDIR)/sys_common.js
+  LIBSYSBROWSER=$(SYSDIR)/sys_browser.js
+  LIBSYSNODE=$(SYSDIR)/sys_node.js
+  LIBVMJS=$(CMDIR)/vm_js.js
+
+  CLIENT_LDFLAGS += --js-library $(LIBSYSCOMMON) \
+    --js-library $(LIBSYSBROWSER) \
+    --js-library $(LIBVMJS) \
+    -s INVOKE_RUN=0 \
+    -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_VM_GetCurrent', '_VM_SetCurrent']" \
+    -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
+    -s LEGACY_GL_EMULATION=1 \
+    -s ASSERTIONS=1 \
+    -s GL_ENABLE_GET_PROC_ADDRESS \
+    -s RESERVED_FUNCTION_POINTERS=1 \
+    -s STACK_SIZE=268435456 \
+    -s TOTAL_MEMORY=805306368 \
+    -s ALLOW_MEMORY_GROWTH=1 \
+    -s EXPORT_NAME=\"ioq3\" \
+    $(OPTIMIZE)
+
+  SERVER_LDFLAGS += --js-library $(LIBSYSCOMMON) \
+    --js-library $(LIBSYSNODE) \
+    --js-library $(LIBVMJS) \
+    -s INVOKE_RUN=1 \
+    -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_CON_SetIsTTY', '_VM_GetCurrent', '_VM_SetCurrent']" \
+    -s LEGACY_GL_EMULATION=1 \
+    -s RESERVED_FUNCTION_POINTERS=1 \
+    -s TOTAL_MEMORY=234881024 \
+    -s EXPORT_NAME=\"ioq3ded\" \
+    $(OPTIMIZE)
+
+  SHLIBEXT=js
+  SHLIBNAME=.$(SHLIBEXT)
+  SHLIBLDFLAGS=$(LDFLAGS) \
+    -s INVOKE_RUN=0 \
+    -s EXPORTED_FUNCTIONS="['_vmMain', '_dllEntry']" \
+    -s SIDE_MODULE=1 \
+    $(OPTIMIZE)
+
+  CLIENT_CFLAGS += -s USE_SDL=1 -sWASM=0
+  CLIENT_LIBS += -lidbfs.js
+  SHLIBCFLAGS=-fPIC
+
+else # ifeq js
+
+#############################################################################
 # SETUP AND BUILD -- GENERIC
 #############################################################################
   BASE_CFLAGS=
@@ -763,6 +837,7 @@ endif #Linux
 endif #darwin
 endif #MINGW
 endif #FreeBSD
+endif #js
 
 ifndef CC
   CC=gcc
@@ -1191,7 +1266,7 @@ targets: makedirs
 	@echo "  CC: $(CC)"
 	@echo "  CXX: $(CXX)"
 	@echo "  TOOLS_CC $(TOOLS_CC)"
-ifeq ($(PLATFORM),mingw32)
+ifeq (,$(findstring "$(PLATFORM)", "mingw32" "js"))
 	@echo "  WINDRES: $(WINDRES)"
 endif
 	@echo ""
@@ -1215,6 +1290,12 @@ endif
 	@echo ""
 	@echo "  LDFLAGS:"
 	$(call print_wrapped, $(LDFLAGS))
+	@echo ""
+	@echo "  CLIENT_LDFLAGS:"
+	$(call print_wrapped, $(CLIENT_LDFLAGS))
+	@echo ""
+	@echo "  SERVER_LDFLAGS:"
+	$(call print_wrapped, $(SERVER_LDFLAGS))
 	@echo ""
 	@echo "  LIBS:"
 	$(call print_wrapped, $(LIBS))
@@ -1574,7 +1655,7 @@ $(B)/granger.dir/src/%.o: $(GRANGERDIR)/%.cpp
 
 $(B)/granger$(FULLBINEXT): $(GRANGEROBJ)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CC) $(LDFLAGS) -o $@ $(GRANGEROBJ) $(GRANGER_LIBS) 
+	$(Q)$(CXX) $(LDFLAGS) -o $@ $(GRANGEROBJ) $(GRANGER_LIBS) 
 
 ifneq ($(BUILD_GRANGER),0)
 TARGETS += $(B)/granger$(FULLBINEXT)
@@ -2256,8 +2337,10 @@ ifdef MINGW
     $(B)/client/sys_win32.o \
     $(B)/client/sys_win32_default_homepath.o
 else
-  Q3OBJ += \
-    $(B)/client/sys_unix.o
+	ifneq ($(PLATFORM),js)
+		Q3OBJ += \
+			$(B)/client/sys_unix.o
+	endif
 endif
 
 ifeq ($(PLATFORM),darwin)
@@ -2286,18 +2369,22 @@ $(B)/renderer_opengl2$(SHLIBNAME): $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ)
 	$(Q)$(CXX) $(SHLIBLDFLAGS) -o $@ $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) \
 		$(THREAD_LIBS) $(LIBSDLMAIN) $(RENDERER_LIBS) $(LDFLAGS)
 else
-$(B)/$(CLIENTBIN)$(FULLBINEXT): $(Q3OBJ) $(Q3ROBJ) $(JPGOBJ) $(LIBSDLMAIN)
+#ifeq ($(BUILD_RENDERER_OPENGL2), 0)
+$(B)/$(CLIENTBIN)$(FULLBINEXT): $(Q3OBJ) $(Q3ROBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIBSYSCOMMON) $(LIBSYSBROWSER) $(LIBVMJS)
 	$(echo_cmd) "LD $@"
 	$(Q)$(CXX) -std=c++1y $(CXXFLAGS) $(CLIENT_CFLAGS) $(CFLAGS) $(CLIENT_LDFLAGS) $(LDFLAGS) \
 		-o $@ $(Q3OBJ) $(Q3ROBJ) $(JPGOBJ) \
 		$(LIBSDLMAIN) $(CLIENT_LIBS) $(RENDERER_LIBS) $(LIBS)
-
 $(B)/$(CLIENTBIN)_opengl2$(FULLBINEXT): $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) $(LIBSDLMAIN)
+#else
+#$(B)/$(CLIENTBIN)$(FULLBINEXT): $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIBSYSCOMMON) $(LIBSYSBROWSER) $(LIBVMJS)
+
 	$(echo_cmd) "LD $@"
 	$(Q)$(CXX) -std=c++1y $(CXXFLAGS) $(CLIENT_CFLAGS) $(CFLAGS) $(CLIENT_LDFLAGS) $(LDFLAGS) \
 		-o $@ $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) \
 		$(LIBSDLMAIN) $(CLIENT_LIBS) $(RENDERER_LIBS) $(LIBS)
 endif
+#endif
 
 ifneq ($(strip $(LIBSDLMAIN)),)
 ifneq ($(strip $(LIBSDLMAINSRC)),)
@@ -2336,6 +2423,7 @@ Q3DOBJ = \
   $(B)/ded/cvar.o \
   $(B)/ded/files.o \
   $(B)/ded/md4.o \
+	$(B)/ded/md5.o \
   $(B)/ded/msg.o \
   $(B)/ded/net_chan.o \
   $(B)/ded/net_ip.o \
@@ -2400,8 +2488,11 @@ ifdef MINGW
     $(B)/ded/con_win32.o
 else
   Q3DOBJ += \
-    $(B)/ded/sys_unix.o \
     $(B)/ded/con_tty.o
+	ifneq ($(PLATFORM),js)
+		Q3DOBJ += \
+			$(B)/ded/sys_unix.o
+	endif
 endif
 
 ifeq ($(PLATFORM),darwin)
@@ -2409,9 +2500,9 @@ ifeq ($(PLATFORM),darwin)
     $(B)/ded/sys_osx.o
 endif
 
-$(B)/$(SERVERBIN)$(FULLBINEXT): $(Q3DOBJ)
+$(B)/$(SERVERBIN)$(FULLBINEXT): $(Q3DOBJ) $(LIBSYSCOMMON) $(LIBSYSNODE) $(LIBVMJS)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(Q3DOBJ) $(LIBS)
+	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) $(SERVER_LDFLAGS) -o $@ $(Q3DOBJ) -v $(LIBS)
 
 #############################################################################
 ## TREMULOUS CGAME
@@ -2455,9 +2546,9 @@ CGOBJ_ = \
 CGOBJ = $(CGOBJ_) $(B)/$(BASEGAME)/cgame/cg_syscalls.o
 CGVMOBJ = $(CGOBJ_:%.o=%.asm)
 
-$(B)/$(BASEGAME)/cgame$(SHLIBNAME): $(CGOBJ)
+$(B)/$(BASEGAME)/cgame$(SHLIBNAME): $(CGOBJ) $(LIBVM)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CC) $(SHLIBLDFLAGS) $(LDFLAGS) -o $@ $(CGOBJ)
+	$(Q)$(CXX) $(SHLIBLDFLAGS) $(LDFLAGS) -o $@ $(CGOBJ)
 
 $(B)/$(BASEGAME)/vm/cgame.qvm: $(CGVMOBJ) $(CGDIR)/cg_syscalls.asm $(Q3ASM)
 	$(echo_cmd) "Q3ASM $@"
@@ -2549,9 +2640,9 @@ GOBJ_ = \
 GOBJ = $(GOBJ_) $(B)/$(BASEGAME)/game/g_syscalls.o
 GVMOBJ = $(GOBJ_:%.o=%.asm)
 
-$(B)/$(BASEGAME)/game$(SHLIBNAME): $(GOBJ)
+$(B)/$(BASEGAME)/game$(SHLIBNAME): $(GOBJ)  $(LIBVM)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CC) $(SHLIBLDFLAGS) $(LDFLAGS) -o $@ $(GOBJ)
+	$(Q)$(CXX) $(SHLIBLDFLAGS) $(LDFLAGS) -o $@ $(GOBJ)
 
 $(B)/$(BASEGAME)/vm/game.qvm: $(GVMOBJ) $(GDIR)/g_syscalls.asm $(Q3ASM)
 	$(echo_cmd) "Q3ASM $@"
@@ -2579,9 +2670,9 @@ UIOBJ_ = \
 UIOBJ = $(UIOBJ_) $(B)/$(BASEGAME)/ui/ui_syscalls.o
 UIVMOBJ = $(UIOBJ_:%.o=%.asm)
 
-$(B)/$(BASEGAME)/ui$(SHLIBNAME): $(UIOBJ)
+$(B)/$(BASEGAME)/ui$(SHLIBNAME): $(UIOBJ) $(LIBVM)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CC) -I${ASSETS_DIR}/ui $(SHLIBLDFLAGS) $(LDFLAGS) -o $@ $(UIOBJ)
+	$(Q)$(CXX) -I${ASSETS_DIR}/ui $(SHLIBLDFLAGS) $(LDFLAGS) -o $@ $(UIOBJ)
 
 $(B)/$(BASEGAME)/vm/ui.qvm: $(UIVMOBJ) $(UIDIR)/ui_syscalls.asm $(Q3ASM)
 	$(echo_cmd) "Q3ASM $@"
