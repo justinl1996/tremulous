@@ -3890,3 +3890,25 @@ void* Com_Bucket_Select_A_Random_Item(unsigned int bucket_handle) {
 void Com_Bucket_Select_A_Specific_Item(unsigned int bucket_handle, void* item) {
     Q_Bucket_Select_A_Specific_Item(bucket_handle, item);
 }
+
+/*
+===================
+Com_ProxyCallback
+
+If a callback function is passed to our JS layer and its invocation
+is deferred (e.g. it's called as the result of a setTimeout), there
+will be no stack to unwind to if a longjmp is called. For this reason,
+callbacks passed to the JS layer should be proxied through this when
+invoked.
+===================
+*/
+void Com_ProxyCallback(cb_context_t *context) {
+       int jmpval;
+
+       jmpval = setjmp(abortframe);
+       if (jmpval) {
+               return;
+       }
+
+       cb_run(context, 0);
+}

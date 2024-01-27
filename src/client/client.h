@@ -46,7 +46,10 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include "sys/sys_shared.h"
 #include "ui/ui_public.h"
 
+#ifdef USE_CURL
 #include "cl_curl.h"
+#endif /* USE_CURL */
+
 #include "keys.h"
 #include "snd_public.h"
 
@@ -271,7 +274,7 @@ struct clientConnection_t {
     fileHandle_t download;
     char downloadTempName[MAX_OSPATH];
     char downloadName[MAX_OSPATH];
-
+#ifdef USE_CURL
     // XXX Refactor this -vjr
     bool cURLEnabled;
     bool cURLUsed;
@@ -280,8 +283,8 @@ struct clientConnection_t {
     char downloadURL[MAX_OSPATH];
     CURL *downloadCURL;
     CURLM *downloadCURLM;
+#endif
     bool activeCURLNotGameRelated;
-
     int sv_allowDownload;
     char sv_dlURL[MAX_CVAR_VALUE_STRING];
     int downloadNumber;  // Unused ??

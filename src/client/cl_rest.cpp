@@ -15,7 +15,9 @@
 #include <vector>
 
 #include "qcommon/files.h"
+#ifdef USE_RESTCLIENT
 #include "restclient/restclient.h"
+#endif
 
 bool is_good(std::string filename, int permissions = (R_OK|W_OK))
 {
@@ -64,6 +66,7 @@ static bool PromptDownloadPk3s(std::string basegame, const std::vector<std::stri
 
 bool GetTremulousPk3s(const char* destdir, const char* basegame)
 {
+#ifdef USE_RESTCLIENT
     std::string baseuri = "https://github.com/wtfbbqhax/tremulous-data/raw/master/";
     std::vector<std::string> files = { 
         "data-gpp1.pk3",
@@ -114,4 +117,7 @@ bool GetTremulousPk3s(const char* destdir, const char* basegame)
     }
 
     return true;
+#else
+    return false;
+#endif;
 }

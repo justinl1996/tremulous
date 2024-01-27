@@ -1887,7 +1887,7 @@ Called when all downloading has been completed
 static void CL_DownloadsComplete(void)
 {
     Com_Printf("Downloads complete\n");
-
+#ifdef USE_CURL
     // if we downloaded with cURL
     if (clc.cURLUsed)
     {
@@ -1905,7 +1905,7 @@ static void CL_DownloadsComplete(void)
             return;
         }
     }
-
+#endif
     // if we downloaded files we need to restart the file system
     if (clc.downloadRestart)
     {
@@ -2144,7 +2144,7 @@ void CL_NextDownload(void)
             *s++ = 0;
         else
             s = localName + strlen(localName);  // point at the nul byte
-
+#ifdef USE_CURL
         if (((cl_allowDownload->integer & DLF_ENABLE) && !(cl_allowDownload->integer & DLF_NO_REDIRECT)) ||
             prompt == DLP_CURL)
         {
@@ -2184,6 +2184,7 @@ void CL_NextDownload(void)
                 "configuration (cl_allowDownload is %d)\n",
                 cl_allowDownload->integer);
         }
+#endif
         if (!useCURL)
         {
             Com_Printf("Trying UDP download: %s; %s\n", localName, remoteName);
@@ -2963,7 +2964,7 @@ void CL_Frame(int msec)
             Cvar_Set("com_downloadPrompt", va("%d", com_downloadPrompt->integer | DLP_STALE));
         }
     }
-
+#ifdef USE_CURL
     if (clc.downloadCURLM)
     {
         CL_cURL_PerformDownload();
@@ -2983,7 +2984,7 @@ void CL_Frame(int msec)
             return;
         }
     }
-
+#endif
     if (clc.state == CA_DISCONNECTED && !(Key_GetCatcher() & KEYCATCH_UI) && !com_sv_running->integer && cls.ui)
     {
         // if disconnected, bring up the menu
@@ -3152,9 +3153,9 @@ void CL_ShutdownAll(bool shutdownRef)
     if (CL_VideoRecording()) CL_CloseAVI();
 
     if (clc.demorecording) CL_StopRecord_f();
-
+#ifdef USE_CURL
     CL_cURL_Shutdown();
-
+#endif
     // clear sounds
     S_DisableSounds();
     // shutdown CGame

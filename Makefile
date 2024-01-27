@@ -756,6 +756,7 @@ else # ifeq freebsd
 
 ifeq ($(PLATFORM),js)
   CC=$(EMSCRIPTEN)/emcc
+  CXX=$(EMSCRIPTEN)/emcc
   RANLIB=$(EMSCRIPTEN)/emranlib
   ARCH=js
 
@@ -776,6 +777,7 @@ ifeq ($(PLATFORM),js)
   USE_OPENAL_DLOPEN=0
   USE_RENDERER_DLOPEN=0
   USE_LOCAL_HEADERS=0
+  USE_RESTCLIENT=0
 
   LIBSYSCOMMON=$(SYSDIR)/sys_common.js
   LIBSYSBROWSER=$(SYSDIR)/sys_browser.js
@@ -817,7 +819,7 @@ ifeq ($(PLATFORM),js)
     -s SIDE_MODULE=1 \
     $(OPTIMIZE)
 
-  CLIENT_CFLAGS += -s USE_SDL=1 -sWASM=0
+  CLIENT_CFLAGS += -s USE_SDL=2 -sWASM=0
   CLIENT_LIBS += -lidbfs.js
   SHLIBCFLAGS=-fPIC
 

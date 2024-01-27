@@ -347,6 +347,28 @@ extern "C" {
 
 #endif
 
+//================================================================== Q3JS ===
+
+#ifdef EMSCRIPTEN
+
+    #define OS_STRING "emscripten"
+    #define ID_INLINE
+    #define PATH_SEP '/'
+
+    #define ARCH_STRING ""
+
+    #define DLL_EXT ".js"
+    #define EXE_EXT
+
+    #define Q3_LITTLE_ENDIAN
+
+    // For cl_updates.cpp
+    #define RELEASE_PACKAGE_NAME ( "release-js-" ARCH_STRING ".zip" )
+    #define RELEASE_SIGNATURE_NAME ( "release-js-" ARCH_STRING ".zip.sig" )
+    #define GRANGER_EXE ( "granger" EXE_EXT )
+
+#endif
+
 //===========================================================================
 
 //catch missing defines in above blocks

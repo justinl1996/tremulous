@@ -62,7 +62,9 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef DEDICATED
 #include "script/bind.h"
 #include "script/client.h"
+#ifdef USE_RESTCLIENT
 #include "script/http_client.h"
+#endif
 #endif
 #include "script/cmd.h"
 #include "script/cvar.h"
@@ -790,7 +792,9 @@ int main( int argc, char **argv )
 #ifndef DEDICATED
     script::client::init(std::move(lua));
     script::keybind::init(std::move(lua));
+#if USE_RESTCLIENT
     script::http_client::init(std::move(lua));
+#endif
 #endif
 
     for ( ;; )

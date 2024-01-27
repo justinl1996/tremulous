@@ -99,7 +99,7 @@ static bool GetNews(bool begin)
     bool finished = false;
     fileHandle_t fileIn;
     int readSize;
-
+#ifdef USE_CURL
     if (begin)
     {  // if not already using curl, start the download
         if (!clc.downloadCURLM)
@@ -131,6 +131,7 @@ static bool GetNews(bool begin)
     if (!finished) strcpy(clc.newsString, "Retrieving...");
     Cvar_Set("cl_newsString", clc.newsString);
     return finished;
+#endif
     Cvar_Set("cl_newsString", "^1You must compile your client with CURL support to use this feature");
     return true;
 }
