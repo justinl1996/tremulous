@@ -458,6 +458,10 @@ static void CL_ParseServerInfo(void)
 	Q_strncpyz(clc.sv_dlURL,
 		Info_ValueForKey(serverInfo, "sv_dlURL"),
 		sizeof(clc.sv_dlURL));
+#ifdef EMSCRIPTEN
+	Q_strncpyz(clc.fs_cdn, Info_ValueForKey(serverInfo, "fs_cdn"), sizeof(clc.fs_cdn));
+	Q_strncpyz(clc.fs_manifest, Info_ValueForKey(serverInfo, "fs_manifest"), sizeof(clc.fs_manifest));
+#endif
 }
 
 /*
@@ -959,3 +963,23 @@ void CL_ParseServerMessage( msg_t *msg ) {
 		}
 	}
 }
+
+#ifdef EMSCRIPTEN
+/*
+==================
+CL_GetCDN
+==================
+*/
+const char *CL_GetCDN(void) {
+	return clc.fs_cdn;
+}
+
+/*
+==================
+CL_GetManifest
+==================
+*/
+const char *CL_GetManifest(void) {
+	return clc.fs_manifest;
+}
+#endif

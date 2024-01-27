@@ -3891,6 +3891,7 @@ void Com_Bucket_Select_A_Specific_Item(unsigned int bucket_handle, void* item) {
     Q_Bucket_Select_A_Specific_Item(bucket_handle, item);
 }
 
+#ifdef EMSCRIPTEN
 /*
 ===================
 Com_ProxyCallback
@@ -3902,13 +3903,48 @@ callbacks passed to the JS layer should be proxied through this when
 invoked.
 ===================
 */
-void Com_ProxyCallback(cb_context_t *context) {
-       int jmpval;
+extern "C" void Com_ProxyCallback(cb_context_t *context) {
+	int jmpval;
 
-       jmpval = setjmp(abortframe);
-       if (jmpval) {
-               return;
-       }
-
-       cb_run(context, 0);
+	jmpval = setjmp(abortframe);
+	if (jmpval) {
+		return;
+	}
+    context->cb(context, 0);
 }
+
+
+/*
+==================
+Com_GetCDN
+==================
+*/
+extern "C" const char *Com_GetCDN(void) {
+#ifndef DEDICATED
+	const char *cdn = CL_GetCDN();
+
+	if (strlen(cdn)) {
+		return cdn;
+	}
+#endif
+
+	return Cvar_VariableString("fs_cdn");
+}
+
+/*
+==================
+Com_GetManifest
+==================
+*/
+extern "C" const char *Com_GetManifest(void) {
+#ifndef DEDICATED
+	const char *manifest = CL_GetManifest();
+	if (strlen(manifest)) {
+		return manifest;
+	}
+#endif
+	return Cvar_VariableString("fs_manifest");
+}
+
+
+#endif

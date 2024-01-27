@@ -35,6 +35,8 @@ enum dialogType_t
 	DT_OK_CANCEL
 };
 
-dialogResult_t Sys_Dialog( dialogType_t type, const char *message, const char *title );
+extern "C" {
+	extern dialogResult_t Sys_Dialog( dialogType_t type, const char *message, const char *title );
+}
 
 #endif

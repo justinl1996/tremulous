@@ -48,7 +48,7 @@ called before and after a stdout or stderr output
 =============================================================
 */
 
-extern bool stdinIsATTY;
+static bool stdinIsATTY;
 
 static bool stdin_active = false;
 // general flag to tell about tty console mode

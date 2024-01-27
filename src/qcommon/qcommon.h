@@ -406,6 +406,11 @@ void S_ClearSoundBuffer( void );
 
 void SCR_DebugGraph (float value);	// FIXME: move logging to common?
 
+#if EMSCRIPTEN
+const char *CL_GetCDN(void);
+const char *CL_GetManifest(void);
+#endif
+
 //
 // server interface
 //
@@ -463,6 +468,8 @@ void         Com_Bucket_Select_A_Specific_Item(
 
 #if EMSCRIPTEN
 extern "C" void Com_ProxyCallback(cb_context_t *context);
+extern "C" const char *Com_GetCDN(void);
+extern "C" const char *Com_GetManifest(void);
 #endif
 
 #endif // _QCOMMON_H_

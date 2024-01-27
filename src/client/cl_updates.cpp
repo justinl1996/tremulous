@@ -6,7 +6,7 @@
 #include "nettle/rsa.h"
 #include "nettle/sha2.h"
 #include "rapidjson.h"
-#ifdef USE_RESTUSE_RESTCLIENT
+#ifdef USE_RESTCLIENT
 #include "restclient/connection.h"
 #include "restclient/restclient.h"
 #endif

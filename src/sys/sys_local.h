@@ -44,14 +44,16 @@ unsigned int CON_LogSize( void );
 unsigned int CON_LogWrite( const char *in );
 unsigned int CON_LogRead( char *out, unsigned int outSize );
 
-void Sys_GLimpSafeInit( void );
-void Sys_GLimpInit( void );
-void Sys_PlatformInit( void );
-void Sys_PlatformExit( void );
-void Sys_SigHandler( int signal ) __attribute__ ((noreturn));
-void Sys_ErrorDialog( const char *error );
-void Sys_AnsiColorPrint( const char *msg );
+extern "C" {
 
+    extern void Sys_GLimpSafeInit( void );
+    extern void Sys_GLimpInit( void );
+    extern void Sys_PlatformInit( void );
+    extern void Sys_PlatformExit( void );
+    extern void Sys_SigHandler( int signal ) __attribute__ ((noreturn));
+    extern void Sys_ErrorDialog( const char *error );
+    extern void Sys_AnsiColorPrint( const char *msg );
+}
 int Sys_PID( void );
 bool Sys_PIDIsRunning( int pid );
 

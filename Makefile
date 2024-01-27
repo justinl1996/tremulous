@@ -41,7 +41,7 @@ ifndef BUILD_GAME_QVM_11
   BUILD_GAME_QVM_11 =
 endif
 ifndef BUILD_RENDERER_OPENGL2
-  BUILD_RENDERER_OPENGL2=
+  BUILD_RENDERER_OPENGL2 =
 endif
 
 #############################################################################
@@ -819,7 +819,7 @@ ifeq ($(PLATFORM),js)
     -s SIDE_MODULE=1 \
     $(OPTIMIZE)
 
-  CLIENT_CFLAGS += -s USE_SDL=2 -sWASM=0
+  CLIENT_CFLAGS += -s USE_SDL=2 -s WASM=0
   CLIENT_LIBS += -lidbfs.js
   SHLIBCFLAGS=-fPIC
 
@@ -876,9 +876,9 @@ ifneq ($(BUILD_CLIENT),0)
     endif
   else
     TARGETS += $(B)/$(CLIENTBIN)$(FULLBINEXT)
-    ifneq ($(BUILD_RENDERER_OPENGL2),0)
-      TARGETS += $(B)/$(CLIENTBIN)_opengl2$(FULLBINEXT)
-    endif
+    #ifneq ($(BUILD_RENDERER_OPENGL2),0)
+    #  TARGETS += $(B)/$(CLIENTBIN)_opengl2$(FULLBINEXT)
+    #endif
   endif
 endif
 
@@ -1911,6 +1911,7 @@ Q3OBJ = \
   \
   $(B)/client/unzip.o \
   $(B)/client/ioapi.o \
+  $(B)/client/json.o \
   $(B)/client/puff.o \
   $(B)/client/vm.o \
   $(B)/client/vm_interpreted.o \
@@ -2371,22 +2372,21 @@ $(B)/renderer_opengl2$(SHLIBNAME): $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ)
 	$(Q)$(CXX) $(SHLIBLDFLAGS) -o $@ $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) \
 		$(THREAD_LIBS) $(LIBSDLMAIN) $(RENDERER_LIBS) $(LDFLAGS)
 else
-#ifeq ($(BUILD_RENDERER_OPENGL2), 0)
+ifeq ($(BUILD_RENDERER_OPENGL2), 0)
 $(B)/$(CLIENTBIN)$(FULLBINEXT): $(Q3OBJ) $(Q3ROBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIBSYSCOMMON) $(LIBSYSBROWSER) $(LIBVMJS)
 	$(echo_cmd) "LD $@"
 	$(Q)$(CXX) -std=c++1y $(CXXFLAGS) $(CLIENT_CFLAGS) $(CFLAGS) $(CLIENT_LDFLAGS) $(LDFLAGS) \
 		-o $@ $(Q3OBJ) $(Q3ROBJ) $(JPGOBJ) \
 		$(LIBSDLMAIN) $(CLIENT_LIBS) $(RENDERER_LIBS) $(LIBS)
 $(B)/$(CLIENTBIN)_opengl2$(FULLBINEXT): $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) $(LIBSDLMAIN)
-#else
-#$(B)/$(CLIENTBIN)$(FULLBINEXT): $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIBSYSCOMMON) $(LIBSYSBROWSER) $(LIBVMJS)
-
+else
+$(B)/$(CLIENTBIN)$(FULLBINEXT): $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) $(LIBSDLMAIN) $(LIBSYSCOMMON) $(LIBSYSBROWSER) $(LIBVMJS)
 	$(echo_cmd) "LD $@"
 	$(Q)$(CXX) -std=c++1y $(CXXFLAGS) $(CLIENT_CFLAGS) $(CFLAGS) $(CLIENT_LDFLAGS) $(LDFLAGS) \
 		-o $@ $(Q3OBJ) $(Q3R2OBJ) $(Q3R2STRINGOBJ) $(JPGOBJ) \
 		$(LIBSDLMAIN) $(CLIENT_LIBS) $(RENDERER_LIBS) $(LIBS)
 endif
-#endif
+endif
 
 ifneq ($(strip $(LIBSDLMAIN)),)
 ifneq ($(strip $(LIBSDLMAINSRC)),)

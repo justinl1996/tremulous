@@ -550,6 +550,9 @@ var LibrarySysCommon = {
 		}
 		return FS.open(path, mode);
 	},
+	Sys_OpenWithDefault: function (path) {
+		console.log("Sys_OpenWithDefault Not Implemented!");
+	},
 	Sys_PathExists: function (ospath, followSymLink) {
 		path = Module.UTF8ToString(ospath);
 		info = FS.analyzePath(ospath, followSymLink);
@@ -582,6 +585,12 @@ var LibrarySysCommon = {
 	},
 	Sys_PIDIsRunning: function (pid) {
 		return 1;
+	},
+	Sys_CryptoRandomBytes: function (buf, length) {
+		console.log("Sys_CryptoRandomBytes Not Implemented!");
+	},
+	Sys_DllExtension: function (filename) {
+		console.log("Sys_DllExtension!");
 	}
 };
 
