@@ -80,6 +80,24 @@ static int hist_current = -1, hist_count = 0;
 
 /*
 ==================
+CON_IsTTY
+==================
+*/
+extern "C" bool CON_IsTTY(void) {
+	return stdinIsATTY;
+}
+
+/*
+==================
+CON_SetIsTTY
+==================
+*/
+extern "C" void CON_SetIsTTY(bool isTTY) {
+	stdinIsATTY = isTTY;
+}
+
+/*
+==================
 CON_FlushIn
 
 Flush stdin, I suspect some terminals are sending a LOT of shit

@@ -45,7 +45,8 @@ unsigned int CON_LogWrite( const char *in );
 unsigned int CON_LogRead( char *out, unsigned int outSize );
 
 extern "C" {
-
+    extern void CON_SetIsTTY(bool isTTY);
+    extern bool CON_IsTTY ( void );
     extern void Sys_GLimpSafeInit( void );
     extern void Sys_GLimpInit( void );
     extern void Sys_PlatformInit( void );
