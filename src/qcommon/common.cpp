@@ -131,6 +131,22 @@ void CIN_CloseAllVideos( void );
 
 //============================================================================
 
+unsigned cb_pending = 0;
+
+cb_context_t *_cb_create_context(result_cb cb, int data_size) {
+	cb_context_t *context = (cb_context_t *) calloc(1, sizeof(cb_context_t));
+
+	context->cb = cb;
+
+	if (data_size) {
+		context->data = calloc(data_size, 1);
+	}
+
+	cb_pending++;
+
+	return context;
+}
+
 static char* rd_buffer;
 static unsigned int rd_buffersize;
 static void (*rd_flush)( char *buffer );
@@ -2649,51 +2665,12 @@ static void Com_InitRand(void)
 Com_Init
 =================
 */
-void Com_Init( char *commandLine )
-{
+typedef struct init_data_s {
+	cb_context_t *after;
+} init_data_t;
+
+static void Com_Init_after_FS_InitFilesystem( cb_context_t *context, int status ) {
     int qport;
-
-    if ( setjmp (abortframe) ) {
-        Sys_Error ("Error during initialization");
-    }
-
-    // Clear queues
-    ::memset( &eventQueue[ 0 ], 0, MAX_QUEUED_EVENTS * sizeof( sysEvent_t ) );
-
-    // initialize the weak pseudo-random number generator for use later.
-    Com_InitRand();
-
-    // do this before anything else decides to push events
-    Com_InitPushEvent();
-
-    Com_InitSmallZoneMemory();
-    Cvar_Init();
-
-    // prepare enough of the subsystems to handle
-    // cvar and command buffer management
-    Com_ParseCommandLine( commandLine );
-
-    //Swap_Init ();
-    Cbuf_Init ();
-
-    Com_DetectSSE();
-
-    // override anything from the config files with command line args
-    Com_StartupVariable( NULL );
-
-    Com_InitZoneMemory();
-    Cmd_Init ();
-
-    // get the developer cvar set as early as possible
-    com_developer = Cvar_Get("developer", "0", CVAR_TEMP);
-
-    // done early so bind command exists
-    CL_InitKeyCommands();
-
-    com_homepath = Cvar_Get("com_homepath", "", CVAR_INIT);
-
-    FS_InitFilesystem ();
-
     Com_InitJournaling();
 
     // Add some commands here already so users can use them from config files
@@ -2816,6 +2793,57 @@ void Com_Init( char *commandLine )
     }
 
     Com_Printf ("--- Common Initialization Complete ---\n");
+}
+
+void Com_Init( char *commandLine, cb_context_t *after )
+{
+	cb_context_t *context;
+	init_data_t  *data;
+
+    if ( setjmp (abortframe) ) {
+        Sys_Error ("Error during initialization");
+    }
+
+    // Clear queues
+    ::memset( &eventQueue[ 0 ], 0, MAX_QUEUED_EVENTS * sizeof( sysEvent_t ) );
+
+    // initialize the weak pseudo-random number generator for use later.
+    Com_InitRand();
+
+    // do this before anything else decides to push events
+    Com_InitPushEvent();
+
+    Com_InitSmallZoneMemory();
+    Cvar_Init();
+
+    // prepare enough of the subsystems to handle
+    // cvar and command buffer management
+    Com_ParseCommandLine( commandLine );
+
+    //Swap_Init ();
+    Cbuf_Init ();
+
+    Com_DetectSSE();
+
+    // override anything from the config files with command line args
+    Com_StartupVariable( NULL );
+
+    Com_InitZoneMemory();
+    Cmd_Init ();
+
+    // get the developer cvar set as early as possible
+    com_developer = Cvar_Get("developer", "0", CVAR_TEMP);
+
+    // done early so bind command exists
+    CL_InitKeyCommands();
+
+    com_homepath = Cvar_Get("com_homepath", "", CVAR_INIT);
+
+	context = cb_create_context(Com_Init_after_FS_InitFilesystem, sizeof(init_data_t));
+	data = (init_data_t*)context->data;
+	data->after = after;
+
+    FS_InitFilesystem (context);
 }
 
 /*

@@ -42,6 +42,11 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <cstring>
 #include <cstring>
 #include <iostream>
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#define SDL_HasMMXExt SDL_HasMMX
+#define SDL_Has3DNowExt SDL_Has3DNow
+#endif
 
 #include "lua.hpp"
 #include "sol.hpp"
@@ -718,49 +723,29 @@ void SDLVersionCheck()
 }
 #endif
 
+/*
+=================
+Sys_Frame
+=================
+*/
+void Sys_Frame() {
+    try
+    {
+        Com_Frame( );
+    }
+    catch (sol::error& e)
+    {
+        Com_Printf(S_COLOR_YELLOW "%s\n", e.what());
+    }
+}
 
 /*
 =================
 main
 =================
 */
-int main( int argc, char **argv )
+static void main_after_Com_Init(cb_context_t *context, int status)
 {
-#ifndef DEDICATED
-    SDLVersionCheck();
-#endif
-    Sys_PlatformInit( );
-
-    // Set the initial time base
-    Sys_Milliseconds( );
-
-#ifdef __APPLE__
-    // This is passed if we are launched by double-clicking
-    if ( argc >= 2 )
-        if ( Q_strncmp( argv[1], "-psn", 4 ) == 0 )
-            argc = 1;
-#endif
-
-    Sys_ParseArgs( argc, argv );
-    Sys_SetBinaryPath( Sys_Dirname( argv[ 0 ] ) );
-    Sys_SetDefaultInstallPath( DEFAULT_BASEDIR );
-
-    // Concatenate the command line for passing to Com_Init
-    char args[MAX_STRING_CHARS];
-    args[0] = '\0';
-
-    for( int i = 1; i < argc; i++ )
-    {
-        const bool ws = strchr(argv[i], ' ') ? true : false;
-
-        if (ws) Q_strcat(args, sizeof(args), "\"");
-        Q_strcat(args, sizeof(args), argv[i]);
-        if (ws) Q_strcat(args, sizeof(args), "\"");
-        Q_strcat(args, sizeof(args), " " );
-    }
-
-    CON_Init( );
-    Com_Init( args );
     NET_Init( );
 
     lua.open_libraries
@@ -797,17 +782,59 @@ int main( int argc, char **argv )
 #endif
 #endif
 
+#ifdef EMSCRIPTEN
+	int fps = 0;
+#ifdef DEDICATED
+	// HACK for now to prevent Browser lib from calling
+	// requestAnimationFrame on dedicated builds.
+	fps = 30;
+#endif
+	emscripten_set_main_loop(Sys_Frame, fps, 0);
+#else
     for ( ;; )
     {
-        try
-        { 
-            Com_Frame( );
-        } 
-        catch (sol::error& e)
-        {
-            Com_Printf(S_COLOR_YELLOW "%s\n", e.what());
-        }
+        Sys_Frame();
     }
+#endif
+}
+
+int main( int argc, char **argv )
+{
+#ifndef DEDICATED
+    SDLVersionCheck();
+#endif
+    Sys_PlatformInit( );
+
+    // Set the initial time base
+    Sys_Milliseconds( );
+
+#ifdef __APPLE__
+    // This is passed if we are launched by double-clicking
+    if ( argc >= 2 )
+        if ( Q_strncmp( argv[1], "-psn", 4 ) == 0 )
+            argc = 1;
+#endif
+
+    Sys_ParseArgs( argc, argv );
+    Sys_SetBinaryPath( Sys_Dirname( argv[ 0 ] ) );
+    Sys_SetDefaultInstallPath( DEFAULT_BASEDIR );
+
+    // Concatenate the command line for passing to Com_Init
+    char args[MAX_STRING_CHARS];
+    args[0] = '\0';
+
+    for( int i = 1; i < argc; i++ )
+    {
+        const bool ws = strchr(argv[i], ' ') ? true : false;
+
+        if (ws) Q_strcat(args, sizeof(args), "\"");
+        Q_strcat(args, sizeof(args), argv[i]);
+        if (ws) Q_strcat(args, sizeof(args), "\"");
+        Q_strcat(args, sizeof(args), " " );
+    }
+
+    CON_Init( );
+    Com_Init( args , cb_create_context_no_data(main_after_Com_Init));
 
     return 0;
 }

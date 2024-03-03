@@ -26,6 +26,7 @@ extern "C" {
 
 #include "q_platform.h"
 #include "q_shared.h"
+#include "qcommon.h"
 
 // referenced flags
 // these are in loop specific order so don't change the order
@@ -198,7 +199,7 @@ const char*  FS_GetCurrentGameDir (void);
 void         FS_FilenameCompletion (const char* dir, const char* ext, bool stripExt, void (* callback)(const char* s), bool allowNonPureFilesOnDisk);
 int          FS_FOpenFileByMode (const char* qpath, fileHandle_t* f, enum FS_Mode mode);
 bool     FS_ConditionalRestart (int checksumFeed, bool disconnect);
-void         FS_InitFilesystem (void);
+void         FS_InitFilesystem (cb_context_t *after);
 void         FS_PureServerSetReferencedPaks (const char* pakSums, const char* pakNames);
 void         FS_Restart (int checksumFeed);
 void         FS_PureServerSetLoadedPaks (const char* pakSums, const char* pakNames);
