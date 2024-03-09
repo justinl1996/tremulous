@@ -26,7 +26,6 @@ extern "C" {
 
 #include "q_platform.h"
 #include "q_shared.h"
-#include "qcommon.h"
 
 // referenced flags
 // these are in loop specific order so don't change the order
@@ -195,13 +194,15 @@ extern "C" {
 //	FS_SEEK_SET
 //};
 
+typedef struct cb_context_s cb_context_t;
+
 const char*  FS_GetCurrentGameDir (void);
 void         FS_FilenameCompletion (const char* dir, const char* ext, bool stripExt, void (* callback)(const char* s), bool allowNonPureFilesOnDisk);
 int          FS_FOpenFileByMode (const char* qpath, fileHandle_t* f, enum FS_Mode mode);
-bool     FS_ConditionalRestart (int checksumFeed, bool disconnect);
+void         FS_ConditionalRestart (int checksumFeed, bool disconnect, cb_context_t *after);
 void         FS_InitFilesystem (cb_context_t *after);
 void         FS_PureServerSetReferencedPaks (const char* pakSums, const char* pakNames);
-void         FS_Restart (int checksumFeed);
+void         FS_Restart (int checksumFeed, cb_context_t *after);
 void         FS_PureServerSetLoadedPaks (const char* pakSums, const char* pakNames);
 void         FS_ClearPakReferences (int flags);
 const char*  FS_ReferencedPakNames (bool alternate);
@@ -210,7 +211,7 @@ const char*  FS_ReferencedPakChecksums (bool alternate);
 const char*  FS_LoadedPakPureChecksums (bool alternate);
 const char*  FS_LoadedPakNames (bool alternate);
 const char*  FS_LoadedPakChecksums (bool alternate);
-void         FS_Shutdown (bool closemfp);
+void         FS_Shutdown (bool closemfp, cb_context_t *after);
 bool     FS_ComparePaks (char* neededpaks, int len, bool dlstring);
 bool     FS_CheckDirTraversal (const char* checkdir);
 void         FS_AddGameDirectory (const char* path, const char* dir);

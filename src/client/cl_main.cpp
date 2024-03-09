@@ -1321,7 +1321,7 @@ static void CL_OldGame(void)
         // change back to previous fs_game
         cl_oldGameSet = false;
         Cvar_Set2("fs_game", cl_oldGame, true);
-        FS_ConditionalRestart(clc.checksumFeed, false);
+        FS_ConditionalRestart(clc.checksumFeed, false, NULL);
     }
 }
 
@@ -1884,6 +1884,12 @@ CL_DownloadsComplete
 Called when all downloading has been completed
 =================
 */
+void CL_DownloadsComplete_after_FS_Restart( cb_context_t *context, int status )
+{
+    // inform the server so we get new gamestate info
+    CL_AddReliableCommand("donedl", false);
+}
+
 static void CL_DownloadsComplete(void)
 {
     Com_Printf("Downloads complete\n");
@@ -1897,8 +1903,8 @@ static void CL_DownloadsComplete(void)
         {
             if (clc.downloadRestart)
             {
-                if (!clc.activeCURLNotGameRelated) FS_Restart(clc.checksumFeed);
                 clc.downloadRestart = false;
+                if (!clc.activeCURLNotGameRelated) FS_Restart(clc.checksumFeed, cb_create_context_no_data(CL_DownloadsComplete_after_FS_Restart));
             }
             clc.cURLDisconnected = false;
             if (!clc.activeCURLNotGameRelated) CL_Reconnect_f();
@@ -1911,10 +1917,7 @@ static void CL_DownloadsComplete(void)
     {
         clc.downloadRestart = false;
 
-        FS_Restart(clc.checksumFeed);  // We possibly downloaded a pak, restart the file system to load it
-
-        // inform the server so we get new gamestate info
-        CL_AddReliableCommand("donedl", false);
+        FS_Restart(clc.checksumFeed, cb_create_context_no_data(CL_DownloadsComplete_after_FS_Restart));  // We possibly downloaded a pak, restart the file system to load it
 
         // by sending the donedl command we request a new gamestate
         // so we don't want to load stuff yet
@@ -3227,6 +3230,56 @@ we also have to reload the UI and CGame because the renderer
 doesn't know what graphics to reload
 =================
 */
+void CL_Vid_Restart_f_after_FS_ConditionalRestart(cb_context_t *context, int gameDirChanged)
+{
+    // if not running a server clear the whole hunk
+    if (com_sv_running->integer)
+    {
+        // clear all the client data on the hunk
+        Hunk_ClearToMark();
+    }
+    else
+    {
+        // clear the whole hunk
+        Hunk_Clear();
+    }
+
+    // shutdown the UI
+    CL_ShutdownUI();
+    // shutdown the CGame
+    CL_ShutdownCGame();
+    // shutdown the renderer and clear the renderer interface
+    CL_ShutdownRef();
+    // client is no longer pure untill new checksums are sent
+    CL_ResetPureClientAtServer();
+    // clear pak references
+    FS_ClearPakReferences(FS_UI_REF | FS_CGAME_REF);
+    // reinitialize the filesystem if the game directory or checksum has changed
+
+    cls.rendererStarted = false;
+    cls.uiStarted = false;
+    cls.cgameStarted = false;
+    cls.soundRegistered = false;
+
+    // unpause so the cgame definately gets a snapshot and renders a frame
+    Cvar_Set("cl_paused", "0");
+
+    // initialize the renderer interface
+    CL_InitRef();
+
+    // startup all the client stuff
+    CL_StartHunkUsers(false);
+
+    // start the cgame if connected
+    if (clc.state > CA_CONNECTED && clc.state != CA_CINEMATIC)
+    {
+        cls.cgameStarted = true;
+        CL_InitCGame();
+        // send pure checksums
+        CL_SendPureChecksums();
+    }
+}
+
 static void CL_Vid_Restart_f(void)
 {
     // Settings may have changed so stop recording now
@@ -3236,59 +3289,9 @@ static void CL_Vid_Restart_f(void)
     }
 
     if (clc.demorecording) CL_StopRecord_f();
-
     // don't let them loop during the restart
     S_StopAllSounds();
-
-    if (!FS_ConditionalRestart(clc.checksumFeed, true))
-    {
-        // if not running a server clear the whole hunk
-        if (com_sv_running->integer)
-        {
-            // clear all the client data on the hunk
-            Hunk_ClearToMark();
-        }
-        else
-        {
-            // clear the whole hunk
-            Hunk_Clear();
-        }
-
-        // shutdown the UI
-        CL_ShutdownUI();
-        // shutdown the CGame
-        CL_ShutdownCGame();
-        // shutdown the renderer and clear the renderer interface
-        CL_ShutdownRef();
-        // client is no longer pure untill new checksums are sent
-        CL_ResetPureClientAtServer();
-        // clear pak references
-        FS_ClearPakReferences(FS_UI_REF | FS_CGAME_REF);
-        // reinitialize the filesystem if the game directory or checksum has changed
-
-        cls.rendererStarted = false;
-        cls.uiStarted = false;
-        cls.cgameStarted = false;
-        cls.soundRegistered = false;
-
-        // unpause so the cgame definately gets a snapshot and renders a frame
-        Cvar_Set("cl_paused", "0");
-
-        // initialize the renderer interface
-        CL_InitRef();
-
-        // startup all the client stuff
-        CL_StartHunkUsers(false);
-
-        // start the cgame if connected
-        if (clc.state > CA_CONNECTED && clc.state != CA_CINEMATIC)
-        {
-            cls.cgameStarted = true;
-            CL_InitCGame();
-            // send pure checksums
-            CL_SendPureChecksums();
-        }
-    }
+    FS_ConditionalRestart(clc.checksumFeed, true, cb_create_context_no_data(CL_Vid_Restart_f_after_FS_ConditionalRestart));
 }
 
 /*

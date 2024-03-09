@@ -488,6 +488,13 @@ Both client and server can use this, and it will
 do the apropriate things.
 =============
 */
+static void Com_Quit_f_after_FS_Shutdown( cb_context_t *context, int status ) {
+	cb_free_context(context);
+
+	Sys_Quit();
+}
+
+
 void Engine_Exit(const char* p )
 {
     // don't try to shutdown if we are in a recursive error
@@ -502,7 +509,7 @@ void Engine_Exit(const char* p )
         CL_Shutdown(p[0] ? p : "Client quit", true, true);
         VM_Forced_Unload_Done();
         Com_Shutdown();
-        FS_Shutdown(true);
+        FS_Shutdown(qtrue, cb_create_context_no_data(Com_Quit_f_after_FS_Shutdown));
     }
     Sys_Quit ();
 }
@@ -2518,50 +2525,85 @@ Change to a new mod properly with cleaning up cvars before switching.
 ==================
 */
 
-void Com_GameRestart(int checksumFeed, bool disconnect)
+typedef struct gamerestart_data_s {
+	bool disconnect;
+	int clWasRunning;
+	cb_context_t *after;
+} gamerestart_data_t;
+
+static void Com_GameRestart_after_FS_Restart( cb_context_t *context, int status )
 {
-    // make sure no recursion can be triggered
-    if(!com_gameRestarting && com_fullyInitialized)
+	gamerestart_data_t *data;
+	cb_context_t *after;
+	bool disconnect;
+	int clWasRunning;
+
+	data = (gamerestart_data_t*)context->data;
+	after = data->after;
+	disconnect = data->disconnect;
+	clWasRunning = data->clWasRunning;
+
+	cb_free_context(context);
+
+    // Clean out any user and VM created cvars
+    Cvar_Restart(true);
+    Com_ExecuteCfg();
+
+    if(disconnect)
     {
-        int clWasRunning;
-
-        com_gameRestarting = true;
-        clWasRunning = com_cl_running->integer;
-
-        // Kill server if we have one
-        if(com_sv_running->integer)
-            SV_Shutdown("Game directory changed");
-
-        if(clWasRunning)
-        {
-            if(disconnect)
-                CL_Disconnect(false);
-
-            CL_Shutdown("Game directory changed", disconnect, false);
-        }
-
-        FS_Restart(checksumFeed);
-
-        // Clean out any user and VM created cvars
-        Cvar_Restart(true);
-        Com_ExecuteCfg();
-
-        if(disconnect)
-        {
-            // We don't want to change any network settings if gamedir
-            // change was triggered by a connect to server because the
-            // new network settings might make the connection fail.
-            NET_Restart_f();
-        }
-
-        if(clWasRunning)
-        {
-            CL_Init();
-            CL_StartHunkUsers(false);
-        }
-
-        com_gameRestarting = false;
+        // We don't want to change any network settings if gamedir
+        // change was triggered by a connect to server because the
+        // new network settings might make the connection fail.
+        NET_Restart_f();
     }
+
+    if(clWasRunning)
+    {
+        CL_Init();
+        CL_StartHunkUsers(false);
+    }
+
+    com_gameRestarting = false;
+	if (after) {
+		cb_run(after, 0);
+	}
+}
+
+void Com_GameRestart(int checksumFeed, bool disconnect, cb_context_t *after)
+{
+	cb_context_t       *context;
+	gamerestart_data_t *data;
+
+    // make sure no recursion can be triggered
+    if (com_gameRestarting || !com_fullyInitialized)
+    {
+        return;
+    }
+
+    int clWasRunning;
+
+	context = cb_create_context(Com_GameRestart_after_FS_Restart, sizeof(gamerestart_data_t));
+	data = (gamerestart_data_t*)context->data;
+	data->disconnect = disconnect;
+	data->clWasRunning = com_cl_running->integer;
+	data->after = after;
+
+    com_gameRestarting = true;
+    clWasRunning = com_cl_running->integer;
+
+    // Kill server if we have one
+    if(com_sv_running->integer)
+        SV_Shutdown("Game directory changed");
+
+    if(clWasRunning)
+    {
+        if(disconnect)
+            CL_Disconnect(false);
+
+        CL_Shutdown("Game directory changed", disconnect, false);
+    }
+
+    FS_Restart(checksumFeed, context);
 }
 
 /*
@@ -2585,7 +2627,7 @@ void Com_GameRestart_f(void)
     else
         Cvar_Set("fs_game", Cmd_Argv(1));
 
-    Com_GameRestart(0, true);
+    Com_GameRestart(0, true, NULL);
 }
 
 static void Com_DetectAltivec(void)
@@ -2671,6 +2713,12 @@ typedef struct init_data_s {
 
 static void Com_Init_after_FS_InitFilesystem( cb_context_t *context, int status ) {
     int qport;
+	init_data_t *data;
+	cb_context_t *after;
+
+	data = (init_data_t*)context->data;
+	after = data->after;
+
     Com_InitJournaling();
 
     // Add some commands here already so users can use them from config files
@@ -2793,6 +2841,7 @@ static void Com_Init_after_FS_InitFilesystem( cb_context_t *context, int status 
     }
 
     Com_Printf ("--- Common Initialization Complete ---\n");
+    cb_run(after, 0);
 }
 
 void Com_Init( char *commandLine, cb_context_t *after )

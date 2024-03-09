@@ -62,8 +62,10 @@ using namespace std;
 #define MAX_FILEHASH_SIZE 1024
 
 #if EMSCRIPTEN
-extern void Sys_FS_Startup(cb_context_t *after);
-extern void Sys_FS_Shutdown(cb_context_t *after);
+extern "C" {
+    extern void Sys_FS_Startup(cb_context_t *after);
+    extern void Sys_FS_Shutdown(cb_context_t *after);
+};
 #endif
 
 static bool FS_IsDemoExt(const char *filename);
@@ -3379,51 +3381,14 @@ typedef struct startup_data_s {
 } startup_data_t;
 
 static void FS_Startup_after_Sys_FS_Startup( cb_context_t *context, int status ) {
-
-}
-
-/*
-================
-FS_Startup
-================
-*/
-static void FS_Startup(const char *gameName, cb_context_t *after )
-{
-	cb_context_t *context;
 	startup_data_t *data;
+	char gameName[MAX_OSPATH];
+	cb_context_t *after;
 
-    Com_Printf("----- FS_Startup -----\n");
-    fs_packFiles = 0;
-
-    fs_debug = Cvar_Get("fs_debug", "0", 0);
-
-#if EMSCRIPTEN
-	fs_cdn = Cvar_Get("fs_cdn", "localhost:9000", CVAR_INIT | CVAR_SERVERINFO);
-	//fs_cdn = Cvar_Get("fs_cdn", "content.quakejs.com", CVAR_INIT | CVAR_SERVERINFO);
-	fs_manifest = Cvar_Get("fs_manifest", "", CVAR_ROM | CVAR_SERVERINFO);
-	fs_completeManifest = Cvar_Get("fs_completeManifest", "", CVAR_ROM);
-    Com_Printf("fs_cdn: %s\n", fs_cdn->string);
-    Com_Printf("fs_manifest: %s\n", fs_manifest->string);
-
-#endif
-
-    fs_basepath = Cvar_Get("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT | CVAR_PROTECTED);
-    fs_basegame = Cvar_Get("fs_basegame", BASEGAME, CVAR_INIT);
-
-    const char *homePath = Sys_DefaultHomePath();
-    if (!homePath || !homePath[0])
-    {
-        homePath = fs_basepath->string;
-    }
-
-    fs_homepath = Cvar_Get("fs_homepath", homePath, CVAR_INIT | CVAR_PROTECTED);
-    fs_gamedirvar = Cvar_Get("fs_game", BASEGAME, CVAR_INIT | CVAR_SYSTEMINFO);
-
-	// Setup callback.
-	context = cb_create_context(FS_Startup_after_Sys_FS_Startup, startup_data_t);
 	data = (startup_data_t*)context->data;
-	Q_strncpyz(data->gameName, gameName, MAX_OSPATH);
-	data->after = after;
+	Q_strncpyz(gameName, data->gameName, MAX_OSPATH);
+	after = data->after;
+	cb_free_context(context);
 
 #ifdef DEDICATED
     // add search path elements in reverse priority order
@@ -3546,6 +3511,58 @@ static void FS_Startup(const char *gameName, cb_context_t *after )
 #endif
 
     Com_Printf("%d files in pk3 files\n", fs_packFiles);
+
+    cb_run(after, 0);
+}
+
+/*
+================
+FS_Startup
+================
+*/
+static void FS_Startup(const char *gameName, cb_context_t *after )
+{
+	cb_context_t *context;
+	startup_data_t *data;
+
+    Com_Printf("----- FS_Startup -----\n");
+    fs_packFiles = 0;
+
+    fs_debug = Cvar_Get("fs_debug", "0", 0);
+
+#if EMSCRIPTEN
+	fs_cdn = Cvar_Get("fs_cdn", "localhost:9000", CVAR_INIT | CVAR_SERVERINFO);
+	//fs_cdn = Cvar_Get("fs_cdn", "content.quakejs.com", CVAR_INIT | CVAR_SERVERINFO);
+	fs_manifest = Cvar_Get("fs_manifest", "", CVAR_ROM | CVAR_SERVERINFO);
+	fs_completeManifest = Cvar_Get("fs_completeManifest", "", CVAR_ROM);
+    Com_Printf("fs_cdn: %s\n", fs_cdn->string);
+    Com_Printf("fs_manifest: %s\n", fs_manifest->string);
+
+#endif
+
+    fs_basepath = Cvar_Get("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT | CVAR_PROTECTED);
+    fs_basegame = Cvar_Get("fs_basegame", BASEGAME, CVAR_INIT);
+
+    const char *homePath = Sys_DefaultHomePath();
+    if (!homePath || !homePath[0])
+    {
+        homePath = fs_basepath->string;
+    }
+
+    fs_homepath = Cvar_Get("fs_homepath", homePath, CVAR_INIT | CVAR_PROTECTED);
+    fs_gamedirvar = Cvar_Get("fs_game", BASEGAME, CVAR_INIT | CVAR_SYSTEMINFO);
+
+	// Setup callback.
+	context = cb_create_context(FS_Startup_after_Sys_FS_Startup, startup_data_t);
+	data = (startup_data_t*)context->data;
+	Q_strncpyz(data->gameName, gameName, MAX_OSPATH);
+	data->after = after;
+
+#if EMSCRIPTEN
+	Sys_FS_Startup(context);
+#else
+	cb_run(context, 0);
+#endif
 }
 
 /*
@@ -3790,13 +3807,13 @@ void FS_PureServerSetLoadedPaks(const char *pakSums, const char *pakNames)
     {
         Com_DPrintf("Connected to a pure server.\n");
     }
-    else if (fs_reordered)
+    /*else if (fs_reordered)
     {
         // force a restart to make sure the search order will be correct
         Com_DPrintf("FS search reorder is required\n");
         FS_Restart(fs_checksumFeed);
         return;
-    }
+    }*/
 
     for (int i = 0; i < c; i++)
     {
@@ -3955,7 +3972,7 @@ static void FS_Restart_after_FS_Startup( cb_context_t *context, int status ) {
             Cvar_Set("fs_basegame", lastValidBase);
             Cvar_Set("fs_game", lastValidGame);
             lastValidBase[0] = lastValidGame[0] = '\0';
-            FS_Restart(fs_checksumFeed);
+            FS_Restart(fs_checksumFeed, context);
             Com_Error(ERR_DROP, "Invalid game folder");
             return;
         }
@@ -3973,6 +3990,7 @@ static void FS_Restart_after_FS_Startup( cb_context_t *context, int status ) {
 
     Q_strncpyz(lastValidBase, fs_basegame->string, sizeof(lastValidBase));
     Q_strncpyz(lastValidGame, fs_gamedirvar->string, sizeof(lastValidGame));
+    cb_run(after, 0);
 }
 
 static void FS_Restart_after_FS_Shutdown( cb_context_t *context, int status ) {
@@ -4012,27 +4030,54 @@ Restart if necessary
 Return true if restarting due to game directory changed, false otherwise
 =================
 */
-bool FS_ConditionalRestart(int checksumFeed, bool disconnect)
+typedef struct conditional_restart_data_s {
+	qboolean result;
+	cb_context_t *after;
+} conditional_restart_data_t;
+
+static void FS_ConditionalRestart_after_restart( cb_context_t *context, int status ) {
+	conditional_restart_data_t *data;
+	cb_context_t *after;
+	int result;
+
+	data = (conditional_restart_data_t*)context->data;
+	after = data->after;
+	result = data->result;
+	cb_free_context(context);
+
+	cb_run(after, result);
+}
+
+void FS_ConditionalRestart(int checksumFeed, bool disconnect, cb_context_t *after)
 {
+	cb_context_t *context;
+	conditional_restart_data_t *data;
+
+	context = cb_create_context(FS_ConditionalRestart_after_restart, conditional_restart_data_t);
+	data = (conditional_restart_data_t*)context->data;
+	data->after = after;
+
     if (fs_gamedirvar->modified)
     {
         if (FS_FilenameCompare(lastValidGame, fs_gamedirvar->string) &&
             (*lastValidGame || FS_FilenameCompare(fs_gamedirvar->string, BASEGAME)) &&
             (*fs_gamedirvar->string || FS_FilenameCompare(lastValidGame, BASEGAME)))
         {
-            Com_GameRestart(checksumFeed, disconnect);
-            return true;
+            Com_GameRestart(checksumFeed, disconnect, context);
+            return;
         }
         fs_gamedirvar->modified = false;
     }
 
     if (checksumFeed != fs_checksumFeed)
-        FS_Restart(checksumFeed);
+    {
+        FS_Restart(checksumFeed, context);
+    }
 
     else if (fs_numServerPaks && !fs_reordered)
         FS_ReorderPurePaks();
 
-    return false;
+    cb_run(context, 0);
 }
 
 /*

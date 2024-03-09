@@ -209,7 +209,7 @@ void 		QDECL Com_Error( int code, const char *fmt, ... ) __attribute__ ((noretur
 void 		QDECL Com_DPrintf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 void        Engine_Exit(const char* p ) __attribute__ ((noreturn));
 void 		Com_Quit_f( void ) __attribute__ ((noreturn));
-void		Com_GameRestart(int checksumFeed, bool disconnect);
+void		Com_GameRestart(int checksumFeed, bool disconnect, cb_context_t *after);
 
 int			Com_Milliseconds( void );	// will be journaled properly
 char		*Com_MD5File(const char *filename, int length, const char *prefix, int prefix_len);

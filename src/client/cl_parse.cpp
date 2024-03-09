@@ -469,6 +469,16 @@ static void CL_ParseServerInfo(void)
 CL_ParseGamestate
 ==================
 */
+static void CL_ParseGamestate_after_FS_ConditionalRestart( cb_context_t *context, int status )
+{
+	// This used to call CL_StartHunkUsers, but now we enter the download state before loading the
+	// cgame
+	CL_InitDownloads();
+
+	// make sure the game starts
+	Cvar_Set( "cl_paused", "0" );
+}
+
 void CL_ParseGamestate( msg_t *msg ) {
 	int				i;
 	entityState_t	*es;
@@ -550,14 +560,7 @@ void CL_ParseGamestate( msg_t *msg ) {
 		Q_strncpyz(cl_oldGame, oldGame, sizeof(cl_oldGame));
 	}
 
-	FS_ConditionalRestart(clc.checksumFeed, false);
-
-	// This used to call CL_StartHunkUsers, but now we enter the download state before loading the
-	// cgame
-	CL_InitDownloads();
-
-	// make sure the game starts
-	Cvar_Set( "cl_paused", "0" );
+	FS_ConditionalRestart(clc.checksumFeed, false, cb_create_context_no_data(CL_ParseGamestate_after_FS_ConditionalRestart));
 }
 
 

@@ -299,7 +299,6 @@ var LibrarySys = {
 		}
 
 		var start = Date.now();
-
 		FS.syncfs(true, function (err) {
 			if (err) {
 				return SYSC.Error('fatal', err.message);

@@ -281,14 +281,15 @@ var LibrarySysCommon = {
 					console.log("fs_game: ", fs_game);
 					console.log("com_basegame:", com_basegame);
 					console.log("mapname:", mapname);
+					console.log("manifest:", manifest);
 					var fs_manifestName = Module.allocate(intArrayFromString('fs_manifest'), ALLOC_STACK);
 					var fs_manifest = Module.allocate(intArrayFromString(formatManifestString(manifest.filter(activePaks))), ALLOC_STACK);
 					_Cvar_Set(fs_manifestName, fs_manifest);
-					console.log("fs_manifest: ", formatManifestString(manifest.filter(activePaks)));
+					//console.log("fs_manifest: ", formatManifestString(manifest.filter(activePaks)));
 					var fs_completeManifestName = Module.allocate(intArrayFromString('fs_completeManifest'), ALLOC_STACK);
 					var fs_completeManifest = Module.allocate(intArrayFromString(formatManifestString(manifest)), ALLOC_STACK);
 					_Cvar_Set(fs_completeManifestName, fs_completeManifest);
-					console.log("fs_completemanifest: ", formatManifestString(manifest));
+					//console.log("fs_completemanifest: ", formatManifestString(manifest));
 					return callback();
 				}
 			});
@@ -322,7 +323,7 @@ var LibrarySysCommon = {
 
 			return true;
 		},
-		DirtyInstallers: function () {
+		DirtyInstallers: function (callback) {
 			var installers = [];
 			var assets = SYSC.GetManifest();
 			for (var i = 0; i < SYSC.installers.length; i++) {
@@ -375,7 +376,7 @@ var LibrarySysCommon = {
 			nextEntry();
 		},
 		SyncInstallers: function (callback) {
-			var downloads = SYSC.DirtyInstallers();
+			var downloads = SYSC.DirtyInstallers(callback);
 
 			if (!downloads.length) {
 				return callback();

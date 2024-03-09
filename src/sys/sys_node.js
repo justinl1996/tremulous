@@ -96,11 +96,11 @@ var LibrarySys = {
 	},
 	Sys_FS_Startup__deps: ['$Browser', '$FS', '$PATH', '$SYSC'],
 	Sys_FS_Startup: function (context) {
+		console.log("Sys_FS_Startup sys_node");
 		// mount a persistable fs into base if not already mounted
 		var name = Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK);
 		var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(name));
 		var localPath = PATH.join('.', fs_homepath);
-
 		// make sure the local path exists
 		var mkdirp = function (p) {
 			try {
