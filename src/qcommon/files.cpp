@@ -1068,6 +1068,7 @@ long FS_FOpenFileReadDir(
     char *netpath;
     FILE *filep;
     int len;
+    qboolean exists;
 
     searchpath_t *search = static_cast<searchpath_t *>(_search);
 
@@ -1119,6 +1120,13 @@ long FS_FOpenFileReadDir(
             dir = search->dir;
 
             netpath = FS_BuildOSPath(dir->path, dir->gamedir, filename);
+#if EMSCRIPTEN
+			exists = Sys_PathExists(netpath, qtrue);
+			if (!exists)
+			{
+				return -1;
+			}
+#endif
             filep = Sys_FOpen(netpath, "rb");
 
             if (filep)
@@ -1242,6 +1250,13 @@ long FS_FOpenFileReadDir(
         dir = search->dir;
 
         netpath = FS_BuildOSPath(dir->path, dir->gamedir, filename);
+#if EMSCRIPTEN
+        exists = Sys_PathExists(netpath, qtrue);
+        if (!exists)
+        {
+            return -1;
+        }
+#endif
         filep = Sys_FOpen(netpath, "rb");
 
         if (filep == nullptr)

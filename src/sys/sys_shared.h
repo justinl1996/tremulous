@@ -70,6 +70,7 @@ void Sys_SetErrorText(const char *text);
 
 FILE *Sys_FOpen(const char *ospath, const char *mode);
 bool Sys_Mkdir(const char *path);
+qboolean Sys_PathExists(const char *path, qboolean followSymLink );
 FILE *Sys_Mkfifo(const char *ospath);
 bool Sys_OpenWithDefault( const char *path );
 char *Sys_Cwd(void);

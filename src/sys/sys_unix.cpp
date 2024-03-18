@@ -231,6 +231,18 @@ bool Sys_Mkdir( const char *path )
 }
 
 /*
+==============
+Sys_PathExists
+==============
+*/
+qboolean Sys_PathExists( const char *path, qboolean followSymLink) {
+	struct stat buf;
+
+	// check if path exists
+	return !stat( path, &buf );
+}
+
+/*
 ==================
 Sys_Mkfifo
 ==================

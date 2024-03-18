@@ -107,6 +107,18 @@ var LibrarySysCommon = {
 				]
 			}
 		],
+		paks: [
+			{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
+			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3"', checksum: 3984856731 },
+			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
+			{ src: 'map-atcs-1.1.0.pk3', dest: 'gpp/map-atcs-1.1.0.pk3', checksum: 1649092924 },
+			{ src: 'map-karith-1.1.0.pk3', dest: 'gpp/map-karith-1.1.0.pk3', checksum: 3322431863 },
+			{ src: 'map-nexus6-1.1.0.pk3', dest: 'gpp/map-nexus6-1.1.0.pk3', checksum: 3629754221 },
+			{ src: 'map-niveus-1.1.0.pk3', dest: 'gpp/map-niveus-1.1.0.pk3', checksum: 1601849332 },
+			{ src: 'map-transit-1.1.0.pk3', dest: 'gpp/map-transit-1.1.0.pk3', checksum: 1087076925 },
+			{ src: 'map-tremor-1.1.0.pk3', dest: 'gpp/map-tremor-1.1.0.pk3', checksum: 2902177249 },
+			{ src: 'map-uncreation-1.1.0.pk3', dest: 'gpp/map-uncreation-1.1.0.pk3', checksum: 29654410 }
+		],
 		manifest: null,
 		Print: function (str) {
 			str = Module.allocate(intArrayFromString(str + '\n'), ALLOC_STACK);
@@ -281,15 +293,14 @@ var LibrarySysCommon = {
 					console.log("fs_game: ", fs_game);
 					console.log("com_basegame:", com_basegame);
 					console.log("mapname:", mapname);
-					console.log("manifest:", manifest);
 					var fs_manifestName = Module.allocate(intArrayFromString('fs_manifest'), ALLOC_STACK);
-					var fs_manifest = Module.allocate(intArrayFromString(formatManifestString(manifest.filter(activePaks))), ALLOC_STACK);
+					var fs_manifest = Module.allocate(intArrayFromString(formatManifestString(manifest)), ALLOC_STACK);
 					_Cvar_Set(fs_manifestName, fs_manifest);
-					//console.log("fs_manifest: ", formatManifestString(manifest.filter(activePaks)));
+					console.log("fs_manifest: ", fs_manifest);
 					var fs_completeManifestName = Module.allocate(intArrayFromString('fs_completeManifest'), ALLOC_STACK);
 					var fs_completeManifest = Module.allocate(intArrayFromString(formatManifestString(manifest)), ALLOC_STACK);
 					_Cvar_Set(fs_completeManifestName, fs_completeManifest);
-					//console.log("fs_completemanifest: ", formatManifestString(manifest));
+					console.log("fs_completemanifest: ", fs_completeManifest);
 					return callback();
 				}
 			});
@@ -309,6 +320,40 @@ var LibrarySysCommon = {
 			FS.writeFile(localPath, new Uint8Array(buffer), { encoding: 'binary', flags: 'w', canOwn: true });
 
 			FS.syncfs(callback);
+		},
+		DirtyPaks: function (callback) {
+			var paks = [];
+			var assets = SYSC.GetManifest();
+			console.log(assets);
+			for (var i = 0; i < SYSC.paks.length; i++) {
+				var pak = SYSC.paks[i];
+
+				var asset;
+				for (var j = 0; j < assets.length; j++) {
+					if (assets[j].name === pak.src) {
+						asset = assets[j];
+						break;
+					}
+				}
+
+				if (!asset) {
+					return callback(new Error('Failed to find "' + pak.name + '" in manifest'));
+				}
+				if (!SYSC.ValidatePak(pak)) {
+					paks.push(asset);
+				}
+			}
+			return paks;
+
+		},
+		ValidatePak: function (pak) {
+			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
+			var localPath = PATH.join(fs_homepath, pak.dest);
+			var crc = SYSC.CRC32File(localPath);
+			if (crc !== pak.checksum) {
+				return false;
+			}
+			return true;
 		},
 		ValidateInstaller: function (installer) {
 			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
@@ -376,7 +421,8 @@ var LibrarySysCommon = {
 			nextEntry();
 		},
 		SyncInstallers: function (callback) {
-			var downloads = SYSC.DirtyInstallers(callback);
+			//var downloads = SYSC.DirtyInstallers(callback);
+			var downloads = SYSC.DirtyPaks(callback);
 
 			if (!downloads.length) {
 				return callback();
@@ -389,7 +435,8 @@ var LibrarySysCommon = {
 				}, function (loaded, total) {
 					SYS.LoadingProgress(loaded / total);
 				}, function (asset, data, next) {
-					SYSC.ExtractInstaller(new Uint8Array(data, asset.installer.offset), asset.installer.paks, next);
+					callback(err);
+					//SYSC.ExtractInstaller(new Uint8Array(data, asset.installer.offset), asset.installer.paks, next);
 				}, function (err) {
 					SYS.LoadingDescription(null);
 
@@ -399,7 +446,7 @@ var LibrarySysCommon = {
 				});
 			});
 		},
-		ValidatePak: function (asset) {
+		/*ValidatePak: function (asset) {
 			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
 			var localPath = PATH.join(fs_homepath, asset.name);
 			var crc = SYSC.CRC32File(localPath);
@@ -410,7 +457,7 @@ var LibrarySysCommon = {
 			return SYSC.GetManifest().filter(function (asset) {
 				return asset.name.indexOf('.pk3') !== -1 && !SYSC.ValidatePak(asset);
 			});
-		},
+		},*/
 		SyncPaks: function (callback) {
 			var downloads = SYSC.DirtyPaks();
 			SYSC.DownloadAssets(downloads, function (asset) {
@@ -544,11 +591,6 @@ var LibrarySysCommon = {
 		path = Module.UTF8ToString(ospath);
 		console.log("FOpen:", path);
 		console.log(new Error().stack);
-		if (path == "/base/qkey") {
-			console.log("HERE");
-			contents = FS.readdir('/base');
-			console.log(contents);
-		}
 		return FS.open(path, mode);
 	},
 	Sys_OpenWithDefault: function (path) {
