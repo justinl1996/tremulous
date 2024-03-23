@@ -235,6 +235,7 @@ var LibrarySysCommon = {
 				}
 
 				var asset = assets[nextDownload.pos];
+
 				onstartasset(asset);
 
 				SYSC.DownloadAsset(asset, function (loaded, total) {
@@ -308,7 +309,6 @@ var LibrarySysCommon = {
 		SavePak: function (name, buffer, callback) {
 			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
 			var localPath = PATH.join(fs_homepath, name);
-
 			try {
 				FS.mkdir(PATH.dirname(localPath), 0777);
 			} catch (e) {
@@ -324,7 +324,6 @@ var LibrarySysCommon = {
 		DirtyPaks: function (callback) {
 			var paks = [];
 			var assets = SYSC.GetManifest();
-			console.log(assets);
 			for (var i = 0; i < SYSC.paks.length; i++) {
 				var pak = SYSC.paks[i];
 
@@ -340,6 +339,7 @@ var LibrarySysCommon = {
 					return callback(new Error('Failed to find "' + pak.name + '" in manifest'));
 				}
 				if (!SYSC.ValidatePak(pak)) {
+					asset.dest = pak.dest;
 					paks.push(asset);
 				}
 			}
@@ -459,13 +459,13 @@ var LibrarySysCommon = {
 			});
 		},*/
 		SyncPaks: function (callback) {
-			var downloads = SYSC.DirtyPaks();
+			var downloads = SYSC.DirtyPaks(callback);
 			SYSC.DownloadAssets(downloads, function (asset) {
 				SYS.LoadingDescription('loading ' + asset.name);
 			}, function (loaded, total) {
 				SYS.LoadingProgress(loaded / total);
 			}, function (asset, data, next) {
-				SYSC.SavePak(asset.name, data, next);
+				SYSC.SavePak(asset.dest, data, next);
 			}, function (err) {
 				SYS.LoadingDescription(null);
 				setTimeout(function () {
@@ -476,10 +476,7 @@ var LibrarySysCommon = {
 		FS_Startup: function (callback) {
 			SYSC.UpdateManifest(function (err) {
 				if (err) return callback(err);
-				SYSC.SyncInstallers(function (err) {
-					if (err) return callback(err);
-					SYSC.SyncPaks(callback);
-				});
+				SYSC.SyncPaks(callback);
 			});
 		},
 		FS_Shutdown: function (callback) {

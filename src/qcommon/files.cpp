@@ -665,7 +665,11 @@ fileHandle_t FS_SV_FOpenFileWrite(const char *filename)
     }
 
     Com_DPrintf("writing to: %s\n", ospath);
-    fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "wb");
+#if EMSCRIPTEN
+	fsh[f].handleFiles.file.o = fopen( ospath, "wb" );
+#else
+	fsh[f].handleFiles.file.o = Sys_FOpen( ospath, "wb" );
+#endif
 
     Q_strncpyz(fsh[f].name, filename, sizeof(fsh[f].name));
 
@@ -707,8 +711,18 @@ long FS_SV_FOpenFileRead(const char *filename, fileHandle_t *fp)
     ospath[strlen(ospath) - 1] = '\0';
 
     Com_DPrintf("FS_SV_FOpenFileRead (fs_homepath): %s\n", ospath);
-
-    fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "rb");
+#if EMSCRIPTEN
+	qboolean exists = Sys_PathExists(ospath, qtrue);
+	if (!exists)
+	{
+		fsh[f].handleFiles.file.o = 0;
+	}
+	else {
+		fsh[f].handleFiles.file.o = fopen( ospath, "rb" );
+	}
+#else
+	fsh[f].handleFiles.file.o = Sys_FOpen( ospath, "rb" );
+#endif
     fsh[f].handleSync = false;
     if (!fsh[f].handleFiles.file.o)
     {
@@ -720,8 +734,18 @@ long FS_SV_FOpenFileRead(const char *filename, fileHandle_t *fp)
             ospath[strlen(ospath) - 1] = '\0';
 
             Com_DPrintf("FS_SV_FOpenFileRead (fs_basepath): %s\n", ospath);
-
-            fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "rb");
+#if EMSCRIPTEN
+			exists = Sys_PathExists(ospath, qtrue);
+			if (!exists)
+			{
+				fsh[f].handleFiles.file.o = 0;
+			}
+			else {
+				fsh[f].handleFiles.file.o = fopen( ospath, "rb" );
+			}
+#else
+			fsh[f].handleFiles.file.o = Sys_FOpen( ospath, "rb" );
+#endif
             fsh[f].handleSync = false;
         }
 
@@ -913,8 +937,11 @@ fileHandle_t FS_FOpenFileAppend(const char *filename)
     {
         return 0;
     }
-
+#if EMSCRIPTEN
+	fsh[f].handleFiles.file.o = fopen( ospath, "ab" );
+#else
     fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "ab");
+#endif
     fsh[f].handleSync = false;
     if (!fsh[f].handleFiles.file.o)
     {
@@ -3436,7 +3463,6 @@ static void FS_Startup_after_Sys_FS_Startup( cb_context_t *context, int status )
     }
 
 #else
-
     // add search path elements in reverse priority order
     if (fs_basepath->string[0])
     {
@@ -3557,7 +3583,6 @@ static void FS_Startup(const char *gameName, cb_context_t *after )
 
     fs_basepath = Cvar_Get("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT | CVAR_PROTECTED);
     fs_basegame = Cvar_Get("fs_basegame", BASEGAME, CVAR_INIT);
-
     const char *homePath = Sys_DefaultHomePath();
     if (!homePath || !homePath[0])
     {
