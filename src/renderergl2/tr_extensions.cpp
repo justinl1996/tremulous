@@ -45,7 +45,7 @@ void GLimp_InitExtraExtensions()
 {
     const char *extension;
     const char *result[3] = {"...ignoring %s\n", "...using %s\n", "...%s not found\n"};
-
+#if !EMSCRIPTEN
     // Check OpenGL version
     sscanf(glConfig.version_string, "%d.%d", &glRefConfig.openglMajorVersion, &glRefConfig.openglMinorVersion);
     if (glRefConfig.openglMajorVersion < 2) ri.Error(ERR_FATAL, "OpenGL 2.0 required!");
@@ -58,7 +58,10 @@ void GLimp_InitExtraExtensions()
     // Check if we need Intel graphics specific fixes.
     glRefConfig.intelGraphics = qfalse;
     if (strstr((char *)qglGetString(GL_RENDERER), "Intel")) glRefConfig.intelGraphics = qtrue;
-
+#else
+    bool q_gl_version_at_least_3_0 = false;
+    bool q_gl_version_at_least_3_2 = false;
+#endif
         // set DSA fallbacks
 #define GLE(ret, name, ...) qgl##name = GLDSA_##name;
     QGL_EXT_direct_state_access_PROCS;
