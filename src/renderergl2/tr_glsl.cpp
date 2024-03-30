@@ -504,6 +504,14 @@ static void GLSL_ShowProgramUniforms(GLuint program)
 	int             i, count, size;
 	GLenum			type;
 	char            uniformName[1000];
+// This function is rather expensive in WebGL, let's completely
+// avoid it if not a developer.
+#ifdef EMSCRIPTEN
+	if(!Cvar_VariableIntegerValue("developer"))
+	{
+		return;
+	}
+#endif
 
 	// query the number of active uniforms
 	qglGetProgramiv(program, GL_ACTIVE_UNIFORMS, &count);

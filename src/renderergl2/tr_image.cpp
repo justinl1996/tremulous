@@ -1965,6 +1965,11 @@ static void RawImage_UploadTexture(GLuint texture, byte *data, int x, int y,
 	dataFormat = PixelDataFormatFromInternalFormat(internalFormat);
 	dataType = picFormat == GL_RGBA16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE;
 
+// HULK-SMASH! GLES requires that the internal format matches the data format.
+#ifdef EMSCRIPTEN
+	internalFormat = dataFormat;
+#endif
+
 	miplevel = 0;
 	do
 	{

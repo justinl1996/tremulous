@@ -782,9 +782,11 @@ void GL_SetDefaultState( void )
 		GL_SelectTexture( 0 );
 	}
 
+#if !EMSCRIPTEN
 	qglEnable(GL_TEXTURE_2D);
 	GL_TextureMode( r_textureMode->string );
 	GL_TexEnv( GL_MODULATE );
+#endif
 
 	qglShadeModel( GL_SMOOTH );
 	qglDepthFunc( GL_LEQUAL );

@@ -1134,8 +1134,10 @@ static void IN_ProcessEvents( void )
 						case 1:   b = K_MOUSE1;     break;
 						case 2:   b = K_MOUSE3;     break;
 						case 3:   b = K_MOUSE2;     break;
+#if !EMSCRIPTEN
 						case 4:   b = K_MOUSE4;     break;
 						case 5:   b = K_MOUSE5;     break;
+#endif
 						default:  b = K_AUX1 + ( e.button.button - 8 ) % 16; break;
 					}
 					Com_QueueEvent(in_eventTime, SE_KEY, b,
