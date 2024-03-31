@@ -70,6 +70,7 @@ static bool winsockInitialized = false;
 #define _BSD_SOCKLEN_T_
 #endif
 
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <errno.h>
 #include <netdb.h>
@@ -893,20 +894,21 @@ SOCKET NET_IPSocket(int alternateProtocol, char *net_interface, int port, int *e
         return newsocket;
     }
     // make it non-blocking
-    if (ioctlsocket(newsocket, FIONBIO, &_true) == SOCKET_ERROR)
+    //if (ioctlsocket(newsocket, FIONBIO, &_true) == SOCKET_ERROR)
+    if( fcntl( newsocket, F_SETFL, O_NONBLOCK ) == SOCKET_ERROR )
     {
         Com_Printf("WARNING: NET_IPSocket: ioctl FIONBIO: %s\n", NET_ErrorString());
         *err = socketError;
         closesocket(newsocket);
         return INVALID_SOCKET;
     }
-
+#ifndef EMSCRIPTEN
     // make it broadcast capable
     if (setsockopt(newsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i)) == SOCKET_ERROR)
     {
         Com_Printf("WARNING: NET_IPSocket: setsockopt SO_BROADCAST: %s\n", NET_ErrorString());
     }
-
+#endif
     if (!net_interface || !net_interface[0])
     {
         address.sin_family = AF_INET;
@@ -978,14 +980,15 @@ SOCKET NET_IP6Socket(int alternateProtocol, char *net_interface, int port, struc
     }
 
     // make it non-blocking
-    if (ioctlsocket(newsocket, FIONBIO, &_true) == SOCKET_ERROR)
+    //if (ioctlsocket(newsocket, FIONBIO, &_true) == SOCKET_ERROR)
+    if( fcntl( newsocket, F_SETFL, O_NONBLOCK ) == SOCKET_ERROR )
     {
         Com_Printf("WARNING: NET_IP6Socket: ioctl FIONBIO: %s\n", NET_ErrorString());
         *err = socketError;
         closesocket(newsocket);
         return INVALID_SOCKET;
     }
-
+#ifndef EMSCRIPTEN
 #ifdef IPV6_V6ONLY
     {
         int i = 1;
@@ -998,7 +1001,7 @@ SOCKET NET_IP6Socket(int alternateProtocol, char *net_interface, int port, struc
         }
     }
 #endif
-
+#endif
     if (!net_interface || !net_interface[0])
     {
         address.sin6_family = AF_INET6;

@@ -3098,7 +3098,6 @@ Com_Frame
 */
 void Com_Frame( void )
 {
-
     int msec, minMsec;
     int timeVal, timeValSV;
     static int lastTime = 0, bias = 0;
