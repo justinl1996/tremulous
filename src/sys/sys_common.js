@@ -109,7 +109,8 @@ var LibrarySysCommon = {
 		],
 		paks: [
 			{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
-			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3"', checksum: 3984856731 },
+			{ src: 'data-1.1.1.pk3', dest: 'gpp/data-1.1.1.pk3', checksum: 2236444480 },
+			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
 			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
 			{ src: 'map-atcs-1.1.0.pk3', dest: 'gpp/map-atcs-1.1.0.pk3', checksum: 1649092924 },
 			{ src: 'map-karith-1.1.0.pk3', dest: 'gpp/map-karith-1.1.0.pk3', checksum: 3322431863 },
@@ -117,7 +118,12 @@ var LibrarySysCommon = {
 			{ src: 'map-niveus-1.1.0.pk3', dest: 'gpp/map-niveus-1.1.0.pk3', checksum: 1601849332 },
 			{ src: 'map-transit-1.1.0.pk3', dest: 'gpp/map-transit-1.1.0.pk3', checksum: 1087076925 },
 			{ src: 'map-tremor-1.1.0.pk3', dest: 'gpp/map-tremor-1.1.0.pk3', checksum: 2902177249 },
-			{ src: 'map-uncreation-1.1.0.pk3', dest: 'gpp/map-uncreation-1.1.0.pk3', checksum: 29654410 }
+			{ src: 'map-uncreation-1.1.0.pk3', dest: 'gpp/map-uncreation-1.1.0.pk3', checksum: 29654410 },
+		],
+		qvms: [
+			{ src: 'cgame.qvm', dest: 'gpp/vm/cgame.qvm' },
+			{ src: 'game.qvm', dest: 'gpp/vm/game.qvm' },
+			{ src: 'ui.qvm', dest: 'gpp/vm/ui.qvm' }
 		],
 		manifest: null,
 		Print: function (str) {
@@ -306,7 +312,7 @@ var LibrarySysCommon = {
 				}
 			});
 		},
-		SavePak: function (name, buffer, callback) {
+		SaveFile: function (name, buffer, callback) {
 			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
 			var localPath = PATH.join(fs_homepath, name);
 			try {
@@ -344,7 +350,6 @@ var LibrarySysCommon = {
 				}
 			}
 			return paks;
-
 		},
 		ValidatePak: function (pak) {
 			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
@@ -354,6 +359,27 @@ var LibrarySysCommon = {
 				return false;
 			}
 			return true;
+		},
+		DirtyQVM: function(callback) {
+			var qvms = [];
+			var assets = SYSC.GetManifest();
+			for (var i = 0; i < SYSC.qvms.length; i++) {
+				var qvm = SYSC.qvms[i];
+
+				var asset;
+				for (var j = 0; j < assets.length; j++) {
+					if (assets[j].name === qvm.src) {
+						asset = assets[j];
+						break;
+					}
+				}
+				if (!asset) {
+					return callback(new Error('Failed to find "' + qvm.name + '" in manifest'));
+				}
+				asset.dest = qvm.dest;
+				qvms.push(asset);
+			}
+			return qvms;
 		},
 		ValidateInstaller: function (installer) {
 			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
@@ -458,14 +484,15 @@ var LibrarySysCommon = {
 				return asset.name.indexOf('.pk3') !== -1 && !SYSC.ValidatePak(asset);
 			});
 		},*/
-		SyncPaks: function (callback) {
+		SyncFiles: function (callback) {
 			var downloads = SYSC.DirtyPaks(callback);
+			downloads = downloads.concat(SYSC.DirtyQVM(callback));
 			SYSC.DownloadAssets(downloads, function (asset) {
 				SYS.LoadingDescription('loading ' + asset.name);
 			}, function (loaded, total) {
 				SYS.LoadingProgress(loaded / total);
 			}, function (asset, data, next) {
-				SYSC.SavePak(asset.dest, data, next);
+				SYSC.SaveFile(asset.dest, data, next);
 			}, function (err) {
 				SYS.LoadingDescription(null);
 				setTimeout(function () {
@@ -476,7 +503,7 @@ var LibrarySysCommon = {
 		FS_Startup: function (callback) {
 			SYSC.UpdateManifest(function (err) {
 				if (err) return callback(err);
-				SYSC.SyncPaks(callback);
+				SYSC.SyncFiles(callback);
 			});
 		},
 		FS_Shutdown: function (callback) {
@@ -595,7 +622,7 @@ var LibrarySysCommon = {
 	},
 	Sys_PathExists: function (ospath, followSymLink) {
 		path = Module.UTF8ToString(ospath);
-		info = FS.analyzePath(ospath, followSymLink);
+		info = FS.analyzePath(path, followSymLink);
 		return info.exists;
 	},
 	Sys_Mkdir: function (directory) {

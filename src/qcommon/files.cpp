@@ -891,8 +891,11 @@ fileHandle_t FS_FOpenFileWrite(const char *filename)
     // enabling the following line causes a recursive function call loop
     // when running with +set logfile 1 +set developer 1
     // Com_DPrintf( "writing to: %s\n", ospath );
+#if EMSCRIPTEN
+    fsh[f].handleFiles.file.o = fopen(ospath, "wb");
+#else
     fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "wb");
-
+#endif
     Q_strncpyz(fsh[f].name, filename, sizeof(fsh[f].name));
 
     fsh[f].handleSync = false;
@@ -1148,14 +1151,20 @@ long FS_FOpenFileReadDir(
 
             netpath = FS_BuildOSPath(dir->path, dir->gamedir, filename);
 #if EMSCRIPTEN
+
 			exists = Sys_PathExists(netpath, qtrue);
 			if (!exists)
 			{
 				return -1;
 			}
 #endif
+            if (strstr(filename, "ui.qvm"))
+                Com_Printf("exists ui.qvm: %s\n", netpath);
+#if EMSCRIPTEN
+            filep = fopen(netpath, "rb");
+#else
             filep = Sys_FOpen(netpath, "rb");
-
+#endif
             if (filep)
             {
                 len = FS_fplength(filep);
@@ -1284,8 +1293,12 @@ long FS_FOpenFileReadDir(
             return -1;
         }
 #endif
-        filep = Sys_FOpen(netpath, "rb");
 
+#if EMSCRIPTEN
+        filep = fopen(netpath, "rb");
+#else
+        filep = Sys_FOpen(netpath, "rb");
+#endif
         if (filep == nullptr)
         {
             *file = 0;
