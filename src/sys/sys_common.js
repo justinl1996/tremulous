@@ -658,6 +658,7 @@ var LibrarySysCommon = {
 	},
 	Sys_DllExtension: function (filename) {
 		console.log("Sys_DllExtension!");
+		return 0;
 	}
 };
 

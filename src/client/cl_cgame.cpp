@@ -383,9 +383,17 @@ void CL_ShutdownCGame( void ) {
 	if ( !cls.cgame ) {
 		return;
 	}
+
 	VM_Call( cls.cgame, CG_SHUTDOWN );
 	VM_Free( cls.cgame );
 	cls.cgame = NULL;
+/*
+#if EMSCRIPTEN
+	cls.cgameGlConfig = NULL;
+	cls.cgameFirstCvar = NULL;
+	cls.numCgamePatches = 0;
+#endif
+*/
 }
 
 static int	FloatAsInt( float f ) {

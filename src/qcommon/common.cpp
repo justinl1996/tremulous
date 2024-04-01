@@ -2184,6 +2184,7 @@ sysEvent_t Com_GetSystemEvent( void )
         return eventQueue[ ( eventTail - 1 ) & MASK_QUEUED_EVENTS ];
     }
 
+#ifndef EMSCRIPTEN
     // check for console commands
     s = Sys_ConsoleInput();
     if ( s )
@@ -2196,6 +2197,7 @@ sysEvent_t Com_GetSystemEvent( void )
         strcpy( b, s );
         Com_QueueEvent( 0, SE_CONSOLE, 0, 0, len, b );
     }
+#endif
 
     // return if we have data
     if ( eventHead > eventTail )
@@ -2390,6 +2392,7 @@ int Com_EventLoop(void)
                 CL_CharEvent( ev.evValue );
                 break;
             case SE_MOUSE:
+                Com_Printf("Mouse Movement\n");
                 CL_MouseEvent( ev.evValue, ev.evValue2, ev.evTime );
                 break;
             case SE_JOYSTICK_AXIS:
@@ -2820,7 +2823,6 @@ static void Com_Init_after_FS_InitFilesystem( cb_context_t *context, int status 
         }
 #endif
     }
-
     // start in full screen ui mode
     Cvar_Set("r_uiFullScreen", "1");
 

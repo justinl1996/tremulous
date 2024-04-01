@@ -386,11 +386,13 @@ IN_ActivateMouse
 */
 static void IN_ActivateMouse( void )
 {
-	if (!mouseAvailable || !SDL_WasInit( SDL_INIT_VIDEO ) )
+	if (!mouseAvailable || !SDL_WasInit( SDL_INIT_VIDEO ) ) {
+		Com_Printf("Mouse not available\n");
 		return;
-
+	}
 	if( !mouseActive )
 	{
+		Com_Printf("Mouse not active\n");
 		SDL_SetRelativeMouseMode( SDL_TRUE );
 		SDL_SetWindowGrab( SDL_window, SDL_TRUE );
 
@@ -400,6 +402,7 @@ static void IN_ActivateMouse( void )
 	// in_nograb makes no sense in fullscreen mode
 	if( !cls.glconfig.isFullscreen )
 	{
+		Com_Printf("Mouse not fullscreen\n");
 		if( in_nograb->modified || !mouseActive )
 		{
 			if( in_nograb->integer )
@@ -1039,12 +1042,12 @@ static void IN_ProcessEvents( void )
 
 	if( !SDL_WasInit( SDL_INIT_VIDEO ) )
 			return;
-
 	while( SDL_PollEvent( &e ) )
 	{
 		switch( e.type )
 		{
 			case SDL_KEYDOWN:
+				Com_Printf("SDL_KEYDOWN\n");
 				if ( e.key.repeat && Key_GetCatcher( ) == 0 )
 					break;
 
@@ -1117,6 +1120,7 @@ static void IN_ProcessEvents( void )
 				break;
 
 			case SDL_MOUSEMOTION:
+				Com_Printf("SDL_MOUSEMOTION\n");
 				if( mouseActive )
 				{
 					if( !e.motion.xrel && !e.motion.yrel )
@@ -1128,6 +1132,7 @@ static void IN_ProcessEvents( void )
 			case SDL_MOUSEBUTTONDOWN:
 			case SDL_MOUSEBUTTONUP:
 				{
+					Com_Printf("SDL_MOUSEBUTTON\n");
 					int b;
 					switch( e.button.button )
 					{
@@ -1231,29 +1236,34 @@ void IN_Frame( void )
 
 	if( !cls.glconfig.isFullscreen && ( Key_GetCatcher( ) & KEYCATCH_CONSOLE ) )
 	{
+		Com_Printf("1 Deactivate Mouse\n");
 		// Console is down in windowed mode
 		IN_DeactivateMouse( );
 	}
 	else if( !cls.glconfig.isFullscreen && loading )
 	{
+		Com_Printf("2 Deactivate Mouse\n");
 		// Loading in windowed mode
 		IN_DeactivateMouse( );
 	}
 	else if( !cls.glconfig.isFullscreen && cursorShowing && cls.uiInterface != 2 )
 	{
+		Com_Printf("3 Deactivate Mouse\n");
 		// Use WM cursor when not fullscreen
 		IN_DeactivateMouse( );
 	}
 	else if( !( SDL_GetWindowFlags( SDL_window ) & SDL_WINDOW_INPUT_FOCUS ) )
 	{
+		Com_Printf("4 Deactivate Mouse\n");
 		// Window not got focus
 		IN_DeactivateMouse( );
 	}
 	else
-		IN_ActivateMouse( );
-
-	if( !mouseActive && cls.uiInterface != 2 )
 	{
+		IN_ActivateMouse( );
+	}
+	if( !mouseActive && cls.uiInterface != 2 )
+	{	
 		SDL_GetMouseState( &x, &y );
 		IN_SetUIMousePosition( x, y );
 	}
@@ -1285,10 +1295,9 @@ void IN_Init( void *windowData )
 		Com_Error( ERR_FATAL, "IN_Init called before SDL_Init( SDL_INIT_VIDEO )" );
 		return;
 	}
-
 	SDL_window = (SDL_Window *)windowData;
 
-	Com_DPrintf( "\n------- Input Initialization -------\n" );
+	Com_Printf( "\n------- Input Initialization -------\n" );
 
 	in_keyboardDebug = Cvar_Get( "in_keyboardDebug", "0", CVAR_ARCHIVE );
 
@@ -1309,7 +1318,7 @@ void IN_Init( void *windowData )
 	Cvar_SetValue( "com_minimized", appState & SDL_WINDOW_MINIMIZED );
 
 	IN_InitJoystick( );
-	Com_DPrintf( "------------------------------------\n" );
+	Com_Printf( "------------------------------------\n" );
 }
 
 /*
