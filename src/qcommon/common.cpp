@@ -2392,7 +2392,6 @@ int Com_EventLoop(void)
                 CL_CharEvent( ev.evValue );
                 break;
             case SE_MOUSE:
-                Com_Printf("Mouse Movement\n");
                 CL_MouseEvent( ev.evValue, ev.evValue2, ev.evTime );
                 break;
             case SE_JOYSTICK_AXIS:
