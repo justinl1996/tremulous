@@ -3958,7 +3958,10 @@ void FS_InitFilesystem_after_FS_Startup( cb_context_t *context, int status ) {
     Com_Printf("lastValidBase: %s\n", fs_basegame->string);
     Com_Printf("lastValidGame: %s\n", fs_gamedirvar->string);
 
-	cb_run(after, 0);
+    Com_Printf("lastValidBase: %s\n", fs_basegame->string);
+    Com_Printf("lastValidGame: %s\n", fs_gamedirvar->string);
+
+    cb_run(after, 0);
 }
 
 /*
