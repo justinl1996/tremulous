@@ -2639,7 +2639,6 @@ static qboolean UI_OwnerDrawVisible(int flags)
     uiClientState_t cs;
     team_t team;
     char info[MAX_INFO_STRING];
-
     trap_GetClientState(&cs);
     trap_GetConfigString(CS_PLAYERS + cs.clientNum, info, MAX_INFO_STRING);
     team = atoi(Info_ValueForKey(info, "t"));
@@ -2730,6 +2729,7 @@ static qboolean UI_OwnerDrawVisible(int flags)
 
 static qboolean UI_NetSource_HandleKey(int key)
 {
+    Com_Printf("NetSource HandleKey\n");
     if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER)
     {
         if (key == K_MOUSE2)
@@ -2766,6 +2766,7 @@ static qboolean UI_NetSource_HandleKey(int key)
 
 static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int key)
 {
+    Com_Printf("UI_OwnerDrawHandleKey %d %d %d\n", ownerDraw, key, UI_NETSOURCE);
     switch (ownerDraw)
     {
         case UI_NETSOURCE:

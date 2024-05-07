@@ -23,11 +23,15 @@ enum
   ITEM_TYPE_BIND          // keyboard control configuration
 };
 
-#define ALIGN_LEFT   0 // left alignment
-#define ALIGN_CENTER 1 // center alignment
-#define ALIGN_RIGHT  2 // right alignment
-#define ASPECT_NONE  3 // no aspect compensation
-#define ALIGN_NONE   4
+// The first items in these enums are the defaults if menus do not specify
+enum
+{
+  ALIGN_LEFT,   // left alignment
+  ALIGN_CENTER, // center alignment
+  ALIGN_RIGHT,  // right alignment
+  ASPECT_NONE,  // no aspect compensation
+  ALIGN_NONE
+};
 
 enum
 {
@@ -51,19 +55,15 @@ enum
 
 enum
 {
-  WINDOW_BORDER_NONE,       // no border
-  WINDOW_BORDER_FULL,       // full border based on border color (single pixel)
-  WINDOW_BORDER_HORZ,       // horizontal borders only
-  WINDOW_BORDER_VERT,       // vertical borders only
-  WINDOW_BORDER_KCGRADIENT, // horizontal border using the gradient bars
-  WINDOW_BORDER_ROUNDED     // full rounded
-};
-
-enum
-{
   BORDER_SQUARE,          // as WINDOW_BORDER_FULL
   BORDER_ROUNDED,         // rounded
-  BORDER_FOLD             // fold paper
+  BORDER_FOLD,             // fold paper
+  WINDOW_BORDER_NONE,      // no border
+  WINDOW_BORDER_FULL,      // full border based on border color (single pixel)
+  WINDOW_BORDER_HORZ,      // horizontal borders only
+  WINDOW_BORDER_VERT,      // vertical borders only
+  WINDOW_BORDER_KCGRADIENT,// horizontal border using the gradient bars
+  WINDOW_BORDER_ROUNDED     // full rounded
 };
 
 enum
@@ -118,9 +118,10 @@ enum
   FEEDER_TREMHUMANBUILD,       // human buildables
   FEEDER_IGNORE_LIST,          // ignored players
   FEEDER_HELP_LIST,            // help topics
-  FEEDER_RESOLUTIONS,           // display resolutions
-  FEEDER_TREMVOICECMD,      // voice commands
-  FEEDER_GITHUB_RELEASE           // latest update info
+  FEEDER_TREMVOICECMD,         // voice commands
+  FEEDER_GITHUB_RELEASE,       // latest update info
+
+  FEEDER_RESOLUTIONS           // display resolutions
 };
 
 // display flags
@@ -209,7 +210,6 @@ enum
   CG_PLAYER_THZ_SCANNER,
 
   UI_DOWNLOAD_OVERALL,
-
   UI_NETSOURCE,
   UI_NETMAPPREVIEW,
   UI_NETMAPCINEMATIC,
@@ -224,8 +224,8 @@ enum
   UI_TEAMINFOPANEMODEL,
   UI_ACLASSINFOPANE,
   UI_ACLASSINFOPANEMODEL,
-  UI_AUPGRADEINFOPANE,
   UI_AUPGRADEINFOPANEMODEL,
+  UI_AUPGRADEINFOPANE,
   UI_HITEMINFOPANE,
   UI_HITEMINFOPANEMODEL,
   UI_HBUYINFOPANE,
@@ -236,7 +236,6 @@ enum
   UI_HBUILDINFOPANE,
   UI_HBUILDINFOPANEMODEL,
   UI_HELPINFOPANE,
-
   UI_VOICECMDINFOPANE
 };
 

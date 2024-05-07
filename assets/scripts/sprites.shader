@@ -64,19 +64,3 @@ gfx/sprites/chatballoon
 		blendfunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
 	}
 }
-
-gfx/sprites/aliens_chatballoon
-{
-	{
-		map gfx/sprites/aliens_chatballoon.png
-		blendfunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-gfx/sprites/humans_chatballoon
-{
-	{
-		map gfx/sprites/humans_chatballoon.png
-		blendfunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}

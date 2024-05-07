@@ -1,5 +1,4 @@
 #include "ui/menudef.h"
-#include "ui/menustyle.h"
 
 {
 
@@ -23,7 +22,7 @@
     fullscreen MENU_FALSE
     outOfBoundsClick
     rect (320-(W/2)) (240-(H/2)) W H
-    focusColor HUMANS_WINDOW_FOCUSCOLOR
+    focusColor 1 .75 0 1
     style WINDOW_STYLE_EMPTY
     popup
 
@@ -32,14 +31,13 @@
       name window
       rect 0 0 W H
       style WINDOW_STYLE_FILLED
-      backcolor HUMANS_WINDOW_BACKCOLOR
+      backcolor 0 0 0 1
       visible MENU_TRUE
       decoration
 
-      border WINDOW_BORDER_ROUNDED
+      border WINDOW_BORDER_FULL
       borderSize 1.0
-      borderColor HUMANS_WINDOW_BORDER
-      borderStyle HUMANS_WINDOW_BORDER_STYLE
+      borderColor 0.5 0.5 0.5 1
     }
 
     itemDef

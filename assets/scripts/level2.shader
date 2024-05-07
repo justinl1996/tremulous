@@ -1,19 +1,5 @@
-models/players/level2/default
-{
-	{
-		map models/players/level2/default.tga
-		rgbGen lightingDiffuse
-	}
-	{
-		map models/players/level2/default.tga
-		blendFunc GL_SRC_ALPHA GL_ONE
-		detail
-		alphaGen lightingSpecular
-	}
-}
-
 models/players/level2/level2adv
-{
+{    
   {
     map models/players/level2/lvl2_fx.tga
     blendFunc GL_ONE GL_ZERO
@@ -27,12 +13,6 @@ models/players/level2/level2adv
     map models/players/level2/adv.tga
     blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
     rgbGen lightingDiffuse
-  }
-  {
-    map models/players/level2/adv.tga
-    blendFunc GL_SRC_ALPHA GL_ONE
-    detail
-    alphaGen lightingSpecular
   }
 }
 
