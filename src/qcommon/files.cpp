@@ -3956,6 +3956,8 @@ void FS_InitFilesystem_after_FS_Startup( cb_context_t *context, int status ) {
 
     Q_strncpyz(lastValidBase, fs_basegame->string, sizeof(lastValidBase));
     Q_strncpyz(lastValidGame, fs_gamedirvar->string, sizeof(lastValidGame));
+    Com_Printf("lastValidBase: %s\n", fs_basegame->string);
+    Com_Printf("lastValidGame: %s\n", fs_gamedirvar->string);
 
 	cb_run(after, 0);
 }
@@ -4024,6 +4026,8 @@ static void FS_Restart_after_FS_Startup( cb_context_t *context, int status ) {
             FS_PureServerSetLoadedPaks("", "");
             Cvar_Set("fs_basegame", lastValidBase);
             Cvar_Set("fs_game", lastValidGame);
+            Com_Printf("lastValidBase: %s\n", lastValidBase);
+            Com_Printf("lastValidGame: %s\n", lastValidGame);
             lastValidBase[0] = lastValidGame[0] = '\0';
             FS_Restart(fs_checksumFeed, context);
             Com_Error(ERR_DROP, "Invalid game folder");

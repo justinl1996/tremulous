@@ -9,7 +9,7 @@ models/splash/bright_star
 	{
 		map models/splash/bright_star_2.tga
 		blendfunc add
-		rgbGen wave sin 0 0.5 0 0.09
+		rgbGen wave sin 0 0.5 0 0.09 
 	}
 }
 
@@ -19,23 +19,14 @@ models/splash/nebula
 	{
 		map models/splash/nebula.tga
 		blendfunc add
-		rgbGen wave sin 0.5 1 5 0.05
+		rgbGen wave sin 0.5 1 5 0.05 
 		tcMod scale -1 1
 	}
 	{
 		map models/splash/nebula_2.tga
 		blendfunc add
-		rgbGen wave sin 0.3 1 2.5 0.05
+		rgbGen wave sin 0.3 1 2.5 0.05 
 		tcMod scale -1 1
-	}
-}
-
-models/splash/circles
-{
-	nopicmip
-	{
-		map models/splash/circles.png
-		blendfunc blend
 	}
 }
 
@@ -45,7 +36,7 @@ models/splash/trem_black
 //	{
 //		map models/splash/highlights.tga
 //		blendfunc add
-//		rgbGen wave sin 0 0.2 0 0.2
+//		rgbGen wave sin 0 0.2 0 0.2 
 //		tcMod scroll -0.2 0
 //	}
 
@@ -56,3 +47,4 @@ models/splash/trem_black
 		rgbGen identity
 	}
 }
+

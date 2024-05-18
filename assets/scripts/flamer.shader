@@ -32,19 +32,4 @@ models/weapons/flamer/flamer
 		rgbGen lightingDiffuse
 		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
 	}
-	{
-		map models/weapons/flamer/flamer.tga
-		blendFunc GL_SRC_ALPHA GL_ONE
-		detail
-		alphaGen lightingSpecular
-		depthFunc equal
-	}
-	{
-		map models/buildables/mgturret/ref_map.jpg
-		blendFunc GL_DST_COLOR GL_ONE
-		detail
-		tcGen environment
-		alphaGen lightingSpecular
-		depthFunc equal
-	}
 }

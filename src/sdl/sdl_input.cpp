@@ -1044,7 +1044,6 @@ static void IN_ProcessEvents( void )
 		switch( e.type )
 		{
 			case SDL_KEYDOWN:
-				Com_Printf("SDL_KEYDOWN\n");
 				if ( e.key.repeat && Key_GetCatcher( ) == 0 )
 					break;
 

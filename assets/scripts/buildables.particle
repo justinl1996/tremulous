@@ -6,7 +6,7 @@ humanBuildableDamagedPS
     {
       shader sync gfx/sprites/smoke
 
-      displacement ~8 ~8 3~5 ~0
+      displacement 0 0 8 ~0
 
       velocityType      static
       velocityDir       linear
@@ -18,8 +18,8 @@ humanBuildableDamagedPS
       accelerationMagnitude 50
       acceleration          0 0 1 0
 
-      radius 0 6.0 30.0
-      alpha  0 0.125 0.0
+      radius 0 10.0 50.0
+      alpha  0 0.5 0.0
       rotation 0 ~360 -
       bounce 0.5
 
@@ -28,7 +28,7 @@ humanBuildableDamagedPS
 
     count infinite
     delay 0
-    period 10 - ~0%
+    period 200 - ~0%
   }
 
   ejector
@@ -225,8 +225,7 @@ alienBuildableDamagedPS
       radius 0 4.0 20.0
       alpha  0 1.0 0.0
       rotation 0 ~360 -
-      bounce 0.1
-      bounceMark 3 16 gfx/sprites/green_acid_mark
+      bounce 0.0
 
       lifeTime 1000~50%
     }
@@ -257,7 +256,6 @@ alienBuildableDestroyedPS
       alpha  0 1.0 0.0
       rotation 0 ~360 -
       bounce 0.0
-      bounceMark 3 16 gfx/sprites/green_acid_mark
 
       lifeTime 1000~50%
     }
@@ -289,7 +287,6 @@ alienBuildableDestroyedPS
       alpha  0 1.0 0.0
       rotation 0 ~360 -
       bounce 0.2
-      bounceMark 3 16 gfx/sprites/green_acid_mark
 
       lifeTime 1000
     }
@@ -329,52 +326,6 @@ alienBuildableDestroyedPS
     delay 0
     period 10 - ~0%
   }
-  ejector
-  {
-    particle
-    {
-      dynamicLight    0 300 0 { 0.5 1.0 0.156 }
-
-      lifeTime        600~100
-    }
-
-    count 1
-    delay 0
-    period 0 - ~0%
-  }
-}
-
-alienAcideTubeAcidTrailPS
-{
-  ejector
-  {
-    particle
-    {
-      shader sync gfx/sprites/green_acid
-
-      displacement -4 -4 -4 ~8
-
-      velocityType      static
-      velocityDir       linear
-      velocityMagnitude 300~75%
-      velocity          0 0 0 ~1
-
-      accelerationType      static
-      accelerationDir       linear
-      accelerationMagnitude 800
-      acceleration          0 0 -1 ~30
-
-      radius 0 10 5
-      alpha  500~50% 0.4 0
-      rotation 0 360~200% 360~200%
-      bounce 0.2
-
-      lifeTime 1000~100%
-    }
-
-    count 1
-    delay 350~100%
-  }
 }
 
 alienAcidTubePS
@@ -385,7 +336,7 @@ alienAcidTubePS
     {
       shader sync gfx/sprites/green_acid
 
-      displacement 0 0 -5 ~2
+      displacement 0 0 0 ~2
       normalDisplacement  20
 
       velocityType      normal
@@ -402,44 +353,12 @@ alienAcidTubePS
       alpha  0 1.0 0.0
       rotation 0 ~360 -
       bounce 0.2
-      bounceMark 1 16 gfx/sprites/green_acid_mark
-      // should add child particle system to get better "acid" effect with sound
-      // Marks limit is reached easily with only one acid tube
 
       lifeTime 1000~100%
-
-      childSystem alienAcideTubeAcidTrailPS
     }
 
-    count 35
-    delay 120
-    period 17 17 ~0%
-  }
-  ejector
-  {
-    particle
-    {
-      dynamicLight    0 400 0 { 0.16 0.32 0.05 }
-
-      displacement 0 0 -5 0
-      normalDisplacement  20
-
-      velocityType      normal
-      velocityDir       linear
-      velocityMagnitude 113
-      velocity          0 0 1 5
-
-      accelerationType      static
-      accelerationDir       linear
-      accelerationMagnitude 800
-      acceleration          0 0 -1 15
-
-      bounce 0.2
-
-      lifeTime 4500~20%
-    }
-
-    count 1
-    delay 200
+    count 50
+    delay 0
+    period 10 - ~0%
   }
 }

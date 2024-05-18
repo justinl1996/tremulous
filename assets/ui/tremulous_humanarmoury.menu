@@ -1,5 +1,4 @@
 #include "ui/menudef.h"
-#include "ui/menustyle.h"
 
 {
 
@@ -22,9 +21,6 @@
 #define INFO_Y    BORDER
 #define INFO_TOFF 6
 
-#define MODEL_W (32*4+2*BORDER)
-#define MODEL_H (24*4)
-
 #define BUTT_X    INFO_X
 #define BUTT_W    (INFO_W/3)
 
@@ -35,7 +31,7 @@
     fullscreen MENU_FALSE
     outOfBoundsClick
     rect (320-(W/2)) (240-(H/2)) W H
-    focusColor HUMANS_WINDOW_FOCUSCOLOR
+    focusColor 1 .75 0 1
     style WINDOW_STYLE_FILLED
     popup
     onOpen
@@ -50,14 +46,13 @@
       name window
       rect 0 0 W H
       style WINDOW_STYLE_FILLED
-      backcolor HUMANS_WINDOW_BACKCOLOR
+      backcolor 0 0 0 1
       visible MENU_TRUE
       decoration
 
-      border WINDOW_BORDER_ROUNDED
+      border WINDOW_BORDER_FULL
       borderSize 1.0
-      borderColor HUMANS_WINDOW_BORDER
-      borderStyle HUMANS_WINDOW_BORDER_STYLE
+      borderColor 0.5 0.5 0.5 1
     }
 
     itemDef
@@ -71,9 +66,8 @@
       textscale .33
       elementtype LISTBOX_TEXT
       feeder FEEDER_TREMHUMANARMOURYBUY
-      border WINDOW_BORDER_ROUNDED
+      border WINDOW_BORDER_FULL
       bordercolor   0.5 0.5 0.5 0.5
-      borderStyle HUMANS_BORDER_STYLE BORDER_SQUARE BORDER_SQUARE HUMANS_BORDER_STYLE
       forecolor     1   1   1   1
       backcolor     0.2 0.2 0.2 1
       outlinecolor  0.1 0.1 0.1 0.5
@@ -97,9 +91,8 @@
       textscale .33
       elementtype LISTBOX_TEXT
       feeder FEEDER_TREMHUMANARMOURYSELL
-      border WINDOW_BORDER_ROUNDED
+      border WINDOW_BORDER_FULL
       bordercolor   0.5 0.5 0.5 0.5
-      borderStyle BORDER_SQUARE HUMANS_BORDER_STYLE HUMANS_BORDER_STYLE BORDER_SQUARE
       forecolor     1   1   1   1
       backcolor     0.2 0.2 0.2 1
       outlinecolor  0.1 0.1 0.1 0.5
@@ -110,17 +103,6 @@
         play "sound/misc/menu1.wav";
         uiScript SellToArmoury;
       }
-    }
-
-    itemDef
-    {
-      name infopane_model
-      ownerdraw UI_HBUYINFOPANEMODEL
-      rect (INFO_X+INFO_W-MODEL_W+1) (INFO_Y+INFO_H-MODEL_H+1) MODEL_W MODEL_H
-      style WINDOW_STYLE_EMPTY
-      aspectBias ALIGN_CENTER
-      visible MENU_TRUE
-      decoration
     }
 
     itemDef
