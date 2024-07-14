@@ -759,7 +759,7 @@ ifeq ($(PLATFORM),js)
   CXX=$(EMSCRIPTEN)/emcc
   RANLIB=$(EMSCRIPTEN)/emranlib
   ARCH=js
-
+  BINEXT=.js
 # debug optimize flags: --closure 0 --minify 0 -g
 
   OPTIMIZEVM += -O0 -g
@@ -806,9 +806,12 @@ ifeq ($(PLATFORM),js)
     --js-library $(LIBVMJS) \
     -s INVOKE_RUN=1 \
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_CON_SetIsTTY', '_VM_GetCurrent', '_VM_SetCurrent']" \
+    -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
     -s LEGACY_GL_EMULATION=1 \
     -s RESERVED_FUNCTION_POINTERS=1 \
-    -s TOTAL_MEMORY=234881024 \
+    -s STACK_SIZE=268435456 \
+    -s TOTAL_MEMORY=805306368 \
+    -s ALLOW_MEMORY_GROWTH=1 \
     -s EXPORT_NAME=\"ioq3ded\" \
     $(OPTIMIZE)
 
@@ -823,6 +826,8 @@ ifeq ($(PLATFORM),js)
   CLIENT_CFLAGS += -s USE_SDL=2 -s WASM=0
   CLIENT_LIBS += -lidbfs.js
   SHLIBCFLAGS=-fPIC
+  SERVER_LIBS += -lnodefs.js
+  SERVER_CFLAGS += -s WASM=0
 
 else # ifeq js
 
@@ -2506,7 +2511,7 @@ endif
 
 $(B)/$(SERVERBIN)$(FULLBINEXT): $(Q3DOBJ) $(LIBSYSCOMMON) $(LIBSYSNODE) $(LIBVMJS)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) $(SERVER_LDFLAGS) -o $@ $(Q3DOBJ) -v $(LIBS)
+	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVER_CFLAGS) $(SERVER_LIBS) -o $@ $(Q3DOBJ) -v $(LIBS)
 
 #############################################################################
 ## TREMULOUS CGAME
