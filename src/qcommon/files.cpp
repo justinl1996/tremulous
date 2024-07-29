@@ -4110,10 +4110,6 @@ void FS_ConditionalRestart(int checksumFeed, bool disconnect, cb_context_t *afte
 	cb_context_t *context;
 	conditional_restart_data_t *data;
 
-	context = cb_create_context(FS_ConditionalRestart_after_restart, conditional_restart_data_t);
-	data = (conditional_restart_data_t*)context->data;
-	data->after = after;
-
     if (fs_gamedirvar->modified)
     {
         if (FS_FilenameCompare(lastValidGame, fs_gamedirvar->string) &&
@@ -4128,13 +4124,21 @@ void FS_ConditionalRestart(int checksumFeed, bool disconnect, cb_context_t *afte
 
     if (checksumFeed != fs_checksumFeed)
     {
+        context = cb_create_context(FS_ConditionalRestart_after_restart, conditional_restart_data_t);
+        data = (conditional_restart_data_t*)context->data;
+        data->after = after;
         FS_Restart(checksumFeed, context);
     }
 
     else if (fs_numServerPaks && !fs_reordered)
         FS_ReorderPurePaks();
 
+	context = cb_create_context(FS_ConditionalRestart_after_restart, conditional_restart_data_t);
+	data = (conditional_restart_data_t*)context->data;
+	data->after = after;
+//#ifdef EMSCRIPTEN
     cb_run(context, 0);
+//#endif
 }
 
 /*
