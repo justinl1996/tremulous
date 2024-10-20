@@ -1,4 +1,5 @@
 #include "ui/menudef.h"
+#include "ui/menustyle.h"
 
 {
 
@@ -33,7 +34,8 @@
 #define BOTBUTT_W   (BOT_W/5)
 #define BOTBUTT_H   BOT_H
 
-#define SERVER_C    0.6
+#define SERVER_C    0.45
+#define GAME_C      0.15
 #define MAP_C       0.2
 #define PLAYERS_C   0.1
 #define PING_C      0.1
@@ -50,9 +52,10 @@
     visible MENU_FALSE
     fullscreen MENU_TRUE
     rect 0 0 W H
-    focusColor 1 .75 0 1
+    focusColor WINDOW_FOCUSCOLOR
     outOfBoundsClick
-    style WINDOW_STYLE_EMPTY
+    style WINDOW_STYLE_SHADER
+    background "ui/assets/mainmenu.jpg"
     aspectBias ASPECT_NONE
     onOpen
     {
@@ -65,16 +68,6 @@
     }
 
     onEsc { uiScript closeJoin }
-
-    itemDef
-    {
-      name background
-      rect 0 0 W H
-      style WINDOW_STYLE_FILLED
-      backcolor 0 0 0 1
-      visible MENU_TRUE
-      decoration
-    }
 
 
     //  VIEW OPTIONS  //
@@ -198,7 +191,7 @@
     {
       name legend
       type ITEM_TYPE_TEXT
-      text "[official] = Offical Server\n[featured] = Featured Server"
+      text "[official] = Official Server\n[featured] = Featured Server"
       style WINDOW_STYLE_EMPTY
       textstyle ITEM_TEXTSTYLE_NORMAL
       textscale .25
@@ -243,7 +236,7 @@
       border WINDOW_BORDER_FULL
       bordercolor   0.5 0.5 0.5 1
       forecolor     1   1   1   1
-      backcolor     0   0   0   0
+      backcolor     0   0   0   0.5
       outlinecolor  0.1 0.1 0.1 0.5
       visible MENU_TRUE
       action
@@ -251,10 +244,10 @@
         play "sound/misc/menu1.wav";
         uiScript ServerSort 0;
 
-        setitemcolor grpColumn backcolor 0 0 0 0;
-        setitemcolor grpTabs backcolor 0 0 0 0;
+        setitemcolor grpColumn backcolor 0 0 0 0.5;
+        setitemcolor grpTabs backcolor 0 0 0 0.5;
         setitemcolor server backcolor 0.3 1 1 0.3;
-        setitemcolor serverColumn backcolor 0.2 0.6 0.6 0.1;
+        setitemcolor serverColumn backcolor 0.2 0.6 0.6 0.2;
       }
     }
 
@@ -265,7 +258,51 @@
       rect LIST_X (LIST_Y+HEADFOOT_H) (SERVER_C*LIST_W) (LIST_H-(2*HEADFOOT_H))
       style WINDOW_STYLE_FILLED
       border WINDOW_BORDER_FULL
-      backcolor 0 0 0 0
+      backcolor     0   0   0   0.5
+      bordersize 1
+      bordercolor .5 .5 .5 1
+      visible MENU_TRUE
+      decoration
+    }
+
+    itemDef
+    {
+      name game
+      group grpTabs
+      type ITEM_TYPE_BUTTON
+      text "Game Type"
+      textscale .33
+      style WINDOW_STYLE_FILLED
+      rect (LIST_X+(SERVER_C*LIST_W)) LIST_Y (GAME_C*LIST_W) HEADFOOT_H
+      textalign ALIGN_LEFT
+      textvalign VALIGN_CENTER
+      textalignx LIST_TOFF
+      border WINDOW_BORDER_FULL
+      bordercolor   0.5 0.5 0.5 1
+      forecolor     1   1   1   1
+      backcolor     0   0   0   0.5
+      outlinecolor  0.1 0.1 0.1 0.5
+      visible MENU_TRUE
+      action
+      {
+        play "sound/misc/menu1.wav";
+        uiScript ServerSort 1;
+
+        setitemcolor grpColumn backcolor 0 0 0 0.5;
+        setitemcolor grpTabs backcolor 0 0 0 0.5;
+        setitemcolor game backcolor 0.3 1 1 0.3;
+        setitemcolor gameColumn backcolor 0.2 0.6 0.6 0.2;
+      }
+    }
+
+    itemDef
+    {
+      name gameColumn
+      group grpColumn
+      rect (LIST_X+(SERVER_C*LIST_W)) (LIST_Y+HEADFOOT_H) (GAME_C*LIST_W) (LIST_H-(2*HEADFOOT_H))
+      style WINDOW_STYLE_FILLED
+      border WINDOW_BORDER_FULL
+      backcolor     0   0   0   0.5
       bordersize 1
       bordercolor .5 .5 .5 1
       visible MENU_TRUE
@@ -280,25 +317,25 @@
       text "Map Name"
       textscale .33
       style WINDOW_STYLE_FILLED
-      rect (LIST_X+(SERVER_C*LIST_W)) LIST_Y (MAP_C*LIST_W) HEADFOOT_H
+      rect (LIST_X+((SERVER_C+GAME_C)*LIST_W)) LIST_Y (MAP_C*LIST_W) HEADFOOT_H
       textalign ALIGN_LEFT
       textvalign VALIGN_CENTER
       textalignx LIST_TOFF
       border WINDOW_BORDER_FULL
       bordercolor   0.5 0.5 0.5 1
       forecolor     1   1   1   1
-      backcolor     0   0   0   0
+      backcolor     0   0   0   0.5
       outlinecolor  0.1 0.1 0.1 0.5
       visible MENU_TRUE
       action
       {
         play "sound/misc/menu1.wav";
-        uiScript ServerSort 1;
+        uiScript ServerSort 2;
 
-        setitemcolor grpColumn backcolor 0 0 0 0;
-        setitemcolor grpTabs backcolor 0 0 0 0;
+        setitemcolor grpColumn backcolor 0 0 0 0.5;
+        setitemcolor grpTabs backcolor 0 0 0 0.5;
         setitemcolor map backcolor 0.3 1 1 0.3;
-        setitemcolor mapColumn backcolor 0.2 0.6 0.6 0.1;
+        setitemcolor mapColumn backcolor 0.2 0.6 0.6 0.2;
       }
     }
 
@@ -306,10 +343,10 @@
     {
       name mapColumn
       group grpColumn
-      rect (LIST_X+(SERVER_C*LIST_W)) (LIST_Y+HEADFOOT_H) (MAP_C*LIST_W) (LIST_H-(2*HEADFOOT_H))
+      rect (LIST_X+((SERVER_C+GAME_C)*LIST_W)) (LIST_Y+HEADFOOT_H) (MAP_C*LIST_W) (LIST_H-(2*HEADFOOT_H))
       style WINDOW_STYLE_FILLED
       border WINDOW_BORDER_FULL
-      backcolor 0 0 0 0
+      backcolor     0   0   0   0.5
       bordersize 1
       bordercolor .5 .5 .5 1
       visible MENU_TRUE
@@ -324,25 +361,25 @@
       type ITEM_TYPE_BUTTON
       textscale .33
       style WINDOW_STYLE_FILLED
-      rect (LIST_X+((SERVER_C+MAP_C)*LIST_W)) LIST_Y (PLAYERS_C*LIST_W) HEADFOOT_H
+      rect (LIST_X+((SERVER_C+GAME_C+MAP_C)*LIST_W)) LIST_Y (PLAYERS_C*LIST_W) HEADFOOT_H
       textalign ALIGN_LEFT
       textvalign VALIGN_CENTER
       textalignx LIST_TOFF
       border WINDOW_BORDER_FULL
       bordercolor   0.5 0.5 0.5 1
       forecolor     1   1   1   1
-      backcolor     0   0   0   0
+      backcolor     0   0   0   0.5
       outlinecolor  0.1 0.1 0.1 0.5
       visible MENU_TRUE
       action
       {
         play "sound/misc/menu1.wav";
-        uiScript ServerSort 2;
+        uiScript ServerSort 3;
 
-        setitemcolor grpColumn backcolor 0 0 0 0;
-        setitemcolor grpTabs backcolor 0 0 0 0;
+        setitemcolor grpColumn backcolor 0 0 0 0.5;
+        setitemcolor grpTabs backcolor 0 0 0 0.5;
         setitemcolor players backcolor 0.3 1 1 0.3;
-        setitemcolor playerColumn backcolor 0.2 0.6 0.6 0.1;
+        setitemcolor playerColumn backcolor 0.2 0.6 0.6 0.2;
       }
     }
 
@@ -350,10 +387,10 @@
     {
       name playerColumn
       group grpColumn
-      rect (LIST_X+((SERVER_C+MAP_C)*LIST_W)) (LIST_Y+HEADFOOT_H) (PLAYERS_C*LIST_W) (LIST_H-(2*HEADFOOT_H))
+      rect (LIST_X+((SERVER_C+GAME_C+MAP_C)*LIST_W)) (LIST_Y+HEADFOOT_H) (PLAYERS_C*LIST_W) (LIST_H-(2*HEADFOOT_H))
       style WINDOW_STYLE_FILLED
       border WINDOW_BORDER_FULL
-      backcolor 0 0 0 0
+      backcolor     0   0   0   0.5
       bordersize 1
       bordercolor .5 .5 .5 1
       visible MENU_TRUE
@@ -368,7 +405,7 @@
       type ITEM_TYPE_BUTTON
       textscale .33
       style WINDOW_STYLE_FILLED
-      rect (LIST_X+((SERVER_C+MAP_C+PLAYERS_C)*LIST_W)) LIST_Y (PING_C*LIST_W) HEADFOOT_H
+      rect (LIST_X+((SERVER_C+GAME_C+MAP_C+PLAYERS_C)*LIST_W)) LIST_Y (PING_C*LIST_W) HEADFOOT_H
       textalign ALIGN_LEFT
       textvalign VALIGN_CENTER
       textalignx LIST_TOFF
@@ -381,12 +418,12 @@
       action
       {
         play "sound/misc/menu1.wav";
-        uiScript ServerSort 3;
+        uiScript ServerSort 4;
 
-        setitemcolor grpColumn backcolor 0 0 0 0;
-        setitemcolor grpTabs backcolor 0 0 0 0;
+        setitemcolor grpColumn backcolor 0 0 0 0.5;
+        setitemcolor grpTabs backcolor 0 0 0 0.5;
         setitemcolor ping backcolor 0.3 1 1 0.3;
-        setitemcolor pingColumn backcolor 0.2 0.6 0.6 0.1;
+        setitemcolor pingColumn backcolor 0.2 0.6 0.6 0.2;
       }
     }
 
@@ -394,10 +431,10 @@
     {
       name pingColumn
       group grpColumn
-      rect (LIST_X+((SERVER_C+MAP_C+PLAYERS_C)*LIST_W)) (LIST_Y+HEADFOOT_H) (PING_C*LIST_W) (LIST_H-(2*HEADFOOT_H))
+      rect (LIST_X+((SERVER_C+GAME_C+MAP_C+PLAYERS_C)*LIST_W)) (LIST_Y+HEADFOOT_H) (PING_C*LIST_W) (LIST_H-(2*HEADFOOT_H))
       style WINDOW_STYLE_FILLED
       border WINDOW_BORDER_FULL
-      backcolor 0.2 0.6 0.6 0.1
+      backcolor 0.2 0.6 0.6 0.2
       bordersize 1
       bordercolor .5 .5 .5 1
       visible MENU_TRUE
@@ -423,11 +460,12 @@
       backcolor     0.2 0.2 0.2 1
       outlinecolor  0.1 0.3 0.3 0.4
       visible MENU_TRUE
-      columns 4
-        LIST_TOFF                                       ((SERVER_C*LIST_W)-(3*LIST_TOFF))   ALIGN_LEFT
-        (LIST_TOFF+((SERVER_C)*LIST_W))                 ((MAP_C*LIST_W)-(3*LIST_TOFF))      ALIGN_LEFT
-        (LIST_TOFF+((SERVER_C+MAP_C)*LIST_W))           ((PLAYERS_C*LIST_W)-(3*LIST_TOFF))  ALIGN_LEFT
-        (LIST_TOFF+((SERVER_C+MAP_C+PLAYERS_C)*LIST_W)) ((PING_C*LIST_W)-(3*LIST_TOFF))     ALIGN_LEFT
+      columns 5
+        LIST_TOFF                                              ((SERVER_C*LIST_W)-(3*LIST_TOFF))   ALIGN_LEFT
+        (LIST_TOFF+((SERVER_C)*LIST_W))                        ((GAME_C*LIST_W)-(3*LIST_TOFF))     ALIGN_LEFT
+        (LIST_TOFF+((SERVER_C+GAME_C)*LIST_W))                 ((MAP_C*LIST_W)-(3*LIST_TOFF))      ALIGN_LEFT
+        (LIST_TOFF+((SERVER_C+GAME_C+MAP_C)*LIST_W))           ((PLAYERS_C*LIST_W)-(3*LIST_TOFF))  ALIGN_LEFT
+        (LIST_TOFF+((SERVER_C+GAME_C+MAP_C+PLAYERS_C)*LIST_W)) ((PING_C*LIST_W)-(3*LIST_TOFF))     ALIGN_LEFT
 
       doubleClick { uiScript JoinServer }
     }
@@ -441,12 +479,14 @@
       ownerdraw UI_SERVERREFRESHDATE
       textscale .33
       rect LIST_X (LIST_Y+(LIST_H-HEADFOOT_H)) (LIST_W/2) HEADFOOT_H
+      style WINDOW_STYLE_FILLED
       textalign ALIGN_LEFT
       textvalign VALIGN_CENTER
       textalignx LIST_TOFF
       forecolor 1 1 1 1
       border WINDOW_BORDER_FULL
       bordercolor .5 .5 .5 1
+      backcolor 0 0 0 .5
       visible MENU_TRUE
       decoration
     }
@@ -457,12 +497,14 @@
       ownerdraw UI_SERVERMOTD
       textscale .33
       rect (LIST_X+(LIST_W/2)) (LIST_Y+(LIST_H-HEADFOOT_H)) (LIST_W/2) HEADFOOT_H
+      style WINDOW_STYLE_FILLED
       textalign ALIGN_LEFT
       textvalign VALIGN_CENTER
       textalignx LIST_TOFF
       forecolor 1 1 1 1
       border WINDOW_BORDER_FULL
       bordercolor .5 .5 .5 1
+      backcolor 0 0 0 .5
       visible MENU_TRUE
       decoration
     }
@@ -615,7 +657,7 @@
     {
       name back
       style WINDOW_STYLE_SHADER
-      background "ui/assets/backarrow.tga"
+      background "ui/assets/backarrow.png"
       rect BCJ_X BCJ_Y ARROW_H ARROW_W
       aspectBias ALIGN_LEFT
       visible MENU_TRUE
@@ -636,7 +678,7 @@
     {
       name back_alt
       style WINDOW_STYLE_SHADER
-      background "ui/assets/backarrow_alt.tga"
+      background "ui/assets/backarrow_alt.png"
       rect BCJ_X BCJ_Y ARROW_H ARROW_W
       aspectBias ALIGN_LEFT
       backcolor 0 0 0 0
@@ -672,7 +714,7 @@
       style WINDOW_STYLE_SHADER
       rect ((BCJ_X+BCJ_W)-ARROW_W) BCJ_Y ARROW_H ARROW_W
       aspectBias ALIGN_RIGHT
-      background "ui/assets/forwardarrow.tga"
+      background "ui/assets/forwardarrow.png"
       backcolor 0 0 0 0
       forecolor 1 1 1 1
       visible MENU_TRUE
@@ -695,7 +737,7 @@
       style WINDOW_STYLE_SHADER
       rect ((BCJ_X+BCJ_W)-ARROW_W) BCJ_Y ARROW_H ARROW_W
       aspectBias ALIGN_RIGHT
-      background "ui/assets/forwardarrow_alt.tga"
+      background "ui/assets/forwardarrow_alt.png"
       backcolor 0 0 0 0
       type ITEM_TYPE_BUTTON
       forecolor 1 1 1 1

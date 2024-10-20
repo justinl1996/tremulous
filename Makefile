@@ -809,7 +809,7 @@ ifeq ($(PLATFORM),js)
     -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
     -s LEGACY_GL_EMULATION=1 \
     -s RESERVED_FUNCTION_POINTERS=1 \
-    -s STACK_SIZE=268435456 \
+    -s STACK_SIZE=368435456 \
     -s TOTAL_MEMORY=805306368 \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s EXPORT_NAME=\"ioq3ded\" \
