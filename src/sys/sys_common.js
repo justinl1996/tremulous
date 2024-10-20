@@ -333,7 +333,6 @@ var LibrarySysCommon = {
 			var assets = SYSC.GetManifest();
 			for (var i = 0; i < SYSC.paks.length; i++) {
 				var pak = SYSC.paks[i];
-
 				var asset;
 				for (var j = 0; j < assets.length; j++) {
 					if (assets[j].name === pak.src) {
@@ -487,7 +486,7 @@ var LibrarySysCommon = {
 		},*/
 		SyncFiles: function (callback) {
 			var downloads = SYSC.DirtyPaks(callback);
-			downloads = downloads.concat(SYSC.DirtyQVM(callback));
+			//downloads = downloads.concat(SYSC.DirtyQVM(callback));
 			SYSC.DownloadAssets(downloads, function (asset) {
 				SYS.LoadingDescription('loading ' + asset.name);
 			}, function (loaded, total) {

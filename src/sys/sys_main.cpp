@@ -822,17 +822,17 @@ int main( int argc, char **argv )
     Sys_SetDefaultInstallPath( DEFAULT_BASEDIR );
 
     // Concatenate the command line for passing to Com_Init
-    char args[MAX_STRING_CHARS];
+    char *args = new char[MAX_STRING_CHARS];
     args[0] = '\0';
 
     for( int i = 1; i < argc; i++ )
     {
         const bool ws = strchr(argv[i], ' ') ? true : false;
 
-        if (ws) Q_strcat(args, sizeof(args), "\"");
-        Q_strcat(args, sizeof(args), argv[i]);
-        if (ws) Q_strcat(args, sizeof(args), "\"");
-        Q_strcat(args, sizeof(args), " " );
+        if (ws) Q_strcat(args, MAX_STRING_CHARS, "\"");
+        Q_strcat(args, MAX_STRING_CHARS, argv[i]);
+        if (ws) Q_strcat(args, MAX_STRING_CHARS, "\"");
+        Q_strcat(args, MAX_STRING_CHARS, " " );
     }
 
     CON_Init( );
