@@ -25,14 +25,14 @@ jobs:
           build-essential \
           libgl1-mesa-dev \
           libsdl2-dev \
-          libcurl4-openssl-dev \
           libopenal-dev \
           libfreetype6-dev \
           zip \
+          libcurl4-openssl-dev \
           curl \
           rsync
     - name: make
-      run: USE_RESTCLIENT=1 USE_INTERNAL_LUA=1 make -j
+      run: USE_RESTCLIENT=1 USE_INTERNAL_LUA=1 USE_CURL_DLOPEN=0 make -j
     - name: download paks
       run: ./misc/download-paks.sh
     - name: change perms
