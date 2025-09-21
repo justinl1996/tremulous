@@ -746,8 +746,44 @@ void Sys_Frame() {
 main
 =================
 */
-static void main_after_Com_Init(cb_context_t *context, int status)
+int main( int argc, char **argv )
 {
+#ifndef DEDICATED
+    SDLVersionCheck();
+#endif
+    Sys_PlatformInit( );
+
+    // Set the initial time base
+    Sys_Milliseconds( );
+
+#ifdef __APPLE__
+    // This is passed if we are launched by double-clicking
+    if ( argc >= 2 )
+        if ( Q_strncmp( argv[1], "-psn", 4 ) == 0 )
+            argc = 1;
+#endif
+
+    Sys_ParseArgs( argc, argv );
+    Sys_SetBinaryPath( Sys_Dirname( argv[ 0 ] ) );
+    Sys_SetDefaultInstallPath( DEFAULT_BASEDIR );
+
+    // Concatenate the command line for passing to Com_Init
+    char *args = new char[MAX_STRING_CHARS];
+    args[0] = '\0';
+
+    for( int i = 1; i < argc; i++ )
+    {
+        const bool ws = strchr(argv[i], ' ') ? true : false;
+
+        if (ws) Q_strcat(args, MAX_STRING_CHARS, "\"");
+        Q_strcat(args, MAX_STRING_CHARS, argv[i]);
+        if (ws) Q_strcat(args, MAX_STRING_CHARS, "\"");
+        Q_strcat(args, MAX_STRING_CHARS, " " );
+        Com_Printf("argv[%d]=%s\n", i, argv[i]);
+    }
+
+    CON_Init( );
+    Com_Init( args );
     NET_Init( );
 
     lua.open_libraries
@@ -798,45 +834,9 @@ static void main_after_Com_Init(cb_context_t *context, int status)
         Sys_Frame();
     }
 #endif
-}
 
-int main( int argc, char **argv )
-{
-#ifndef DEDICATED
-    SDLVersionCheck();
+#if EMSCRIPTEN
+	emscripten_exit_with_live_runtime();
 #endif
-    Sys_PlatformInit( );
-
-    // Set the initial time base
-    Sys_Milliseconds( );
-
-#ifdef __APPLE__
-    // This is passed if we are launched by double-clicking
-    if ( argc >= 2 )
-        if ( Q_strncmp( argv[1], "-psn", 4 ) == 0 )
-            argc = 1;
-#endif
-
-    Sys_ParseArgs( argc, argv );
-    Sys_SetBinaryPath( Sys_Dirname( argv[ 0 ] ) );
-    Sys_SetDefaultInstallPath( DEFAULT_BASEDIR );
-
-    // Concatenate the command line for passing to Com_Init
-    char *args = new char[MAX_STRING_CHARS];
-    args[0] = '\0';
-
-    for( int i = 1; i < argc; i++ )
-    {
-        const bool ws = strchr(argv[i], ' ') ? true : false;
-
-        if (ws) Q_strcat(args, MAX_STRING_CHARS, "\"");
-        Q_strcat(args, MAX_STRING_CHARS, argv[i]);
-        if (ws) Q_strcat(args, MAX_STRING_CHARS, "\"");
-        Q_strcat(args, MAX_STRING_CHARS, " " );
-    }
-
-    CON_Init( );
-    Com_Init( args , cb_create_context_no_data(main_after_Com_Init));
-
     return 0;
 }

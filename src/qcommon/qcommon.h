@@ -209,7 +209,7 @@ void 		QDECL Com_Error( int code, const char *fmt, ... ) __attribute__ ((noretur
 void 		QDECL Com_DPrintf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 void        Engine_Exit(const char* p ) __attribute__ ((noreturn));
 void 		Com_Quit_f( void ) __attribute__ ((noreturn));
-void		Com_GameRestart(int checksumFeed, bool disconnect, cb_context_t *after);
+void		Com_GameRestart(int checksumFeed, bool disconnect);
 
 int			Com_Milliseconds( void );	// will be journaled properly
 char		*Com_MD5File(const char *filename, int length, const char *prefix, int prefix_len);
@@ -337,7 +337,7 @@ void Hunk_Log( void);
 void Com_TouchMemory( void );
 
 // commandLine should not include the executable name (argv[0])
-void Com_Init( char *commandLine, cb_context_t *after );
+void Com_Init( char *commandLine);
 void Com_Frame( void );
 void Com_Shutdown( void );
 
@@ -467,7 +467,6 @@ void         Com_Bucket_Select_A_Specific_Item(
 	unsigned int bucket_handle, void* item);
 
 #if EMSCRIPTEN
-extern "C" void Com_ProxyCallback(cb_context_t *context);
 extern "C" const char *Com_GetCDN(void);
 extern "C" const char *Com_GetManifest(void);
 #endif

@@ -41,42 +41,14 @@ SV_Map_f
 Restart the server on a different map
 ==================
 */
-
-typedef struct map_data_s {
-	bool cheat;
-} map_data_t;
-
-static void SV_Map_f_after_SV_SpawnServer( cb_context_t *context, int status ) {
-	map_data_t *data;
-	bool cheat;
-	int			a;
-	int			i;
-	// set the cheat value
-	// if the level was started with "map <levelname>", then
-	// cheats will not be allowed.  If started with "devmap <levelname>"
-	// then cheats will be allowed
-	if ( cheat ) {
-		Cvar_Set( "sv_cheats", "1" );
-	} else {
-		Cvar_Set( "sv_cheats", "0" );
-	}
-
-	// This forces the local master server IP address cache
-	// to be updated on sending the next heartbeat
-	for( a = 0; a < 3; ++a )
-		for( i = 0; i < MAX_MASTER_SERVERS; i++ )
-			sv_masters[ a ][ i ]->modified  = true;
-}
-
 static void SV_Map_f( void ) {
 	const char	*cmd;
 	const char	*map;
 	bool        cheat;
 	char		expanded[MAX_QPATH];
 	char		mapname[MAX_QPATH];
-
-	cb_context_t *context;
-	map_data_t   *data;
+	int			a;
+	int			i;
 
 	map = Cmd_Argv(1);
 	if ( !map ) {
@@ -102,13 +74,24 @@ static void SV_Map_f( void ) {
 	// and thus nuke the arguments of the map command
 	Q_strncpyz(mapname, map, sizeof(mapname));
 
-	context = cb_create_context(SV_Map_f_after_SV_SpawnServer, map_data_t);
-	data = (map_data_t*)context->data;
-	data->cheat = cheat;
-
 	// start up the map
-	SV_SpawnServer( mapname, context );
+	SV_SpawnServer( mapname );
 
+	// set the cheat value
+	// if the level was started with "map <levelname>", then
+	// cheats will not be allowed.  If started with "devmap <levelname>"
+	// then cheats will be allowed
+	if ( cheat ) {
+		Cvar_Set( "sv_cheats", "1" );
+	} else {
+		Cvar_Set( "sv_cheats", "0" );
+	}
+
+	// This forces the local master server IP address cache
+	// to be updated on sending the next heartbeat
+	for( a = 0; a < 3; ++a )
+		for( i = 0; i < MAX_MASTER_SERVERS; i++ )
+			sv_masters[ a ][ i ]->modified  = true;
 }
 
 /*
@@ -161,7 +144,7 @@ static void SV_MapRestart_f( void ) {
 		// restart the map the slow way
 		Q_strncpyz( mapname, Cvar_VariableString( "mapname" ), sizeof( mapname ) );
 
-		SV_SpawnServer( mapname, NULL );
+		SV_SpawnServer( mapname );
 		return;
 	}
 

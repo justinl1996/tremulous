@@ -782,11 +782,9 @@ ifeq ($(PLATFORM),js)
   LIBSYSCOMMON=$(SYSDIR)/sys_common.js
   LIBSYSBROWSER=$(SYSDIR)/sys_browser.js
   LIBSYSNODE=$(SYSDIR)/sys_node.js
-  LIBVMJS=$(CMDIR)/vm_js.js
 
   CLIENT_LDFLAGS += --js-library $(LIBSYSCOMMON) \
     --js-library $(LIBSYSBROWSER) \
-    --js-library $(LIBVMJS) \
     -s INVOKE_RUN=0 \
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_VM_GetCurrent', '_VM_SetCurrent']" \
     -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
@@ -803,9 +801,8 @@ ifeq ($(PLATFORM),js)
 
   SERVER_LDFLAGS += --js-library $(LIBSYSCOMMON) \
     --js-library $(LIBSYSNODE) \
-    --js-library $(LIBVMJS) \
     -s INVOKE_RUN=1 \
-    -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_CON_SetIsTTY', '_VM_GetCurrent', '_VM_SetCurrent']" \
+    -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_CON_SetIsTTY', '_VM_GetCurrent', '_VM_SetCurrent']" \
     -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
     -s LEGACY_GL_EMULATION=1 \
     -s RESERVED_FUNCTION_POINTERS=1 \
@@ -827,7 +824,7 @@ ifeq ($(PLATFORM),js)
   CLIENT_LIBS += -lidbfs.js
   SHLIBCFLAGS=-fPIC
   SERVER_LIBS += -lnodefs.js
-  SERVER_CFLAGS += -s WASM=0
+  SERVER_CFLAGS += -sWASM=0 -sNODERAWFS=1 
 
 else # ifeq js
 
@@ -2346,10 +2343,7 @@ ifdef MINGW
     $(B)/client/sys_win32.o \
     $(B)/client/sys_win32_default_homepath.o
 else
-	ifneq ($(PLATFORM),js)
-		Q3OBJ += \
-			$(B)/client/sys_unix.o
-	endif
+	Q3OBJ += $(B)/client/sys_unix.o
 endif
 
 ifeq ($(PLATFORM),darwin)
@@ -2497,11 +2491,8 @@ ifdef MINGW
     $(B)/ded/con_win32.o
 else
   Q3DOBJ += \
-    $(B)/ded/con_tty.o
-	ifneq ($(PLATFORM),js)
-		Q3DOBJ += \
-			$(B)/ded/sys_unix.o
-	endif
+    $(B)/ded/con_tty.o \
+		$(B)/ded/sys_unix.o
 endif
 
 ifeq ($(PLATFORM),darwin)
