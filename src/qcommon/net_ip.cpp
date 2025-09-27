@@ -1581,7 +1581,7 @@ static bool NET_GetCvars(void)
     modified += net_mcast6iface->modified;
     net_mcast6iface->modified = false;
 
-    net_socksEnabled = Cvar_Get("net_socksEnabled", "0", CVAR_LATCH | CVAR_ARCHIVE);
+    net_socksEnabled = Cvar_Get("net_socksEnabled", "1", CVAR_LATCH | CVAR_ARCHIVE);
     modified += net_socksEnabled->modified;
     net_socksEnabled->modified = false;
 
