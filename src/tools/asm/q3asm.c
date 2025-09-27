@@ -22,7 +22,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 ===========================================================================
 */
 
-#include "qcommon/q_platform.h"
+#include "../../qcommon/q_platform.h"
 
 #include "cmdlib.h"
 #include "mathlib.h"

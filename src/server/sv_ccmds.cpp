@@ -368,7 +368,7 @@ SV_CompleteMapName
 */
 static void SV_CompleteMapName( char *args, int argNum ) {
 	if( argNum == 2 ) {
-		Field_CompleteFilename( "maps", "bsp", true, false );
+		Field_CompleteFilename( "maps", "bsp", (qboolean)true, (qboolean)false );    // Cast qboolean for emscripten
 	}
 }
 

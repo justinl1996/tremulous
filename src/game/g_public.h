@@ -26,7 +26,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef GAME_PUBLIC_H
 #define GAME_PUBLIC_H
 
-#include "qcommon/q_shared.h"
+#include "../qcommon/q_shared.h"
 
 #define GAME_API_VERSION 9
 

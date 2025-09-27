@@ -24,7 +24,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef __ASM_I386__
 #define __ASM_I386__
 
-#include "qcommon/q_platform.h"
+#include "../qcommon/q_platform.h"
 
 #ifdef __ELF__
 .section .note.GNU-stack,"",@progbits

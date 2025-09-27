@@ -26,8 +26,8 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "sys_shared.h"
 
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
 
 // Require a minimum version of SDL
 #define MINSDL_MAJOR 2

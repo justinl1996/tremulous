@@ -23,12 +23,12 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 */
 
 
-#include "qcommon/q_shared.h"
-#include "renderercommon/tr_types.h"
-#include "game/bg_public.h"
+#include "../qcommon/q_shared.h"
+#include "../renderercommon/tr_types.h"
+#include "../game/bg_public.h"
 #include "cg_public.h"
 #include "binaryshader.h"
-#include "ui/ui_shared.h"
+#include "../ui/ui_shared.h"
 
 // The entire cgame module is unloaded and reloaded on each level change,
 // so there is NO persistant data between levels on the client side.

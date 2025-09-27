@@ -32,11 +32,11 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <csignal>
 
 #ifndef DEDICATED
-#include "client/client.h"
+#include "../client/client.h"
 #endif
-#include "qcommon/cvar.h"
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/cvar.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
 
 /*
 =============================================================

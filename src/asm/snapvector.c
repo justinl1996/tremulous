@@ -23,7 +23,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 */
 
 #include "qasm-inline.h"
-#include "qcommon/q_shared.h"
+#include "../qcommon/q_shared.h"
 
 /*
  * GNU inline asm version of qsnapvector

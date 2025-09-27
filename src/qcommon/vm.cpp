@@ -38,7 +38,7 @@ and one exported function: Perform
 #include "vm.h"
 #include "vm_local.h"
 
-#include "sys/sys_shared.h"
+#include "../sys/sys_shared.h"
 
 #include "cmd.h"
 #include "cvar.h"

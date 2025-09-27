@@ -36,7 +36,6 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "cl_updates.h"
 #ifdef USE_MUMBLE
-#include "libmumblelink.h"
 #endif
 
 #ifdef USE_MUMBLE
@@ -1086,7 +1085,7 @@ static void CL_CompleteDemoName(char *args, int argNum)
         char demoExt[16];
 
         Com_sprintf(demoExt, sizeof(demoExt), ".%s%d", DEMOEXT, PROTOCOL_VERSION);
-        Field_CompleteFilename("demos", demoExt, true, true);
+        Field_CompleteFilename("demos", demoExt, (qboolean)true, (qboolean)true);   // Cast as qbooleans for emscripten
     }
 }
 
@@ -1721,7 +1720,7 @@ static void CL_CompleteRcon(char *args, int argNum)
         // Skip "rcon "
         char *p = Com_SkipTokens(args, 1, " ");
 
-        if (p > args) Field_CompleteCommand(p, true, true);
+        if (p > args) Field_CompleteCommand(p, (qboolean)true, (qboolean)true);    // Cast as qbooleans for emscripten
     }
 }
 

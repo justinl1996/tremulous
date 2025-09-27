@@ -22,7 +22,7 @@ along with this program; if not,  see <http://www.gnu.org/licenses/>.
 
 #include "tr_common.h"
 
-#include "qcommon/puff.h"
+#include "../qcommon/puff.h"
 
 // we could limit the png size to a lower value here
 #ifndef INT_MAX

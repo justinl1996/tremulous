@@ -24,7 +24,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "net.h"
 
-#include "sys/sys_shared.h"
+#include "../sys/sys_shared.h"
 
 #include "cvar.h"
 #include "huffman.h"

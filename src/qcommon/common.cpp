@@ -34,7 +34,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 //#include <sys/stat.h> // umask
 #endif
 
-#include "sys/sys_shared.h"
+#include "../sys/sys_shared.h"
 
 #include "cmd.h"
 #include "crypto.h"

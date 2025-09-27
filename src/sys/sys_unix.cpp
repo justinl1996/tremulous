@@ -22,10 +22,10 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 ===========================================================================
 */
 
-#include "qcommon/cvar.h"
-#include "qcommon/files.h"
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/cvar.h"
+#include "../qcommon/files.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
 #include "dialog.h"
 #include "sys_local.h"
 

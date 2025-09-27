@@ -25,10 +25,10 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef __CRYPTO_H__
 #define __CRYPTO_H__
 
-#include "nettle/bignum.h"
-#include "nettle/buffer.h"
-#include "nettle/rsa.h"
-#include "nettle/sha2.h"
+#include "../../external/nettle-3.3/nettle/bignum.h"
+#include "../../external/nettle-3.3/nettle/buffer.h"
+#include "../../external/nettle-3.3/nettle/rsa.h"
+#include "../../external/nettle-3.3/nettle/sha2.h"
 
 
 #define RSA_PRIVATE_KEY_FILE "rsa_private_key"

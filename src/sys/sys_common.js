@@ -84,7 +84,7 @@ var LibrarySysCommon = {
 			'7.         U.S. Government Restricted Rights. To the extent applicable, the United States Government shall only have those rights to use the Software as expressly stated and expressly limited and restricted in this Agreement, as provided in 48 C.F.R. §§ 227.7201 through 227.7204, inclusive.\n\n\n\n' +
 			'8.         General Provisions.  Neither this Agreement nor any part or portion hereof shall be assigned or sublicensed by you.  ID may assign its rights under this Agreement in ID\'s sole discretion.  Should any provision of this Agreement be held to be void, invalid, unenforceable or illegal by a court of competent jurisdiction, the validity and enforceability of the other provisions shall not be affected thereby.  If any provision is determined to be unenforceable by a court of competent jurisdiction, you agree to a modification of such provision to provide for enforcement of the provision\'s intent, to the extent permitted by applicable law. Failure of ID to enforce any provision of this Agreement shall not constitute or be construed as a waiver of such provision or of the right to enforce such provision.  Immediately upon your failure to comply with or breach of any term or provision of this Agreement, THIS AGREEMENT AND YOUR LICENSE SHALL AUTOMATICALLY TERMINATE, WITHOUT NOTICE, AND ID MAY PURSUE ALL RELIEF AND REMEDIES AGAINST YOU WHICH ARE AVAILABLE UNDER APPLICABLE LAW AND/OR THIS AGREEMENT.   In the event this Agreement is terminated, you shall have no right to use the Software, in any manner, and you shall immediately destroy all copies of the Software in your possession, custody or control.\n\n\n\n' +
 			'YOU ACKNOWLEDGE THAT YOU HAVE READ THIS AGREEMENT, YOU UNDERSTAND THIS AGREEMENT, AND UNDERSTAND THAT BY CONTINUING THE INSTALLATION OF THE SOFTWARE, BY LOADING OR RUNNING THE SOFTWARE, OR BY PLACING OR COPYING THE SOFTWARE ONTO YOUR COMPUTER HARD DRIVE OR RAM, YOU AGREE TO BE BOUND BY THE TERMS AND CONDITIONS OF THIS AGREEMENT.  YOU FURTHER AGREE THAT, EXCEPT FOR WRITTEN SEPARATE AGREEMENTS BETWEEN ID AND YOU, THIS AGREEMENT IS A COMPLETE AND EXCLUSIVE STATEMENT OF THE RIGHTS AND LIABILITIES OF THE PARTIES HERETO.  THIS AGREEMENT SUPERSEDES ALL PRIOR ORAL AGREEMENTS, PROPOSALS OR UNDERSTANDINGS, AND ANY OTHER COMMUNICATIONS BETWEEN ID AND YOU RELATING TO THE SUBJECT MATTER OF THIS AGREEMENT.',
-		installers: [
+		/*installers: [
 			{
 				name: 'linuxq3ademo-1.11-6.x86.gz.sh',
 				offset: 5468,
@@ -106,12 +106,14 @@ var LibrarySysCommon = {
 					{ src: 'baseq3/pak8.pk3', dest: 'baseq3/pak8.pk3', checksum: 136401958 }
 				]
 			}
-		],
+		],*/
 		paks: [
 			//{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
 			//{ src: 'data-1.1.1.pk3', dest: 'gpp/data-1.1.1.pk3', checksum: 2236444480 },
 			//{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
-			{ src: 'data-1.3.0.pk3', dest: 'gpp/data-1.3.0.pk3', checksum: 3984856731 },
+			{ src: 'vms-1.3.0.pk3', dest: 'gpp/vms-1.3.0.pk3', checksum: 3074975812 },
+			{ src: 'data-1.3.0.pk3', dest: 'gpp/data-1.3.0.pk3', checksum: 1497688995 },
+			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
 			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
 			{ src: 'map-atcs-1.1.0.pk3', dest: 'gpp/map-atcs-1.1.0.pk3', checksum: 1649092924 },
 			{ src: 'map-karith-1.1.0.pk3', dest: 'gpp/map-karith-1.1.0.pk3', checksum: 3322431863 },
@@ -122,9 +124,12 @@ var LibrarySysCommon = {
 			{ src: 'map-uncreation-1.1.0.pk3', dest: 'gpp/map-uncreation-1.1.0.pk3', checksum: 29654410 },
 		],
 		qvms: [
-			{ src: 'cgame.qvm', dest: 'gpp/vm/cgame.qvm' },
-			{ src: 'game.qvm', dest: 'gpp/vm/game.qvm' },
-			{ src: 'ui.qvm', dest: 'gpp/vm/ui.qvm' }
+			{ src: 'vm/cgame.qvm', dest: 'gpp/vm/cgame.qvm' }, 
+			{ src: 'vm/game.qvm', dest: 'gpp/vm/game.qvm' }, //Auriga: This needs to be DEDICATED / CLIENT specific at compilation
+			{ src: 'vm/ui.qvm', dest: 'gpp/vm/ui.qvm' }
+		],
+		so: [
+			{ src: 'vm/game.so', dest: 'gpp/vm/game.so' }
 		],
 		manifest: null,
 		Print: function (str) {
@@ -269,11 +274,11 @@ var LibrarySysCommon = {
 			var mapname = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('mapname'), ALLOC_STACK)));
 			var url = 'http://' + fs_cdn + '/assets/manifest.json';
 			console.log("URL:", url);
-			function isInstaller(name) {
+			/*function isInstaller(name) {
 				return SYSC.installers.some(function (installer) {
 					return installer.name === name;
 				});
-			}
+			}*/
 
 			function isCommon(name) {
 				var basepakRx = RegExp('(' + com_basegame + (fs_game ? '|' + fs_game : '') + ')\/pak.+\.pk3$');
@@ -342,7 +347,7 @@ var LibrarySysCommon = {
 				}
 
 				if (!asset) {
-					return callback(new Error('Failed to find "' + pak.name + '" in manifest'));
+					return callback(new Error('DirtyPaks: Failed to find "' + pak.src + '" in manifest'));
 				}
 				if (!SYSC.ValidatePak(pak)) {
 					asset.dest = pak.dest;
@@ -374,14 +379,14 @@ var LibrarySysCommon = {
 					}
 				}
 				if (!asset) {
-					return callback(new Error('Failed to find "' + qvm.name + '" in manifest'));
+					return callback(new Error('DirtyQVM: Failed to find "' + qvm.src + '" in manifest'));
 				}
 				asset.dest = qvm.dest;
 				qvms.push(asset);
 			}
 			return qvms;
 		},
-		ValidateInstaller: function (installer) {
+		/*ValidateInstaller: function (installer) {
 			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
 			for (var i = 0; i < installer.paks.length; i++) {
 				var pak = installer.paks[i];
@@ -402,14 +407,14 @@ var LibrarySysCommon = {
 
 				var asset;
 				for (var j = 0; j < assets.length; j++) {
-					if (assets[j].name === installer.name) {
+					if (assets[j].name === installer.src) {
 						asset = assets[j];
 						break;
 					}
 				}
 
 				if (!asset) {
-					return callback(new Error('Failed to find "' + installer.name + '" in manifest'));
+					return callback(new Error('DirtyInstallers: Failed to find "' + installer.src + '" in manifest'));
 				}
 				if (!SYSC.ValidateInstaller(installer)) {
 					// append the installer info to the asset
@@ -419,8 +424,8 @@ var LibrarySysCommon = {
 				}
 			}
 			return installers;
-		},
-		ExtractInstaller: function (data, paks, callback) {
+		},*/
+		/*ExtractInstaller: function (data, paks, callback) {
 			var gunzip = new Zlib.Gunzip(data);
 			var buffer = gunzip.decompress();
 			var tar = new Tar(buffer);
@@ -445,7 +450,7 @@ var LibrarySysCommon = {
 			}
 
 			nextEntry();
-		},
+		},*/
 		SyncInstallers: function (callback) {
 			//var downloads = SYSC.DirtyInstallers(callback);
 			var downloads = SYSC.DirtyPaks(callback);
@@ -501,8 +506,10 @@ var LibrarySysCommon = {
 			});
 		},
 		FS_Startup: function (callback) {
+			console.log("Updating manifest...");
 			SYSC.UpdateManifest(function (err) {
 				if (err) return callback(err);
+				console.log("Syncing files...");
 				SYSC.SyncFiles(callback);
 			});
 		},
@@ -657,8 +664,18 @@ var LibrarySysCommon = {
 		console.log("Sys_CryptoRandomBytes Not Implemented!");
 	},
 	Sys_DllExtension: function (filename) {
-		console.log("Sys_DllExtension!");
+		var DLL_EXT = ".so" //Auriga: This needs to match DLL_EXT, but I don't know how to get that value here
+		var inlen = filename.length;
+		var extlen = DLL_EXT.length;
+
+		if(extlen <= inlen)
+		{
+			var fileStub = filename.slice(inlen - extlen, filename.length);
+			if(fileStub === DLL_EXT)
+				return 1;
+		}
 		return 0;
+		//Auriga: Need to check for format of .so.1.2.3..., but I don't have the skill to do that :P
 	}
 };
 

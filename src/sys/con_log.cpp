@@ -24,8 +24,8 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "sys_local.h"
 
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
 
 #define MAX_LOG 32768
 

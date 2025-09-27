@@ -25,7 +25,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "server.h"
 
-#include "qcommon/cvar.h"
+#include "../qcommon/cvar.h"
 
 // Attack log file is started when server is init (!= sv_running 1!)
 // we even log attacks when the server is waiting for rcon and doesn't run a map
@@ -599,6 +599,7 @@ static void SV_SpawnServer_after_FS_Restart( cb_context_t *context, int status )
     sv.state = SS_LOADING;
 
     // load and spawn all other entities
+    Com_Printf("Initializing game...\n");
     SV_InitGameProgs();
 
     // run a few frames to allow everything to settle

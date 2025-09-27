@@ -60,21 +60,21 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #endif
 #endif
 
-#include "qcommon/files.h"
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
-#include "qcommon/vm.h"
+#include "../qcommon/files.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
+#include "../qcommon/vm.h"
 #ifndef DEDICATED
-#include "script/bind.h"
-#include "script/client.h"
+#include "../script/bind.h"
+#include "../script/client.h"
 #ifdef USE_RESTCLIENT
-#include "script/http_client.h"
+#include "../script/http_client.h"
 #endif
 #endif
-#include "script/cmd.h"
-#include "script/cvar.h"
-#include "script/rapidjson.h"
-#include "script/nettle.h"
+#include "../script/cmd.h"
+#include "../script/cvar.h"
+#include "../script/rapidjson.h"
+#include "../script/nettle.h"
 
 #include "dialog.h"
 #include "sys_loadlib.h"
@@ -791,7 +791,7 @@ static void main_after_Com_Init(cb_context_t *context, int status)
 	// requestAnimationFrame on dedicated builds.
 	fps = 30;
 #endif
-	emscripten_set_main_loop(Sys_Frame, fps, 0);
+	//emscripten_set_main_loop(Sys_Frame, fps, 0);
 #else
     for ( ;; )
     {
@@ -837,6 +837,10 @@ int main( int argc, char **argv )
 
     CON_Init( );
     Com_Init( args , cb_create_context_no_data(main_after_Com_Init));
+
+#ifdef EMSCRIPTEN
+	emscripten_set_main_loop( Sys_Frame, 0, 0 );
+#endif
 
     return 0;
 }

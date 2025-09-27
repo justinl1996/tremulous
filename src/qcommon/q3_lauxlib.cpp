@@ -5,7 +5,7 @@
 #include <cstdarg>
 #include <iostream>
 
-#include "sys/sys_shared.h"
+#include "../sys/sys_shared.h"
 
 #include "cvar.h"
 #include "msg.h"

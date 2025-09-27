@@ -51,9 +51,9 @@
 #include "vm.h"
 
 #ifndef DEDICATED
-#include "client/cl_rest.h"
+#include "../client/cl_rest.h"
 #endif
-#include "sys/sys_shared.h"
+#include "../sys/sys_shared.h"
 
 using namespace std;
 
@@ -3585,8 +3585,8 @@ static void FS_Startup(const char *gameName, cb_context_t *after )
     fs_debug = Cvar_Get("fs_debug", "0", 0);
 
 #if EMSCRIPTEN
-	fs_cdn = Cvar_Get("fs_cdn", "localhost:9000", CVAR_INIT | CVAR_SERVERINFO);
-	//fs_cdn = Cvar_Get("fs_cdn", "content.quakejs.com", CVAR_INIT | CVAR_SERVERINFO);
+	//fs_cdn = Cvar_Get("fs_cdn", "127.0.0.1", CVAR_INIT | CVAR_SERVERINFO); //Auriga: Use 127.0.0.1, nodejs does not like localhost in some cases
+	fs_cdn = Cvar_Get("fs_cdn", "tremulo.us", CVAR_INIT | CVAR_SERVERINFO);
 	fs_manifest = Cvar_Get("fs_manifest", "", CVAR_ROM | CVAR_SERVERINFO);
 	fs_completeManifest = Cvar_Get("fs_completeManifest", "", CVAR_ROM);
     Com_Printf("fs_cdn: %s\n", fs_cdn->string);
@@ -3612,7 +3612,7 @@ static void FS_Startup(const char *gameName, cb_context_t *after )
 	data->after = after;
 
 #if EMSCRIPTEN
-	Sys_FS_Startup(context);
+	Sys_FS_Startup(context); //Auriga: uhhhh
 #else
 	cb_run(context, 0);
 #endif

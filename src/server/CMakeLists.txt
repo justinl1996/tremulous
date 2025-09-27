@@ -48,6 +48,8 @@ add_executable(
     ${PARENT_DIR}/qcommon/huffman.cpp
     ${PARENT_DIR}/qcommon/huffman.h
     ${PARENT_DIR}/qcommon/ioapi.cpp
+    ${PARENT_DIR}/qcommon/json.cpp
+    ${PARENT_DIR}/qcommon/json.h
     ${PARENT_DIR}/qcommon/md4.cpp
     ${PARENT_DIR}/qcommon/msg.h
     ${PARENT_DIR}/qcommon/msg.cpp

@@ -24,7 +24,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 // bg_misc.c -- both games misc functions, all completely stateless
 
-#include "qcommon/q_shared.h"
+#include "../qcommon/q_shared.h"
 #include "bg_public.h"
 
 int  trap_FS_FOpenFile( const char *qpath, fileHandle_t *f, enum FS_Mode mode );
