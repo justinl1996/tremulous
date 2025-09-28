@@ -2124,7 +2124,6 @@ image_t *R_CreateImage2( const char *name, byte *pic, int width, int height, GLe
 	bool    lastMip;
 	GLenum textureTarget = cubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
 	GLenum dataFormat;
-	Com_Printf("ImageName: %s\n", name);
 
 	if (strlen(name) >= MAX_QPATH ) {
 		ri.Error (ERR_DROP, "R_CreateImage: \"%s\" is too long", name);
