@@ -273,6 +273,7 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 		}
 	}
 
+	Com_Printf("display index: %d\n", display);
 	if( display >= 0 && SDL_GetDesktopDisplayMode( display, &desktopMode ) == 0 )
 	{
 		glConfig.displayAspect = (float)desktopMode.w / (float)desktopMode.h;
@@ -326,6 +327,8 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 
 	ri.Printf (PRINT_ALL, "...setting mode %dx%d\n", glConfig.vidWidth, glConfig.vidHeight);
 
+	Com_Printf("desktopMode width: %d, height: %d\n", desktopMode.w, desktopMode.h);
+	Com_Printf("vidWidth: %d, vidHeight: %d\n", glConfig.vidWidth, glConfig.vidHeight);
 	// Center window
 	if( r_centerWindow->integer && !fullscreen )
 	{
