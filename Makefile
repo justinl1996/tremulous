@@ -762,7 +762,7 @@ ifeq ($(PLATFORM),js)
   BINEXT=.js
 # debug optimize flags: --closure 0 --minify 0 -g
 
-  OPTIMIZEVM += -O0 -g
+  OPTIMIZEVM += -O3
   OPTIMIZE = $(OPTIMIZEVM)
 
   BUILD_STANDALONE=1
