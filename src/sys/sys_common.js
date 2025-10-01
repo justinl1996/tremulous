@@ -498,10 +498,8 @@ var LibrarySysCommon = {
 			});
 		},
 		FS_Startup: function (callback) {
-			console.log("Updating manifest...");
 			SYSC.UpdateManifest(function (err) {
 				if (err) return callback(err);
-				console.log("Syncing files...");
 				SYSC.SyncFiles(callback);
 			});
 		},
