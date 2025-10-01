@@ -108,12 +108,8 @@ var LibrarySysCommon = {
 			}
 		],*/
 		paks: [
-			//{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
-			//{ src: 'data-1.1.1.pk3', dest: 'gpp/data-1.1.1.pk3', checksum: 2236444480 },
-			//{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
-			{ src: 'vms-1.3.0.pk3', dest: 'gpp/vms-1.3.0.pk3', checksum: 3074975812 },
-			{ src: 'data-1.3.0.pk3', dest: 'gpp/data-1.3.0.pk3', checksum: 1497688995 },
-			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
+			{ src: 'vms-1.3.0.pk3', dest: 'gpp/vms-1.3.0.pk3', checksum: 3152474897 },
+			{ src: 'data-1.3.0.pk3', dest: 'gpp/data-1.3.0.pk3', checksum: 2577176428 },
 			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
 			{ src: 'map-atcs-1.1.0.pk3', dest: 'gpp/map-atcs-1.1.0.pk3', checksum: 1649092924 },
 			{ src: 'map-karith-1.1.0.pk3', dest: 'gpp/map-karith-1.1.0.pk3', checksum: 3322431863 },
@@ -168,33 +164,26 @@ var LibrarySysCommon = {
 			}
 		},
 		CRC32File: function (path) {
-			//var stack = Module.Runtime.stackSave();
 			var chunkSize = 1024*1024;
-			var stack = stackSave();
-			var bufp = stackAlloc(chunkSize);
+			var bufp = new Uint8Array(chunkSize)
 			var crc = CRC32.Start();
-
 			var start = Date.now();
 
 			try {
-				var slab = {{{ getHeapForType('i8') }}};
 				var n = 0;
 				var pos = 0;
-				var stream = FS.open(path, 'r', 0666);
+				var stream = FS.open(path, 'r', 0o666);
 				do {
-					n = FS.read(stream, slab, bufp, chunkSize, pos);
-					crc = CRC32.Update(crc, slab, bufp, n);
+					n = FS.read(stream, bufp, 0, chunkSize, pos);
+					crc = CRC32.Update(crc, bufp, 0, n);
 					pos += n;
 				} while (n);
 				FS.close(stream);
 			} catch (e) {
-				stackRestore(stack);
 				return null;
 			}
 
 			SYSC.Print('generated crc32 for ' + path + ' in ' + ((Date.now() - start) / 1000).toFixed(2) + ' seconds');
-
-			stackRestore(stack);
 			return CRC32.Finish(crc);
 		},
 		GetCDN: function () {
@@ -506,10 +495,8 @@ var LibrarySysCommon = {
 			});
 		},
 		FS_Startup: function (callback) {
-			console.log("Updating manifest...");
 			SYSC.UpdateManifest(function (err) {
 				if (err) return callback(err);
-				console.log("Syncing files...");
 				SYSC.SyncFiles(callback);
 			});
 		},

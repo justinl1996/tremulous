@@ -791,7 +791,7 @@ static void main_after_Com_Init(cb_context_t *context, int status)
 	// requestAnimationFrame on dedicated builds.
 	fps = 30;
 #endif
-	//emscripten_set_main_loop(Sys_Frame, fps, 0);
+	emscripten_set_main_loop(Sys_Frame, 90, 0);
 #else
     for ( ;; )
     {
@@ -838,9 +838,9 @@ int main( int argc, char **argv )
     CON_Init( );
     Com_Init( args , cb_create_context_no_data(main_after_Com_Init));
 
-#ifdef EMSCRIPTEN
-	emscripten_set_main_loop( Sys_Frame, 0, 0 );
-#endif
+//#ifdef EMSCRIPTEN
+//	emscripten_set_main_loop( Sys_Frame, 0, 0 );
+//#endif
 
     return 0;
 }

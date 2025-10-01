@@ -262,7 +262,7 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 #endif
 			);
 #endif
-
+#ifndef EMSCRIPTEN
 	// If a window exists, note its display index
 	if( SDL_window != NULL )
 	{
@@ -272,7 +272,7 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 			ri.Printf( PRINT_DEVELOPER, "SDL_GetWindowDisplayIndex() failed: %s\n", SDL_GetError() );
 		}
 	}
-
+#endif
 	Com_Printf("display index: %d\n", display);
 	if( display >= 0 && SDL_GetDesktopDisplayMode( display, &desktopMode ) == 0 )
 	{
@@ -329,6 +329,7 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 
 	Com_Printf("desktopMode width: %d, height: %d\n", desktopMode.w, desktopMode.h);
 	Com_Printf("vidWidth: %d, vidHeight: %d\n", glConfig.vidWidth, glConfig.vidHeight);
+	Com_Printf("fullscreen: %d, centerWindow: %d\n", fullscreen, r_centerWindow->integer);
 	// Center window
 	if( r_centerWindow->integer && !fullscreen )
 	{
