@@ -80,7 +80,11 @@ extern int demo_protocols[];
 
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
+#ifdef EMSCRIPTEN
+#define MASTER_SERVER_NAME	"master.tremulous.online"
+#else
 #define MASTER_SERVER_NAME	"master.tremulous.net"
+#endif
 #endif
 
 #define	PORT_MASTER			30700
@@ -209,7 +213,7 @@ void 		QDECL Com_Error( int code, const char *fmt, ... ) __attribute__ ((noretur
 void 		QDECL Com_DPrintf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 void        Engine_Exit(const char* p ) __attribute__ ((noreturn));
 void 		Com_Quit_f( void ) __attribute__ ((noreturn));
-void		Com_GameRestart(int checksumFeed, bool disconnect, cb_context_t *after);
+void        Com_GameRestart(int checksumFeed, bool disconnect, cb_context_t *after);
 
 int			Com_Milliseconds( void );	// will be journaled properly
 char		*Com_MD5File(const char *filename, int length, const char *prefix, int prefix_len);
@@ -407,6 +411,7 @@ void S_ClearSoundBuffer( void );
 void SCR_DebugGraph (float value);	// FIXME: move logging to common?
 
 #if EMSCRIPTEN
+extern "C" void Com_ProxyCallback(cb_context_t *context);
 const char *CL_GetCDN(void);
 const char *CL_GetManifest(void);
 #endif
@@ -467,7 +472,6 @@ void         Com_Bucket_Select_A_Specific_Item(
 	unsigned int bucket_handle, void* item);
 
 #if EMSCRIPTEN
-extern "C" void Com_ProxyCallback(cb_context_t *context);
 extern "C" const char *Com_GetCDN(void);
 extern "C" const char *Com_GetManifest(void);
 #endif
