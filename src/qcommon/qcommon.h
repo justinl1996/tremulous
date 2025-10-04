@@ -80,7 +80,11 @@ extern int demo_protocols[];
 
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
+#ifdef EMSCRIPTEN
+#define MASTER_SERVER_NAME	"master.tremulous.online"
+#else
 #define MASTER_SERVER_NAME	"master.tremulous.net"
+#endif
 #endif
 
 #define	PORT_MASTER			30700
