@@ -132,7 +132,9 @@ static bool GetNews(bool begin)
     Cvar_Set("cl_newsString", clc.newsString);
     return finished;
 #endif
-    Cvar_Set("cl_newsString", "^1You must compile your client with CURL support to use this feature");
+    //Cvar_Set("cl_newsString", "^1You must compile your client with CURL support to use this feature");
+    Cvar_Set("cl_newsString", "^1This is the tremulous port to the web. Many thanks to megamind, Auriga and inolen (quakejs) for their assistance");
+    
     return true;
 }
 

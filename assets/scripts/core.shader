@@ -8,7 +8,7 @@ textures/REGION
 white
 {
 	{
-		map *white
+		map $whiteimage
 		blendfunc	GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
 		rgbgen vertex
 	}
@@ -16,23 +16,33 @@ white
 
 outline
 {
-  cull none
-  nopicmip
-  nomipmaps
-  {
-    map gfx/2d/outline.tga
-    blendfunc	GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-    rgbgen vertex
-  }
+	cull none
+	nopicmip
+	nomipmaps
+	{
+		map gfx/2d/outline.tga
+		blendfunc	GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbgen vertex
+	}
 }
 
 console
 {
 	nopicmip
 	nomipmaps
-  {
-		map gfx/colors/black.tga
-	} 
+    {
+		map ui/assets/console1.tga
+		blendFunc GL_ONE GL_ZERO
+		tcMod scroll .02  0
+		tcmod scale 4 1
+	}
+	{
+		map ui/assets/console2.jpg
+		blendFunc add
+		tcMod turb 0 .1 0 .1
+		tcMod scale 4 1
+		tcmod scroll 0.2  .1
+	}
 }
 
 gfx/misc/detail
@@ -40,7 +50,7 @@ gfx/misc/detail
 	nopicmip
 	{
 		map gfx/misc/detail.jpg
-    blendFunc GL_DST_COLOR GL_SRC_COLOR
+		blendFunc GL_DST_COLOR GL_SRC_COLOR
 		rgbgen identity
 	}
 }
@@ -57,25 +67,16 @@ gfx/2d/bigchars
 	}
 }
 
-gfx/2d/cursor
-{
-  nopicmip
-	nomipmaps
-  {
-    map gfx/2d/cursor.tga
-  }
-}
-
 // projectionShadow is used for cheap squashed model shadows
 projectionShadow
 {
 	polygonOffset
 	deformVertexes projectionShadow
 	{
-		map			*white
+		map			$whiteimage
 		blendFunc GL_ONE GL_ZERO
 		rgbGen wave square 0 0 0 0
-	}	
+	}
 }
 
 // blinked on top of lagometer when connection is interrupted
@@ -184,6 +185,15 @@ gfx/2d/numbers/minus_32b
 	nopicmip
 	{
 		map gfx/2d/numbers/minus_32b.tga
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbgen vertex
+	}
+}
+gfx/2d/numbers/infinity_32b
+{
+	nopicmip
+	{
+		map gfx/2d/numbers/infinity_32b.tga
 		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
 		rgbgen vertex
 	}

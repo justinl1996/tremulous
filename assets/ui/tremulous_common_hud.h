@@ -8,6 +8,12 @@
 #define CONSOLE_H 180
 #define MAIN_W    (W-(2*BORDER))
 
+//#define TUTORIAL_X (W-(BORDER*MAIN_W))
+#define TUTORIAL_X  320
+
+#define KILLFEED_X (BORDER)
+#define KILLFEED_Y (410)
+
 //CONSOLE
 itemDef
 {
@@ -29,14 +35,14 @@ itemDef
 itemDef
 {
   name "tutorial"
-  rect BORDER 250 MAIN_W 180
+  rect TUTORIAL_X 275 MAIN_W 130
   aspectBias ALIGN_LEFT
   style WINDOW_STYLE_EMPTY
   visible MENU_TRUE
   decoration
   forecolor 1 1 1 0.35
   textalign ALIGN_LEFT
-  textvalign VALIGN_TOP
+  textvalign VALIGN_CENTER
   textscale 0.3
   textstyle ITEM_TEXTSTYLE_NORMAL
   ownerdraw CG_TUTORIAL
@@ -162,7 +168,7 @@ itemDef
   forecolor 1 1 1 1
   textscale 0.3
   ownerdraw CG_DEMO_PLAYBACK
-  background "ui/assets/forwardarrow.tga"
+  background "ui/assets/forwardarrow.png"
 }
 
 //SNAPSHOT
@@ -204,5 +210,38 @@ itemDef
   rect 320 240 0 0
   forecolor COMMON_HUD_R COMMON_HUD_G COMMON_HUD_B .35
   ownerdraw CG_PLAYER_CROSSHAIR
+}
+
+//SPECTATOR TEXT
+itemDef
+{
+    name "followtext"
+    rect 200 375 240 25
+    foreColor 1 1 1 1
+    aspectBias ALIGN_CENTER
+    textalign ALIGN_CENTER
+    textvalign VALIGN_TOP
+    visible MENU_TRUE
+    decoration
+    textScale .7
+    textStyle ITEM_TEXTSTYLE_SHADOWED
+    ownerdraw CG_FOLLOW
+}
+
+//KILLFEED
+itemDef
+{
+  name "killfeed"
+  rect KILLFEED_X KILLFEED_Y 0 0
+  aspectBias ALIGN_LEFT
+  style WINDOW_STYLE_EMPTY
+  visible MENU_TRUE
+  decoration
+  forecolor COMMON_HUD_R COMMON_HUD_G COMMON_HUD_B 1
+  textalign ALIGN_LEFT
+  textvalign VALIGN_CENTER
+  textscale 0.3
+  textstyle ITEM_TEXTSTYLE_SHADOWED
+  ownerdraw CG_KILLFEED
 }
 

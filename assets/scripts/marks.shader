@@ -63,15 +63,13 @@ gfx/marks/plasma_mrk
   }
 }
 
-creep
+gfx/sprites/green_acid_mark
 {
-  nopicmip
-  polygonoffset
+  polygonOffset
   {
-    clampmap gfx/misc/creep.tga
-    blendfunc blend
-    rgbGen identityLighting
-    alphaGen Vertex
+    map gfx/sprites/green_acid
+    blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+    rgbGen    vertex
+    alphaGen  vertex
   }
 }
-
