@@ -789,6 +789,7 @@ ifeq ($(PLATFORM),js)
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_VM_GetCurrent', '_VM_SetCurrent']" \
     -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction', 'setCanvasSize']" \
     -s LEGACY_GL_EMULATION=1 \
+    -s WEBSOCKET_URL=wss:// \
     -s DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0 \
     -s ASSERTIONS=1 \
     -s GL_ENABLE_GET_PROC_ADDRESS \

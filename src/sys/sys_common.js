@@ -213,7 +213,7 @@ var LibrarySysCommon = {
 		DownloadAsset: function (asset, onprogress, onload) {
 			var root = SYSC.GetCDN();
 			var name = asset.name.replace(/(.+\/|)(.+?)$/, '$1' + asset.checksum + '-$2');
-			var url = 'http://' + root + '/assets/' + name;
+			var url = 'https://' + root + '/assets/' + name;
 
 			SYS.DoXHR(url, {
 				dataType: 'arraybuffer',
@@ -265,7 +265,7 @@ var LibrarySysCommon = {
 			var fs_game = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_game'), ALLOC_STACK)));
 			var com_basegame = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('com_basegame'), ALLOC_STACK)));
 			var mapname = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('mapname'), ALLOC_STACK)));
-			var url = 'http://' + fs_cdn + '/assets/manifest.json';
+			var url = "https://" + fs_cdn + '/assets/manifest.json';
 			console.log("URL:", url);
 			/*function isInstaller(name) {
 				return SYSC.installers.some(function (installer) {
