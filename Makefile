@@ -805,6 +805,7 @@ ifeq ($(PLATFORM),js)
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_CON_SetIsTTY', '_VM_GetCurrent', '_VM_SetCurrent']" \
     -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
     -s LEGACY_GL_EMULATION=1 \
+    -s WEBSOCKET_URL=wss:// \
     -s RESERVED_FUNCTION_POINTERS=1 \
     -s STACK_SIZE=368435456 \
     -s TOTAL_MEMORY=805306368 \
