@@ -2867,6 +2867,155 @@ static void CL_ServersResponsePacket(const netadr_t *from, msg_t *msg, bool exte
 
     Com_Printf("%d servers parsed (total %d)\n", numservers, total);
 }
+
+static void CL_ServersWebResponsePacket(const netadr_t *from, msg_t *msg, bool extended)
+{
+    int i, count, length, total;
+    netadr_t addresses[MAX_SERVERSPERPACKET];
+    int numservers;
+    byte *buffptr;
+    byte *buffend;
+    byte *buffstart;
+    char label[MAX_FEATLABEL_CHARS] = "";
+    char domain[MAX_FQDN_NAME];
+
+    Com_DPrintf("CL_ServersWebResponsePacket from %s %s\n",
+            NET_AdrToStringwPort(*from),
+            extended ? " (extended)" : "");
+
+    if (cls.numglobalservers == -1)
+    {
+        // state to detect lack of servers or lack of response
+        cls.numglobalservers = 0;
+        cls.numGlobalServerAddresses = 0;
+        for (i = 0; i < 3; ++i)
+        {
+            cls.numAlternateMasterPackets[i] = 0;
+            cls.receivedAlternateMasterPackets[i] = 0;
+        }
+    }
+
+    // parse through server response string
+    numservers = 0;
+    buffptr = msg->data;
+    buffend = buffptr + msg->cursize;
+
+    // skip header
+    buffptr += 4;
+
+    // advance to initial token
+    // I considered using strchr for this but I don't feel like relying
+    // on its behaviour with '\0'
+    while (*buffptr && *buffptr != '\\' && *buffptr != '/')
+    {
+        buffptr++;
+
+        if (buffptr >= buffend) break;
+    }
+
+    if (*buffptr == '\0')
+    {
+        int ind = CL_GSRSequenceInformation(from->alternateProtocol, &buffptr);
+        if (ind >= 0)
+        {
+            // this denotes the start of new-syntax stuff
+            // have we already received this packet?
+            if (cls.receivedAlternateMasterPackets[from->alternateProtocol] & (1 << (ind - 1)))
+            {
+                Com_DPrintf(
+                    "CL_ServersResponsePacket: "
+                    "received packet %d again, ignoring\n",
+                    ind);
+                return;
+            }
+            // TODO: detect dropped packets and make another
+            // request
+            Com_DPrintf(
+                "CL_ServersResponsePacket:%s packet "
+                "%d of %d\n",
+                (from->alternateProtocol == 0 ? "" : from->alternateProtocol == 1 ? " alternate-1" : " alternate-2"),
+                ind, cls.numAlternateMasterPackets[from->alternateProtocol]);
+            cls.receivedAlternateMasterPackets[from->alternateProtocol] |= (1 << (ind - 1));
+
+            CL_GSRFeaturedLabel(&buffptr, label, sizeof(label));
+        }
+        // now skip to the server list
+        for (; buffptr < buffend && *buffptr != '\\' && *buffptr != '/'; buffptr++)
+            ;
+    }
+    while (buffptr + 1 < buffend)
+    {
+        // Domain name
+        if (*buffptr == '\\')
+        {
+            buffptr++;
+            // "EOT" at the end.
+            if (buffend - buffptr <= 4) break;
+
+            buffstart = buffptr;
+
+            for (length=0; buffptr < buffend && *buffptr != ':'; buffptr++) length++;
+
+            Q_strncpyz(domain, (const char *) buffstart, length + 1);
+        } else {
+            // syntax error!
+            break;
+        }
+        buffptr++;
+        addresses[numservers].port = (*buffptr++) << 8;
+        addresses[numservers].port += *buffptr++;
+        addresses[numservers].port = BigShort(addresses[numservers].port);
+
+        switch (NET_StringToAdr(domain, &addresses[numservers], NA_UNSPEC))
+        {
+            case 0:
+                Com_Printf("Couldn't resolve %s address\n", domain);
+                return;
+
+            case 2:
+                cls.updateServer.port = BigShort(PORT_MASTER);
+            default:
+                break;
+        }
+        Com_Printf("%s resolved to %s\n", domain, NET_AdrToStringwPort(addresses[numservers]));
+        // syntax check
+        if (*buffptr != '\\' && *buffptr != '/') break;
+
+        addresses[numservers].alternateProtocol = from->alternateProtocol;
+
+        numservers++;
+        if (numservers >= MAX_SERVERSPERPACKET) break;
+    }
+    count = cls.numglobalservers;
+
+    for (i = 0; i < numservers && count < MAX_GLOBAL_SERVERS; i++)
+    {
+        // build net address
+        serverInfo_t *server = &cls.globalServers[count];
+
+        CL_InitServerInfo(server, &addresses[i]);
+        Q_strncpyz(server->label, label, sizeof(server->label));
+        // advance to next slot
+        count++;
+    }
+
+    // if getting the global list
+    if (count >= MAX_GLOBAL_SERVERS && cls.numGlobalServerAddresses < MAX_GLOBAL_SERVERS)
+    {
+        // if we couldn't store the servers in the main list anymore
+        for (; i < numservers && cls.numGlobalServerAddresses < MAX_GLOBAL_SERVERS; i++)
+        {
+            // just store the addresses in an additional list
+            cls.globalServerAddresses[cls.numGlobalServerAddresses++] = addresses[i];
+        }
+    }
+
+    cls.numglobalservers = count;
+    total = count + cls.numGlobalServerAddresses;
+
+    Com_Printf("%d servers parsed (total %d)\n", numservers, total);
+}
+
 /*
 ==================
 CL_CheckTimeout
@@ -3968,6 +4117,15 @@ static void CL_ConnectionlessPacket(netadr_t from, msg_t *msg)
 
         return;
     }
+
+#ifdef EMSCRIPTEN
+    if (!Q_strncmp(c, "getserverswebResponse", 18))
+    {
+        CL_ServersWebResponsePacket(&from, msg, false);
+
+        return;
+    }
+#endif
 
     // list of servers sent back by a master server (extended)
     if (!Q_strncmp(c, "getserversExtResponse", 21))

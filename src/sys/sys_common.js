@@ -213,7 +213,7 @@ var LibrarySysCommon = {
 		DownloadAsset: function (asset, onprogress, onload) {
 			var root = SYSC.GetCDN();
 			var name = asset.name.replace(/(.+\/|)(.+?)$/, '$1' + asset.checksum + '-$2');
-			var url = 'https://' + root + '/assets/' + name;
+			var url = 'http://' + root + '/assets/' + name;
 
 			SYS.DoXHR(url, {
 				dataType: 'arraybuffer',
@@ -265,7 +265,7 @@ var LibrarySysCommon = {
 			var fs_game = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_game'), ALLOC_STACK)));
 			var com_basegame = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('com_basegame'), ALLOC_STACK)));
 			var mapname = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('mapname'), ALLOC_STACK)));
-			var url = "https://" + fs_cdn + '/assets/manifest.json';
+			var url = "http://" + fs_cdn + '/assets/manifest.json';
 			console.log("URL:", url);
 			/*function isInstaller(name) {
 				return SYSC.installers.some(function (installer) {
@@ -296,17 +296,12 @@ var LibrarySysCommon = {
 				dataType: 'json',
 				onload: function (err, manifest) {
 					if (err) return callback(new Error('Failed to download and parse manifest, ' + err.message));
-					console.log("fs_game: ", fs_game);
-					console.log("com_basegame:", com_basegame);
-					console.log("mapname:", mapname);
 					var fs_manifestName = Module.allocate(intArrayFromString('fs_manifest'), ALLOC_STACK);
 					var fs_manifest = Module.allocate(intArrayFromString(formatManifestString(manifest)), ALLOC_STACK);
 					_Cvar_Set(fs_manifestName, fs_manifest);
-					console.log("fs_manifest: ", fs_manifest);
 					var fs_completeManifestName = Module.allocate(intArrayFromString('fs_completeManifest'), ALLOC_STACK);
 					var fs_completeManifest = Module.allocate(intArrayFromString(formatManifestString(manifest)), ALLOC_STACK);
 					_Cvar_Set(fs_completeManifestName, fs_completeManifest);
-					console.log("fs_completemanifest: ", fs_completeManifest);
 					return callback();
 				}
 			});

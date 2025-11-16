@@ -296,6 +296,8 @@ typedef struct {
 #define	MAX_NAME_LENGTH			32		// max length of a client name ignoring colors
 #define	MAX_HOSTNAME_LENGTH	80		// max length of a host name
 
+#define MAX_FQDN_NAME   253
+
 #define	MAX_SAY_TEXT	800
 
 // paramters for command buffer stuffing
