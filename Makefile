@@ -790,6 +790,7 @@ ifeq ($(PLATFORM),js)
     -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction', 'setCanvasSize']" \
     -s LEGACY_GL_EMULATION=1 \
     -s WEBSOCKET_URL=wss:// \
+    -s WEBSOCKET_SUBPROTOCOL=binary \
     -s DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0 \
     -s ASSERTIONS=1 \
     -s GL_ENABLE_GET_PROC_ADDRESS \
