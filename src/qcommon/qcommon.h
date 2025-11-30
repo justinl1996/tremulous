@@ -88,11 +88,11 @@ extern int demo_protocols[];
 #endif
 
 #define	PORT_MASTER			30700
-#define	PORT_SERVER			30720
+#define	PORT_SERVER			40720
 #define	ALT1PORT_MASTER			30700
-#define	ALT1PORT_SERVER			30721
+#define	ALT1PORT_SERVER			40721
 #define	ALT2PORT_MASTER			30710
-#define	ALT2PORT_SERVER			30722
+#define	ALT2PORT_SERVER			40722
 #define	NUM_SERVER_PORTS	4		// broadcast scan this many ports after
 									// PORT_SERVER so a single machine can
 									// run multiple servers

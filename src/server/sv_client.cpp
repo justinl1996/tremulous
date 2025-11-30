@@ -1247,9 +1247,8 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 		}
 
 		cl->gotCP = true;
-#ifdef EMSCRIPTEN
 		cl->pureAuthentic = 1;
-#else
+/*
 		if (bGood) {
 			cl->pureAuthentic = 1;
 		} 
@@ -1265,6 +1264,7 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 			SV_DropClient( cl, "Unpure client detected. Invalid .PK3 files referenced!" );
 		}
 #endif
+*/
 	}
 }
 
