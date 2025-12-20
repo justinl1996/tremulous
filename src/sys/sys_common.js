@@ -122,6 +122,11 @@ var LibrarySysCommon = {
 			{ src: 'map-transit-1.1.0.pk3', dest: 'gpp/map-transit-1.1.0.pk3', checksum: 1087076925 },
 			{ src: 'map-tremor-1.1.0.pk3', dest: 'gpp/map-tremor-1.1.0.pk3', checksum: 2902177249 },
 			{ src: 'map-uncreation-1.1.0.pk3', dest: 'gpp/map-uncreation-1.1.0.pk3', checksum: 29654410 },
+			{ src: 'map-atcszalpha.pk3', dest: 'gpp/map-atcszalpha.pk3', checksum: 4133546162 },
+			{ src: 'map-treecannon_b4.pk3', dest: 'gpp/map-treecannon_b4.pk3', checksum: 1151549188 },
+			{ src: 'map-atcshd-gpp.pk3', dest: 'gpp/map-atcshd-gpp.pk3', checksum: 2833692283 },
+			{ src: 'map-spacelab_b2.pk3', dest: 'gpp/map-spacelab_b2.pk3', checksum: 3262686861 },
+			{ src: 'map-base-a51_b2.pk3', dest: 'gpp/map-base-a51_b2.pk3', checksum: 213743857 },
 		],
 		qvms: [
 			{ src: 'vm/cgame.qvm', dest: 'gpp/vm/cgame.qvm' }, 
