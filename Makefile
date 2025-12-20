@@ -5,7 +5,6 @@
 #
 COMPILE_PLATFORM=$(shell uname | sed -e 's/_.*//' | tr '[:upper:]' '[:lower:]' | sed -e 's/\//_/g')
 COMPILE_ARCH=$(shell uname -m | sed -e 's/i.86/x86/' | sed -e 's/^arm.*/arm/')
-EMSCRIPTEN=/home/justin/coding/emsdk/upstream/emscripten
 
 ifeq ($(COMPILE_PLATFORM),sunos)
   # Solaris uname and GNU uname differ
@@ -755,9 +754,9 @@ else # ifeq freebsd
 #############################################################################
 
 ifeq ($(PLATFORM),js)
-  CC=$(EMSCRIPTEN)/emcc
-  CXX=$(EMSCRIPTEN)/emcc
-  RANLIB=$(EMSCRIPTEN)/emranlib
+  CC=emcc
+  CXX=emcc
+  RANLIB=emranlib
   ARCH=js
   BINEXT=.js
 # debug optimize flags: --closure 0 --minify 0 -g

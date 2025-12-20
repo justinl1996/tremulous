@@ -113,7 +113,7 @@ var LibrarySysCommon = {
 			{ src: 'vms-1.3.0.pk3', dest: 'gpp/vms-v1.3.0.pk3', checksum: 2074043898 },
 			//{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
 			//{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
-			{ src: 'data-1.3.0.pk3', dest: 'gpp/data-v1.3.0.pk3', checksum: 4146704090 },
+			{ src: 'data-1.3.0.pk3', dest: 'gpp/data-v1.3.0.pk3', checksum: 903113155 },
 			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
 			{ src: 'map-atcs-1.1.0.pk3', dest: 'gpp/map-atcs-1.1.0.pk3', checksum: 1649092924 },
 			{ src: 'map-karith-1.1.0.pk3', dest: 'gpp/map-karith-1.1.0.pk3', checksum: 3322431863 },

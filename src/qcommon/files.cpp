@@ -594,9 +594,11 @@ Tests if path and file exists
 bool FS_FileInPathExists(const char *testpath)
 {
     FILE *filep;
-
+#if EMSCRIPTEN
+	filep = fopen( testpath, "rb" );
+#else
     filep = Sys_FOpen(testpath, "rb");
-
+#endif
     if (filep)
     {
         fclose(filep);
@@ -4123,10 +4125,12 @@ void FS_ConditionalRestart(int checksumFeed, bool disconnect, cb_context_t *afte
         fs_gamedirvar->modified = false;
     }
 
+#ifndef EMSCRIPTEN
     if (checksumFeed != fs_checksumFeed)
     {
         FS_Restart(checksumFeed, context);
     }
+#endif
 
     else if (fs_numServerPaks && !fs_reordered)
         FS_ReorderPurePaks();

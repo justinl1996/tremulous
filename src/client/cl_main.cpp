@@ -1445,11 +1445,12 @@ void CL_Disconnect(bool showMainMenu)
     }
 
     CL_UpdateGUID(NULL, 0);
-
+#ifndef EMSCRIPTEN
     if (!noGameRestart)
         CL_OldGame();
     else
         noGameRestart = false;
+#endif
 }
 
 /*
