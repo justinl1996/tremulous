@@ -61,6 +61,31 @@ Mingw32 requires `USE_INTERNAL_LIBS=1`
 
 Currently there is no native Windows build setup, all builds are cross compiled on Linux.
 
+### Web (Emscripten)
+
+Emscripten based on instructions found at https://emscripten.org/docs/getting_started/downloads.html
+
+```bash
+# Get the emsdk repo
+git clone https://github.com/emscripten-core/emsdk.git
+
+# Enter that directory
+cd emsdk
+
+# Fetch the latest version of the emsdk (not needed the first time you clone)
+git pull
+
+# Download and install the latest SDK tools.
+./emsdk install latest
+
+# Make the "latest" SDK "active" for the current user. (writes .emscripten file)
+./emsdk activate latest
+
+# Activate PATH and other environment variables in the current terminal
+source ./emsdk_env.sh
+```
+
+
 ### OSX
 
 TBD
@@ -77,6 +102,24 @@ make
 # cd build/release-linux-x86_64/
 ./tremulous
 ```
+
+# How to build for Web
+## Client
+```bash
+git clone https://github.com/GrangerHub/tremulous.git
+cd tremulous
+make PLATFORM=js
+```
+
+## Server
+```bash
+git clone https://github.com/GrangerHub/tremulous.git
+cd tremulous
+git checkout emscripten_server
+make BUILD_CLIENT=0 BUILD_SERVER=1
+```
+
+To deploy the binaries: https://github.com/justinl1996/tremulous_web
 
 # How to build for Win64
 
