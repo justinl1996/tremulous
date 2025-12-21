@@ -25,7 +25,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 // cg_main.c -- initialization and primary entry point for cgame
 
 #include "cg_local.h"
-#include "ui/ui_shared.h"
+#include "../ui/ui_shared.h"
 
 // display context for new ui stuff
 displayContextDef_t cgDC;
@@ -336,7 +336,7 @@ static cvarTable_t cvarTable[ ] =
   { &cg_disableScannerPlane, "cg_disableScannerPlane", "1", CVAR_ARCHIVE },
   { &cg_tutorial, "cg_tutorial", "1", CVAR_ARCHIVE },
 
-  { &cg_rangeMarkerDrawSurface, "cg_rangeMarkerDrawSurface", "1", CVAR_ARCHIVE },
+  { &cg_rangeMarkerDrawSurface, "cg_rangeMarkerDrawSurface", "0", CVAR_ARCHIVE },
   { &cg_rangeMarkerDrawIntersection, "cg_rangeMarkerDrawIntersection", "0", CVAR_ARCHIVE },
   { &cg_rangeMarkerDrawFrontline, "cg_rangeMarkerDrawFrontline", "0", CVAR_ARCHIVE },
   { &cg_rangeMarkerSurfaceOpacity, "cg_rangeMarkerSurfaceOpacity", "0.08", CVAR_ARCHIVE },

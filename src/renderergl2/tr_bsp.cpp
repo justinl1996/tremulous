@@ -26,7 +26,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include "tr_local.h"
 
 #define JSON_IMPLEMENTATION
-#include "qcommon/json.h"
+#include "../qcommon/json.h"
 #undef JSON_IMPLEMENTATION
 
 /*

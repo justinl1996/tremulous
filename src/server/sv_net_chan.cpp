@@ -24,10 +24,10 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "server.h"
 
-#include "qcommon/q_shared.h"
-#include "qcommon/msg.h"
-#include "qcommon/net.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/msg.h"
+#include "../qcommon/net.h"
+#include "../qcommon/qcommon.h"
 
 /*
 ==============

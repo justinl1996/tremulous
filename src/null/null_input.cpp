@@ -22,7 +22,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 ===========================================================================
 */
 
-#include "sys/sys_local.h"
+#include "../sys/sys_local.h"
 
 void IN_Init( void ) {
 }

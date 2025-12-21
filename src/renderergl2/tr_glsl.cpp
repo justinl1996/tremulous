@@ -239,6 +239,7 @@ static void GLSL_GetShaderHeader( GLenum shaderType, const GLchar *extra, char *
 	dest[0] = '\0';
 
 	// HACK: abuse the GLSL preprocessor to turn GLSL 1.20 shaders into 1.30 ones
+#if !EMSCRIPTEN
 	if(glRefConfig.glslMajorVersion > 1 || (glRefConfig.glslMajorVersion == 1 && glRefConfig.glslMinorVersion >= 30))
 	{
 		Q_strcat(dest, size, "#version 150\n");
@@ -264,7 +265,7 @@ static void GLSL_GetShaderHeader( GLenum shaderType, const GLchar *extra, char *
 		Q_strcat(dest, size, "#version 120\n");
         Q_strcat(dest, size, "#define shadow2D(a,b) shadow2D(a,b).r \n");
 	}
-
+#endif
 	// HACK: add some macros to avoid extra uniforms and save speed and code maintenance
 	//Q_strcat(dest, size,
 	//		 va("#ifndef r_SpecularExponent\n#define r_SpecularExponent %f\n#endif\n", r_specularExponent->value));
@@ -503,6 +504,14 @@ static void GLSL_ShowProgramUniforms(GLuint program)
 	int             i, count, size;
 	GLenum			type;
 	char            uniformName[1000];
+// This function is rather expensive in WebGL, let's completely
+// avoid it if not a developer.
+#ifdef EMSCRIPTEN
+	if(!Cvar_VariableIntegerValue("developer"))
+	{
+		return;
+	}
+#endif
 
 	// query the number of active uniforms
 	qglGetProgramiv(program, GL_ACTIVE_UNIFORMS, &count);
@@ -1145,6 +1154,7 @@ void GLSL_InitGPUShaders(void)
 		numLightShaders++;
 	}
 
+#if !EMSCRIPTEN
 	attribs = ATTR_POSITION | ATTR_POSITION2 | ATTR_NORMAL | ATTR_NORMAL2 | ATTR_TEXCOORD;
 
 	extradefines[0] = '\0';
@@ -1252,7 +1262,6 @@ void GLSL_InitGPUShaders(void)
 		numEtcShaders++;		
 	}
 
-
 	attribs = ATTR_POSITION | ATTR_TEXCOORD;
 	extradefines[0] = '\0';
 
@@ -1332,6 +1341,7 @@ void GLSL_InitGPUShaders(void)
 
 		numEtcShaders++;
 	}
+#endif
 
 #if 0
 	attribs = ATTR_POSITION | ATTR_TEXCOORD;

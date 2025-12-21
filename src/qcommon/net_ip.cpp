@@ -70,6 +70,7 @@ static bool winsockInitialized = false;
 #define _BSD_SOCKLEN_T_
 #endif
 
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <errno.h>
 #include <netdb.h>
@@ -123,11 +124,11 @@ static struct sockaddr socksRelayAddr;
 
 static SOCKET ip_sockets[3] = {INVALID_SOCKET, INVALID_SOCKET, INVALID_SOCKET};
 static SOCKET ip6_sockets[3] = {INVALID_SOCKET, INVALID_SOCKET, INVALID_SOCKET};
-/*
-TODO: accommodate
-static SOCKET	socks_socket = INVALID_SOCKET;
-static SOCKET	multicast6_socket = INVALID_SOCKET;
-*/
+
+//SOCKS
+static SOCKET	socks_sockets[3] = {INVALID_SOCKET, INVALID_SOCKET, INVALID_SOCKET};
+static SOCKET	multicast6_sockets[3] = {INVALID_SOCKET, INVALID_SOCKET, INVALID_SOCKET};
+
 
 // Keep track of currently joined multicast group.
 static struct ipv6_mreq curgroup;
@@ -585,6 +586,7 @@ bool NET_GetPacket(netadr_t *net_from, msg_t *net_message, fd_set *fdr)
             {
                 memset(((struct sockaddr_in *)&from)->sin_zero, 0, 8);
 
+                //SOCKS
                 if (usingSocks && memcmp(&from, &socksRelayAddr, fromlen) == 0)
                 {
                     if (ret < 10 || net_message->data[0] != 0 || net_message->data[1] != 0 ||
@@ -649,12 +651,11 @@ bool NET_GetPacket(netadr_t *net_from, msg_t *net_message, fd_set *fdr)
             }
         }
 
-        /*
-        TODO: accommodate
-        if(multicast6_socket != INVALID_SOCKET && multicast6_socket != ip6_socket && FD_ISSET(multicast6_socket, fdr))
+        //SOCKS
+        if(multicast6_sockets[a] != INVALID_SOCKET && multicast6_sockets[a] != ip6_sockets[a] && FD_ISSET(multicast6_sockets[a], fdr))
         {
                 fromlen = sizeof(from);
-                ret = recvfrom(multicast6_socket, (char*)net_message->data, net_message->maxsize, 0, (struct sockaddr *)
+                ret = recvfrom(multicast6_sockets[a], (char*)net_message->data, net_message->maxsize, 0, (struct sockaddr *)
         &from, &fromlen);
 
                 if (ret == SOCKET_ERROR)
@@ -679,7 +680,6 @@ bool NET_GetPacket(netadr_t *net_from, msg_t *net_message, fd_set *fdr)
                         return true;
                 }
         }
-        */
         // outdent
     }
 
@@ -717,6 +717,7 @@ void Sys_SendPacket(int length, const void *data, netadr_t to)
     memset(&addr, 0, sizeof(addr));
     NetadrToSockadr(&to, (struct sockaddr *)&addr);
 
+    //SOCKS
     if (usingSocks && to.type == NA_IP)
     {
         socksBuf[0] = 0;  // reserved
@@ -877,13 +878,13 @@ SOCKET NET_IPSocket(int alternateProtocol, char *net_interface, int port, int *e
     if (net_interface)
     {
         Com_Printf("Opening%s IP socket: %s:%i\n",
-            (alternateProtocol == 2 ? " alternate-2" : alternateProtocol == 1 ? " alternate-1" : ""), net_interface,
+            (alternateProtocol == 2 ? " alternateProtocol-2" : alternateProtocol == 1 ? " alternateProtocol-1" : ""), net_interface,
             port);
     }
     else
     {
         Com_Printf("Opening%s IP socket: 0.0.0.0:%i\n",
-            (alternateProtocol == 2 ? " alternate-2" : alternateProtocol == 1 ? " alternate-1" : ""), port);
+            (alternateProtocol == 2 ? " alternateProtocol-2" : alternateProtocol == 1 ? " alternateProtocol-1" : ""), port);
     }
 
     if ((newsocket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == INVALID_SOCKET)
@@ -893,20 +894,21 @@ SOCKET NET_IPSocket(int alternateProtocol, char *net_interface, int port, int *e
         return newsocket;
     }
     // make it non-blocking
-    if (ioctlsocket(newsocket, FIONBIO, &_true) == SOCKET_ERROR)
+    //if (ioctlsocket(newsocket, FIONBIO, &_true) == SOCKET_ERROR)
+    if( fcntl( newsocket, F_SETFL, O_NONBLOCK ) == SOCKET_ERROR )
     {
         Com_Printf("WARNING: NET_IPSocket: ioctl FIONBIO: %s\n", NET_ErrorString());
         *err = socketError;
         closesocket(newsocket);
         return INVALID_SOCKET;
     }
-
+#ifndef EMSCRIPTEN
     // make it broadcast capable
     if (setsockopt(newsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i)) == SOCKET_ERROR)
     {
         Com_Printf("WARNING: NET_IPSocket: setsockopt SO_BROADCAST: %s\n", NET_ErrorString());
     }
-
+#endif
     if (!net_interface || !net_interface[0])
     {
         address.sin_family = AF_INET;
@@ -959,16 +961,16 @@ SOCKET NET_IP6Socket(int alternateProtocol, char *net_interface, int port, struc
         // Print the name in brackets if there is a colon:
         if (Q_CountChar(net_interface, ':'))
             Com_Printf("Opening%s IP6 socket: [%s]:%i\n",
-                (alternateProtocol == 2 ? " alternate-2" : alternateProtocol == 1 ? " alternate-1" : ""), net_interface,
+                (alternateProtocol == 2 ? " alternateProtocol-2" : alternateProtocol == 1 ? " alternateProtocol-1" : ""), net_interface,
                 port);
         else
             Com_Printf("Opening%s IP6 socket: %s:%i\n",
-                (alternateProtocol == 2 ? " alternate-2" : alternateProtocol == 1 ? " alternate-1" : ""), net_interface,
+                (alternateProtocol == 2 ? " alternateProtocol-2" : alternateProtocol == 1 ? " alternateProtocol-1" : ""), net_interface,
                 port);
     }
     else
         Com_Printf("Opening%s IP6 socket: [::]:%i\n",
-            (alternateProtocol == 2 ? " alternate-2" : alternateProtocol == 1 ? " alternate-1" : ""), port);
+            (alternateProtocol == 2 ? " alternateProtocol-2" : alternateProtocol == 1 ? " alternateProtocol-1" : ""), port);
 
     if ((newsocket = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == INVALID_SOCKET)
     {
@@ -978,14 +980,15 @@ SOCKET NET_IP6Socket(int alternateProtocol, char *net_interface, int port, struc
     }
 
     // make it non-blocking
-    if (ioctlsocket(newsocket, FIONBIO, &_true) == SOCKET_ERROR)
+    //if (ioctlsocket(newsocket, FIONBIO, &_true) == SOCKET_ERROR)
+    if( fcntl( newsocket, F_SETFL, O_NONBLOCK ) == SOCKET_ERROR )
     {
         Com_Printf("WARNING: NET_IP6Socket: ioctl FIONBIO: %s\n", NET_ErrorString());
         *err = socketError;
         closesocket(newsocket);
         return INVALID_SOCKET;
     }
-
+#ifndef EMSCRIPTEN
 #ifdef IPV6_V6ONLY
     {
         int i = 1;
@@ -998,7 +1001,7 @@ SOCKET NET_IP6Socket(int alternateProtocol, char *net_interface, int port, struc
         }
     }
 #endif
-
+#endif
     if (!net_interface || !net_interface[0])
     {
         address.sin6_family = AF_INET6;
@@ -1080,74 +1083,77 @@ Join an ipv6 multicast group
 */
 void NET_JoinMulticast6(void)
 {
-    /*
-    TODO: accommodate
+
+    //SOCKS
     int err;
+    int a;
 
-    if(ip6_socket == INVALID_SOCKET || multicast6_socket != INVALID_SOCKET || (net_enabled->integer & NET_DISABLEMCAST))
-            return;
+    for (a = 0; a < 3; ++a)
+    {
 
-    if(IN6_IS_ADDR_MULTICAST(&boundto.sin6_addr) || IN6_IS_ADDR_UNSPECIFIED(&boundto.sin6_addr))
-    {
-            // The way the socket was bound does not prohibit receiving multi-cast packets. So we don't need to open a
-    new one.
-            multicast6_socket = ip6_socket;
-    }
-    else
-    {
-            if((multicast6_socket = NET_IP6Socket(net_mcast6addr->string, ntohs(boundto.sin6_port), NULL, &err)) ==
-    INVALID_SOCKET)
-            {
-                    // If the OS does not support binding to multicast addresses, like WinXP, at least try with the
-    normal file descriptor.
-                    multicast6_socket = ip6_socket;
-            }
-    }
+        if(ip6_sockets[a] == INVALID_SOCKET || multicast6_sockets[a] != INVALID_SOCKET || (net_enabled->integer & NET_DISABLEMCAST))
+                return;
 
-    if(curgroup.ipv6mr_interface)
-    {
-            if (setsockopt(multicast6_socket, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+        if(IN6_IS_ADDR_MULTICAST(&boundto.sin6_addr) || IN6_IS_ADDR_UNSPECIFIED(&boundto.sin6_addr))
+        {
+            // The way the socket was bound does not prohibit receiving multi-cast packets. So we don't need to open a new one.
+            multicast6_sockets[a] = ip6_sockets[a];
+        }
+        else
+        {
+                if((multicast6_sockets[a] = NET_IP6Socket(a, net_mcast6addr->string, ntohs(boundto.sin6_port), NULL, &err)) == INVALID_SOCKET)
+                {
+                    // If the OS does not support binding to multicast addresses, like WinXP, at least try with the normal file descriptor.
+                    multicast6_sockets[a] = ip6_sockets[a];
+                }
+        }
+
+        if(curgroup.ipv6mr_interface)
+        {
+            if (setsockopt(multicast6_sockets[a], IPPROTO_IPV6, IPV6_MULTICAST_IF,
                                     (char *) &curgroup.ipv6mr_interface, sizeof(curgroup.ipv6mr_interface)) < 0)
             {
                     Com_Printf("NET_JoinMulticast6: Couldn't set scope on multicast socket: %s\n", NET_ErrorString());
 
-                    if(multicast6_socket != ip6_socket)
+                    if(multicast6_sockets[a] != ip6_sockets[a])
                     {
-                            closesocket(multicast6_socket);
-                            multicast6_socket = INVALID_SOCKET;
+                            closesocket(multicast6_sockets[a]);
+                            multicast6_sockets[a] = INVALID_SOCKET;
                             return;
                     }
             }
-    }
+        }
 
-    if (setsockopt(multicast6_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char *) &curgroup, sizeof(curgroup)))
-    {
+        if (setsockopt(multicast6_sockets[a], IPPROTO_IPV6, IPV6_JOIN_GROUP, (char *) &curgroup, sizeof(curgroup)))
+        {
             Com_Printf("NET_JoinMulticast6: Couldn't join multicast group: %s\n", NET_ErrorString());
 
-            if(multicast6_socket != ip6_socket)
+            if(multicast6_sockets[a] != ip6_sockets[a])
             {
-                    closesocket(multicast6_socket);
-                    multicast6_socket = INVALID_SOCKET;
+                    closesocket(multicast6_sockets[a]);
+                    multicast6_sockets[a] = INVALID_SOCKET;
                     return;
             }
+        }
     }
-    */
 }
 
 void NET_LeaveMulticast6()
 {
-    /*
-    TODO: accommodate
-    if(multicast6_socket != INVALID_SOCKET)
-    {
-            if(multicast6_socket != ip6_socket)
-                    closesocket(multicast6_socket);
-            else
-                    setsockopt(multicast6_socket, IPPROTO_IPV6, IPV6_LEAVE_GROUP, (char *) &curgroup, sizeof(curgroup));
+    int a;
 
-            multicast6_socket = INVALID_SOCKET;
+    for (a = 0; a < 3; ++a)
+    {
+        if(multicast6_sockets[a] != INVALID_SOCKET)
+        {
+            if(multicast6_sockets[a] != ip6_sockets[a])
+                    closesocket(multicast6_sockets[a]);
+            else
+                    setsockopt(multicast6_sockets[a], IPPROTO_IPV6, IPV6_LEAVE_GROUP, (char *) &curgroup, sizeof(curgroup));
+
+            multicast6_sockets[a] = INVALID_SOCKET;
+        }
     }
-    */
 }
 
 /*
@@ -1155,40 +1161,43 @@ void NET_LeaveMulticast6()
 NET_OpenSocks
 ====================
 */
-void NET_OpenSocks(int port)
+void NET_OpenSocks(int alternateProtocol, int port)
 {
-    /*
-    TODO: accommodate
+    
+    //SOCKS
     struct sockaddr_in	address;
     struct hostent		*h;
     int					len;
-    bool			rfc1929;
-    unsigned char		buf[64];
+    bool			    rfc1929;
+    unsigned char		buf[4 + 255 * 2];
+    char                protoStr[255];
 
     usingSocks = false;
 
-    Com_Printf( "Opening connection to SOCKS server.\n" );
+    snprintf(protoStr, sizeof(protoStr), "%s", (alternateProtocol == 2 ? "alt2" : alternateProtocol == 1 ? "alt1" : "alt0"));
 
-    if ( ( socks_socket = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP ) ) == INVALID_SOCKET ) {
-            Com_Printf( "WARNING: NET_OpenSocks: socket: %s\n", NET_ErrorString() );
+    Com_Printf( "Opening %s connection to SOCKS server.\n", protoStr);
+
+    if ( ( socks_sockets[alternateProtocol] = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP ) ) == INVALID_SOCKET ) {
+            Com_Printf( "WARNING: NET_OpenSocks[%s]: socket: %s\n", protoStr, NET_ErrorString() );
             return;
     }
 
     h = gethostbyname( net_socksServer->string );
     if ( h == NULL ) {
-            Com_Printf( "WARNING: NET_OpenSocks: gethostbyname: %s\n", NET_ErrorString() );
+            Com_Printf( "WARNING: NET_OpenSocks[%s]: gethostbyname: %s\n", protoStr, NET_ErrorString() );
             return;
     }
     if ( h->h_addrtype != AF_INET ) {
-            Com_Printf( "WARNING: NET_OpenSocks: gethostbyname: address type was not AF_INET\n" );
+            Com_Printf( "WARNING: NET_OpenSocks[%s]: gethostbyname: address type was not AF_INET\n", protoStr );
             return;
     }
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = *(int *)h->h_addr_list[0];
     address.sin_port = htons( (short)net_socksPort->integer );
 
-    if ( connect( socks_socket, (struct sockaddr *)&address, sizeof( address ) ) == SOCKET_ERROR ) {
-            Com_Printf( "NET_OpenSocks: connect: %s\n", NET_ErrorString() );
+    if ( connect( socks_sockets[alternateProtocol], (struct sockaddr *)&address, sizeof( address ) ) == SOCKET_ERROR ) {
+            Com_Printf( "NET_OpenSocks[%s]: connect: %s\n", protoStr, NET_ErrorString() );
             return;
     }
 
@@ -1214,19 +1223,19 @@ void NET_OpenSocks(int port)
     if ( rfc1929 ) {
             buf[2] = 2;		// method #2 - method id #02: username/password
     }
-    if ( send( socks_socket, (void *)buf, len, 0 ) == SOCKET_ERROR ) {
-            Com_Printf( "NET_OpenSocks: send: %s\n", NET_ErrorString() );
+    if ( send( socks_sockets[alternateProtocol], (void *)buf, len, 0 ) == SOCKET_ERROR ) {
+            Com_Printf( "NET_OpenSocks[%s]: send: %s\n", protoStr, NET_ErrorString() );
             return;
     }
 
     // get the response
-    len = recv( socks_socket, (void *)buf, 64, 0 );
+    len = recv( socks_sockets[alternateProtocol], (void *)buf, 64, 0 );
     if ( len == SOCKET_ERROR ) {
-            Com_Printf( "NET_OpenSocks: recv: %s\n", NET_ErrorString() );
+            Com_Printf( "NET_OpenSocks[%s]: recv: %s\n", protoStr, NET_ErrorString() );
             return;
     }
     if ( len != 2 || buf[0] != 5 ) {
-            Com_Printf( "NET_OpenSocks: bad response\n" );
+            Com_Printf( "NET_OpenSocks[%s]: bad response\n", protoStr );
             return;
     }
     switch( buf[1] ) {
@@ -1235,49 +1244,49 @@ void NET_OpenSocks(int port)
     case 2: // username/password authentication
             break;
     default:
-            Com_Printf( "NET_OpenSocks: request denied\n" );
+            Com_Printf( "NET_OpenSocks[%s]: request denied\n", protoStr );
             return;
     }
 
     // do username/password authentication if needed
     if ( buf[1] == 2 ) {
-            int		ulen;
-            int		plen;
+        int		ulen;
+        int		plen;
 
-            // build the request
-            ulen = strlen( net_socksUsername->string );
-            plen = strlen( net_socksPassword->string );
+        // build the request
+        ulen = strlen( net_socksUsername->string );
+        plen = strlen( net_socksPassword->string );
 
-            buf[0] = 1;		// username/password authentication version
-            buf[1] = ulen;
-            if ( ulen ) {
-                    memcpy( &buf[2], net_socksUsername->string, ulen );
-            }
-            buf[2 + ulen] = plen;
-            if ( plen ) {
-                    memcpy( &buf[3 + ulen], net_socksPassword->string, plen );
-            }
+        buf[0] = 1;		// username/password authentication version
+        buf[1] = ulen;
+        if ( ulen ) {
+                memcpy( &buf[2], net_socksUsername->string, ulen );
+        }
+        buf[2 + ulen] = plen;
+        if ( plen ) {
+                memcpy( &buf[3 + ulen], net_socksPassword->string, plen );
+        }
 
-            // send it
-            if ( send( socks_socket, (void *)buf, 3 + ulen + plen, 0 ) == SOCKET_ERROR ) {
-                    Com_Printf( "NET_OpenSocks: send: %s\n", NET_ErrorString() );
-                    return;
-            }
+        // send it
+        if ( send( socks_sockets[alternateProtocol], (void *)buf, 3 + ulen + plen, 0 ) == SOCKET_ERROR ) {
+                Com_Printf( "NET_OpenSocks[%s]: send: %s\n", protoStr, NET_ErrorString() );
+                return;
+        }
 
-            // get the response
-            len = recv( socks_socket, (void *)buf, 64, 0 );
-            if ( len == SOCKET_ERROR ) {
-                    Com_Printf( "NET_OpenSocks: recv: %s\n", NET_ErrorString() );
-                    return;
-            }
-            if ( len != 2 || buf[0] != 1 ) {
-                    Com_Printf( "NET_OpenSocks: bad response\n" );
-                    return;
-            }
-            if ( buf[1] != 0 ) {
-                    Com_Printf( "NET_OpenSocks: authentication failed\n" );
-                    return;
-            }
+        // get the response
+        len = recv( socks_sockets[alternateProtocol], (void *)buf, 64, 0 );
+        if ( len == SOCKET_ERROR ) {
+                Com_Printf( "NET_OpenSocks[%s]: recv: %s\n", protoStr, NET_ErrorString() );
+                return;
+        }
+        if ( len != 2 || buf[0] != 1 ) {
+                Com_Printf( "NET_OpenSocks[%s]: bad response\n", protoStr );
+                return;
+        }
+        if ( buf[1] != 0 ) {
+                Com_Printf( "NET_OpenSocks[%s]: authentication failed\n", protoStr );
+                return;
+        }
     }
 
     // send the UDP associate request
@@ -1287,28 +1296,28 @@ void NET_OpenSocks(int port)
     buf[3] = 1;		// address type: IPV4
     *(int *)&buf[4] = INADDR_ANY;
     *(short *)&buf[8] = htons( (short)port );		// port
-    if ( send( socks_socket, (void *)buf, 10, 0 ) == SOCKET_ERROR ) {
-            Com_Printf( "NET_OpenSocks: send: %s\n", NET_ErrorString() );
+    if ( send( socks_sockets[alternateProtocol], (void *)buf, 10, 0 ) == SOCKET_ERROR ) {
+            Com_Printf( "NET_OpenSocks[%s]: send: %s\n", protoStr, NET_ErrorString() );
             return;
     }
 
     // get the response
-    len = recv( socks_socket, (void *)buf, 64, 0 );
+    len = recv( socks_sockets[alternateProtocol], (void *)buf, 64, 0 );
     if( len == SOCKET_ERROR ) {
-            Com_Printf( "NET_OpenSocks: recv: %s\n", NET_ErrorString() );
+            Com_Printf( "NET_OpenSocks[%s]: recv: %s\n", protoStr, NET_ErrorString() );
             return;
     }
     if( len < 2 || buf[0] != 5 ) {
-            Com_Printf( "NET_OpenSocks: bad response\n" );
+            Com_Printf( "NET_OpenSocks[%s]: bad response\n", protoStr );
             return;
     }
     // check completion code
     if( buf[1] != 0 ) {
-            Com_Printf( "NET_OpenSocks: request denied: %i\n", buf[1] );
+            Com_Printf( "NET_OpenSocks[%s]: request denied: %i\n", protoStr, buf[1] );
             return;
     }
     if( buf[3] != 1 ) {
-            Com_Printf( "NET_OpenSocks: relay address is not IPV4: %i\n", buf[3] );
+            Com_Printf( "NET_OpenSocks[%s]: relay address is not IPV4: %i\n", protoStr, buf[3] );
             return;
     }
     ((struct sockaddr_in *)&socksRelayAddr)->sin_family = AF_INET;
@@ -1316,8 +1325,9 @@ void NET_OpenSocks(int port)
     ((struct sockaddr_in *)&socksRelayAddr)->sin_port = *(short *)&buf[8];
     memset( ((struct sockaddr_in *)&socksRelayAddr)->sin_zero, 0, 8 );
 
+    Com_Printf( "Successfully connected to SOCKS server [%s].\n", protoStr);
+
     usingSocks = true;
-    */
 }
 
 /*
@@ -1480,7 +1490,7 @@ void NET_OpenIP(void)
             }
             if (ip6_sockets[a] == INVALID_SOCKET)
                 Com_Printf("WARNING: Couldn't bind to a%s v6 ip address.\n",
-                    (a == 2 ? "n alternate-2" : a == 1 ? "n alternate-1" : ""));
+                    (a == 2 ? "n alternateProtocol-2" : a == 1 ? "n alternateProtocol-1" : ""));
         }
 
         if (net_enabled->integer & NET_ENABLEV4)
@@ -1492,7 +1502,7 @@ void NET_OpenIP(void)
                 {
                     Cvar_SetValue((a == 2 ? "net_alt2port" : a == 1 ? "net_alt1port" : "net_port"), ports[a] + i);
 
-                    if (net_socksEnabled->integer) NET_OpenSocks(ports[a] + i);
+                    if (net_socksEnabled->integer) NET_OpenSocks(a, ports[a] + i);
 
                     break;
                 }
@@ -1504,7 +1514,7 @@ void NET_OpenIP(void)
 
             if (ip_sockets[a] == INVALID_SOCKET)
                 Com_Printf("WARNING: Couldn't bind to a%s v4 ip address.\n",
-                    (a == 2 ? "n alternate-2" : a == 1 ? "n alternate-1" : ""));
+                    (a == 2 ? "n alternateProtocol-2" : a == 1 ? "n alternateProtocol-1" : ""));
         }
         // outdent
     }
@@ -1571,15 +1581,15 @@ static bool NET_GetCvars(void)
     modified += net_mcast6iface->modified;
     net_mcast6iface->modified = false;
 
-    net_socksEnabled = Cvar_Get("net_socksEnabled", "0", CVAR_LATCH | CVAR_ARCHIVE);
+    net_socksEnabled = Cvar_Get("net_socksEnabled", "1", CVAR_LATCH | CVAR_ARCHIVE);
     modified += net_socksEnabled->modified;
     net_socksEnabled->modified = false;
 
-    net_socksServer = Cvar_Get("net_socksServer", "", CVAR_LATCH | CVAR_ARCHIVE);
+    net_socksServer = Cvar_Get("net_socksServer", "tremulo.us", CVAR_LATCH | CVAR_ARCHIVE);
     modified += net_socksServer->modified;
     net_socksServer->modified = false;
 
-    net_socksPort = Cvar_Get("net_socksPort", "1080", CVAR_LATCH | CVAR_ARCHIVE);
+    net_socksPort = Cvar_Get("net_socksPort", "8080", CVAR_LATCH | CVAR_ARCHIVE);
     modified += net_socksPort->modified;
     net_socksPort->modified = false;
 
@@ -1667,21 +1677,21 @@ void NET_Config(bool enableNetworking)
             }
         }
 
-        /*
-        TODO: accommodate
-        if(multicast6_socket != INVALID_SOCKET)
+        
+        //SOCKS
+        if(multicast6_sockets[a] != INVALID_SOCKET)
         {
-                if(multicast6_socket != ip6_socket)
-                        closesocket(multicast6_socket);
+                if(multicast6_sockets[a] != ip6_sockets[a])
+                        closesocket(multicast6_sockets[a]);
 
-                multicast6_socket = INVALID_SOCKET;
+                multicast6_sockets[a] = INVALID_SOCKET;
         }
 
-        if ( socks_socket != INVALID_SOCKET ) {
-                closesocket( socks_socket );
-                socks_socket = INVALID_SOCKET;
+        if ( socks_sockets[a] != INVALID_SOCKET ) {
+                closesocket( socks_sockets[a] );
+                socks_sockets[a] = INVALID_SOCKET;
         }
-        */
+        
     }
 
     if (start)

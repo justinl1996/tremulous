@@ -3053,6 +3053,7 @@ void Item_SetMouseOver(itemDef_t *item, qboolean focus)
 
 qboolean Item_OwnerDraw_HandleKey(itemDef_t *item, int key)
 {
+    Com_Printf("Item_OwnerDraw_HandleKey\n");
     if (item && DC->ownerDrawHandleKey)
         return DC->ownerDrawHandleKey(item->window.ownerDraw, key);
 

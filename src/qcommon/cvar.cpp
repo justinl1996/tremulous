@@ -133,7 +133,7 @@ int Cvar_VariableIntegerValue(const char *var_name)
 Cvar_VariableString
 ============
 */
-const char *Cvar_VariableString(const char *var_name)
+extern "C" const char *Cvar_VariableString(const char *var_name)
 {
     cvar_t *var = Cvar_FindVar(var_name);
     if (!var)
@@ -616,7 +616,7 @@ cvar_t *Cvar_Set2(const char *var_name, const char *value, bool force)
 Cvar_Set
 ============
 */
-void Cvar_Set(const char *var_name, const char *value)
+extern "C" void Cvar_Set(const char *var_name, const char *value)
 {
     Cvar_Set2(var_name, value, true);
 }
@@ -1468,7 +1468,7 @@ void Cvar_CompleteCvarName(char *args, int argNum)
         char *p = Com_SkipTokens(args, 1, " ");
 
         if (p > args)
-            Field_CompleteCommand(p, false, true);
+            Field_CompleteCommand(p, qfalse, qtrue);    // Use qbooleans for emscripten
     }
 }
 

@@ -24,9 +24,9 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef TR_COMMON_H
 #define TR_COMMON_H
 
-#include "qcommon/cvar.h"
-#include "qcommon/q_shared.h"
-#include "sys/sys_shared.h"
+#include "../qcommon/cvar.h"
+#include "../qcommon/q_shared.h"
+#include "../sys/sys_shared.h"
 
 #include "iqm.h"
 #include "qgl.h"

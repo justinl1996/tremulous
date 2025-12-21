@@ -22,10 +22,10 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 ===========================================================================
 */
 
-#include "qcommon/cvar.h"
-#include "qcommon/files.h"
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/cvar.h"
+#include "../qcommon/files.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
 #include "dialog.h"
 #include "sys_local.h"
 
@@ -228,6 +228,18 @@ bool Sys_Mkdir( const char *path )
 		return (bool)(errno == EEXIST);
 
 	return true;
+}
+
+/*
+==============
+Sys_PathExists
+==============
+*/
+qboolean Sys_PathExists( const char *path, qboolean followSymLink) {
+	struct stat buf;
+
+	// check if path exists
+	return qboolean(!stat( path, &buf ));
 }
 
 /*

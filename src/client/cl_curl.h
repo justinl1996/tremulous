@@ -31,8 +31,8 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <curl/curl.h>
 #endif
 
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
 
 #ifdef USE_CURL_DLOPEN
 #ifdef _WIN32

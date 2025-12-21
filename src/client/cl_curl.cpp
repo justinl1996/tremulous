@@ -22,6 +22,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 ===========================================================================
 */
 
+#ifdef USE_CURL
 #include "client.h"
 
 #ifdef USE_CURL_DLOPEN
@@ -362,3 +363,4 @@ void CL_cURL_PerformDownload(void)
 
 	CL_NextDownload();
 }
+#endif /* USE_CURL */

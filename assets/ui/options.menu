@@ -55,7 +55,7 @@
       style WINDOW_STYLE_EMPTY
       text "Name:"
       cvar "name"
-      maxchars 256
+      maxchars 26
       rect X Y W ELEM_H
       textalign ALIGN_RIGHT
       textalignx TOFF_X

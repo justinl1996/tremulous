@@ -383,9 +383,17 @@ void CL_ShutdownCGame( void ) {
 	if ( !cls.cgame ) {
 		return;
 	}
+
 	VM_Call( cls.cgame, CG_SHUTDOWN );
 	VM_Free( cls.cgame );
 	cls.cgame = NULL;
+/*
+#if EMSCRIPTEN
+	cls.cgameGlConfig = NULL;
+	cls.cgameFirstCvar = NULL;
+	cls.numCgamePatches = 0;
+#endif
+*/
 }
 
 static int	FloatAsInt( float f ) {
@@ -692,10 +700,6 @@ intptr_t CL_CgameSystemCalls( intptr_t *args )
 
         case CG_KEY_GETOVERSTRIKEMODE:
             return Key_GetOverstrikeMode( );
-
-        case CG_FIELD_COMPLETELIST:
-            Field_CompleteList( (char*)VMA(1) );
-            return 0;
 
         case CG_MEMSET:
             ::memset( VMA(1), args[2], args[3] );

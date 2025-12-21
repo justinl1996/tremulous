@@ -32,9 +32,9 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 # include <SDL.h>
 #endif
 
-#include "qcommon/cvar.h"
-#include "qcommon/qcommon.h"
-#include "renderercommon/tr_common.h"
+#include "../qcommon/cvar.h"
+#include "../qcommon/qcommon.h"
+#include "../renderercommon/tr_common.h"
 
 extern SDL_Window *SDL_window;
 

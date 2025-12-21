@@ -36,6 +36,31 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #endif
 #endif
 
+//
+// generic callback support
+//
+struct cb_context_s;
+
+typedef void (*result_cb)(struct cb_context_s *req, int status);
+
+typedef struct cb_context_s {
+	void *data;
+	result_cb cb;
+} cb_context_t;
+
+
+extern unsigned cb_pending;
+cb_context_t *_cb_create_context(result_cb cb, int data_size);
+#define cb_num_pending() cb_pending
+#define cb_create_context(cb, t) _cb_create_context(cb, sizeof(t))
+#define cb_create_context_no_data(cb) _cb_create_context(cb, 0)
+#define cb_run(context, status) context->cb(context, status)
+#define cb_free_context(context) \
+	if (context->data != NULL) { free(context->data); } \
+	free(context); \
+	cb_pending--
+
+
 struct netadr_t;
 struct msg_t;
 
@@ -55,7 +80,11 @@ extern int demo_protocols[];
 
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
+#ifdef EMSCRIPTEN
+#define MASTER_SERVER_NAME	"master.tremulous.online"
+#else
 #define MASTER_SERVER_NAME	"master.tremulous.net"
+#endif
 #endif
 
 #define	PORT_MASTER			30700
@@ -184,7 +213,7 @@ void 		QDECL Com_Error( int code, const char *fmt, ... ) __attribute__ ((noretur
 void 		QDECL Com_DPrintf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 void        Engine_Exit(const char* p ) __attribute__ ((noreturn));
 void 		Com_Quit_f( void ) __attribute__ ((noreturn));
-void		Com_GameRestart(int checksumFeed, bool disconnect);
+void        Com_GameRestart(int checksumFeed, bool disconnect, cb_context_t *after);
 
 int			Com_Milliseconds( void );	// will be journaled properly
 char		*Com_MD5File(const char *filename, int length, const char *prefix, int prefix_len);
@@ -282,15 +311,19 @@ temp file loading
 #define Z_TagMalloc(size, tag)			Z_TagMallocDebug(size, tag, #size, __FILE__, __LINE__)
 #define Z_Malloc(size)					Z_MallocDebug(size, #size, __FILE__, __LINE__)
 #define S_Malloc(size)					S_MallocDebug(size, #size, __FILE__, __LINE__)
-void *Z_TagMallocDebug( int size, int tag, const char *label, const char *file, int line );	// NOT 0 filled memory
-void *Z_MallocDebug( int size, const char *label, const char *file, int line );			// returns 0 filled memory
-void *S_MallocDebug( int size, const char *label, const char *file, int line );			// returns 0 filled memory
+extern "C" {
+	void *Z_TagMallocDebug( int size, int tag, const char *label, const char *file, int line );	// NOT 0 filled memory
+	void *Z_MallocDebug( int size, const char *label, const char *file, int line );			// returns 0 filled memory
+	void *S_MallocDebug( int size, const char *label, const char *file, int line );			// returns 0 filled memory
+}
 #else
-void *Z_TagMalloc( int size, int tag );	// NOT 0 filled memory
-void *Z_Malloc( int size );			// returns 0 filled memory
-void *S_Malloc( int size );			// NOT 0 filled memory only for small allocations
+extern "C" {
+	void *Z_TagMalloc( int size, int tag );	// NOT 0 filled memory
+	void *Z_Malloc( int size );			// returns 0 filled memory
+	void *S_Malloc( int size );			// NOT 0 filled memory only for small allocations
+}
 #endif
-void Z_Free( void *ptr );
+extern "C" void Z_Free( void *ptr );
 void Z_FreeTags( int tag );
 int Z_AvailableMemory( void );
 void Z_LogHeap( void );
@@ -308,7 +341,7 @@ void Hunk_Log( void);
 void Com_TouchMemory( void );
 
 // commandLine should not include the executable name (argv[0])
-void Com_Init( char *commandLine );
+void Com_Init( char *commandLine, cb_context_t *after );
 void Com_Frame( void );
 void Com_Shutdown( void );
 
@@ -377,6 +410,12 @@ void S_ClearSoundBuffer( void );
 
 void SCR_DebugGraph (float value);	// FIXME: move logging to common?
 
+#if EMSCRIPTEN
+extern "C" void Com_ProxyCallback(cb_context_t *context);
+const char *CL_GetCDN(void);
+const char *CL_GetManifest(void);
+#endif
+
 //
 // server interface
 //
@@ -431,5 +470,10 @@ void         Com_Bucket_Remove_Item_From_Bucket(
 void*        Com_Bucket_Select_A_Random_Item(unsigned int bucket_handle);
 void         Com_Bucket_Select_A_Specific_Item(
 	unsigned int bucket_handle, void* item);
+
+#if EMSCRIPTEN
+extern "C" const char *Com_GetCDN(void);
+extern "C" const char *Com_GetManifest(void);
+#endif
 
 #endif // _QCOMMON_H_

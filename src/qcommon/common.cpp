@@ -34,7 +34,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 //#include <sys/stat.h> // umask
 #endif
 
-#include "sys/sys_shared.h"
+#include "../sys/sys_shared.h"
 
 #include "cmd.h"
 #include "crypto.h"
@@ -130,6 +130,22 @@ void Com_WriteConfig_f( void );
 void CIN_CloseAllVideos( void );
 
 //============================================================================
+
+unsigned cb_pending = 0;
+
+cb_context_t *_cb_create_context(result_cb cb, int data_size) {
+	cb_context_t *context = (cb_context_t *) calloc(1, sizeof(cb_context_t));
+
+	context->cb = cb;
+
+	if (data_size) {
+		context->data = calloc(data_size, 1);
+	}
+
+	cb_pending++;
+
+	return context;
+}
 
 static char* rd_buffer;
 static unsigned int rd_buffersize;
@@ -472,6 +488,13 @@ Both client and server can use this, and it will
 do the apropriate things.
 =============
 */
+static void Com_Quit_f_after_FS_Shutdown( cb_context_t *context, int status ) {
+	cb_free_context(context);
+
+	Sys_Quit();
+}
+
+
 void Engine_Exit(const char* p )
 {
     // don't try to shutdown if we are in a recursive error
@@ -486,7 +509,7 @@ void Engine_Exit(const char* p )
         CL_Shutdown(p[0] ? p : "Client quit", true, true);
         VM_Forced_Unload_Done();
         Com_Shutdown();
-        FS_Shutdown(true);
+        FS_Shutdown(qtrue, cb_create_context_no_data(Com_Quit_f_after_FS_Shutdown));
     }
     Sys_Quit ();
 }
@@ -2161,6 +2184,7 @@ sysEvent_t Com_GetSystemEvent( void )
         return eventQueue[ ( eventTail - 1 ) & MASK_QUEUED_EVENTS ];
     }
 
+#ifndef EMSCRIPTEN
     // check for console commands
     s = Sys_ConsoleInput();
     if ( s )
@@ -2173,6 +2197,7 @@ sysEvent_t Com_GetSystemEvent( void )
         strcpy( b, s );
         Com_QueueEvent( 0, SE_CONSOLE, 0, 0, len, b );
     }
+#endif
 
     // return if we have data
     if ( eventHead > eventTail )
@@ -2502,50 +2527,85 @@ Change to a new mod properly with cleaning up cvars before switching.
 ==================
 */
 
-void Com_GameRestart(int checksumFeed, bool disconnect)
+typedef struct gamerestart_data_s {
+	bool disconnect;
+	int clWasRunning;
+	cb_context_t *after;
+} gamerestart_data_t;
+
+static void Com_GameRestart_after_FS_Restart( cb_context_t *context, int status )
 {
-    // make sure no recursion can be triggered
-    if(!com_gameRestarting && com_fullyInitialized)
+	gamerestart_data_t *data;
+	cb_context_t *after;
+	bool disconnect;
+	int clWasRunning;
+
+	data = (gamerestart_data_t*)context->data;
+	after = data->after;
+	disconnect = data->disconnect;
+	clWasRunning = data->clWasRunning;
+
+	cb_free_context(context);
+
+    // Clean out any user and VM created cvars
+    Cvar_Restart(true);
+    Com_ExecuteCfg();
+
+    if(disconnect)
     {
-        int clWasRunning;
-
-        com_gameRestarting = true;
-        clWasRunning = com_cl_running->integer;
-
-        // Kill server if we have one
-        if(com_sv_running->integer)
-            SV_Shutdown("Game directory changed");
-
-        if(clWasRunning)
-        {
-            if(disconnect)
-                CL_Disconnect(false);
-
-            CL_Shutdown("Game directory changed", disconnect, false);
-        }
-
-        FS_Restart(checksumFeed);
-
-        // Clean out any user and VM created cvars
-        Cvar_Restart(true);
-        Com_ExecuteCfg();
-
-        if(disconnect)
-        {
-            // We don't want to change any network settings if gamedir
-            // change was triggered by a connect to server because the
-            // new network settings might make the connection fail.
-            NET_Restart_f();
-        }
-
-        if(clWasRunning)
-        {
-            CL_Init();
-            CL_StartHunkUsers(false);
-        }
-
-        com_gameRestarting = false;
+        // We don't want to change any network settings if gamedir
+        // change was triggered by a connect to server because the
+        // new network settings might make the connection fail.
+        NET_Restart_f();
     }
+
+    if(clWasRunning)
+    {
+        CL_Init();
+        CL_StartHunkUsers(false);
+    }
+
+    com_gameRestarting = false;
+	if (after) {
+		cb_run(after, 0);
+	}
+}
+
+void Com_GameRestart(int checksumFeed, bool disconnect, cb_context_t *after)
+{
+	cb_context_t       *context;
+	gamerestart_data_t *data;
+
+    // make sure no recursion can be triggered
+    if (com_gameRestarting || !com_fullyInitialized)
+    {
+        return;
+    }
+
+    int clWasRunning;
+
+	context = cb_create_context(Com_GameRestart_after_FS_Restart, sizeof(gamerestart_data_t));
+	data = (gamerestart_data_t*)context->data;
+	data->disconnect = disconnect;
+	data->clWasRunning = com_cl_running->integer;
+	data->after = after;
+
+    com_gameRestarting = true;
+    clWasRunning = com_cl_running->integer;
+
+    // Kill server if we have one
+    if(com_sv_running->integer)
+        SV_Shutdown("Game directory changed");
+
+    if(clWasRunning)
+    {
+        if(disconnect)
+            CL_Disconnect(false);
+
+        CL_Shutdown("Game directory changed", disconnect, false);
+    }
+
+    FS_Restart(checksumFeed, context);
 }
 
 /*
@@ -2569,7 +2629,7 @@ void Com_GameRestart_f(void)
     else
         Cvar_Set("fs_game", Cmd_Argv(1));
 
-    Com_GameRestart(0, true);
+    Com_GameRestart(0, true, NULL);
 }
 
 static void Com_DetectAltivec(void)
@@ -2649,50 +2709,17 @@ static void Com_InitRand(void)
 Com_Init
 =================
 */
-void Com_Init( char *commandLine )
-{
+typedef struct init_data_s {
+	cb_context_t *after;
+} init_data_t;
+
+static void Com_Init_after_FS_InitFilesystem( cb_context_t *context, int status ) {
     int qport;
+	init_data_t *data;
+	cb_context_t *after;
 
-    if ( setjmp (abortframe) ) {
-        Sys_Error ("Error during initialization");
-    }
-
-    // Clear queues
-    ::memset( &eventQueue[ 0 ], 0, MAX_QUEUED_EVENTS * sizeof( sysEvent_t ) );
-
-    // initialize the weak pseudo-random number generator for use later.
-    Com_InitRand();
-
-    // do this before anything else decides to push events
-    Com_InitPushEvent();
-
-    Com_InitSmallZoneMemory();
-    Cvar_Init();
-
-    // prepare enough of the subsystems to handle
-    // cvar and command buffer management
-    Com_ParseCommandLine( commandLine );
-
-    //Swap_Init ();
-    Cbuf_Init ();
-
-    Com_DetectSSE();
-
-    // override anything from the config files with command line args
-    Com_StartupVariable( NULL );
-
-    Com_InitZoneMemory();
-    Cmd_Init ();
-
-    // get the developer cvar set as early as possible
-    com_developer = Cvar_Get("developer", "0", CVAR_TEMP);
-
-    // done early so bind command exists
-    CL_InitKeyCommands();
-
-    com_homepath = Cvar_Get("com_homepath", "", CVAR_INIT);
-
-    FS_InitFilesystem ();
+	data = (init_data_t*)context->data;
+	after = data->after;
 
     Com_InitJournaling();
 
@@ -2795,7 +2822,6 @@ void Com_Init( char *commandLine )
         }
 #endif
     }
-
     // start in full screen ui mode
     Cvar_Set("r_uiFullScreen", "1");
 
@@ -2816,6 +2842,58 @@ void Com_Init( char *commandLine )
     }
 
     Com_Printf ("--- Common Initialization Complete ---\n");
+    cb_run(after, 0);
+}
+
+void Com_Init( char *commandLine, cb_context_t *after )
+{
+	cb_context_t *context;
+	init_data_t  *data;
+
+    if ( setjmp (abortframe) ) {
+        Sys_Error ("Error during initialization");
+    }
+
+    // Clear queues
+    ::memset( &eventQueue[ 0 ], 0, MAX_QUEUED_EVENTS * sizeof( sysEvent_t ) );
+
+    // initialize the weak pseudo-random number generator for use later.
+    Com_InitRand();
+
+    // do this before anything else decides to push events
+    Com_InitPushEvent();
+
+    Com_InitSmallZoneMemory();
+    Cvar_Init();
+
+    // prepare enough of the subsystems to handle
+    // cvar and command buffer management
+    Com_ParseCommandLine( commandLine );
+
+    //Swap_Init ();
+    Cbuf_Init ();
+
+    Com_DetectSSE();
+
+    // override anything from the config files with command line args
+    Com_StartupVariable( NULL );
+
+    Com_InitZoneMemory();
+    Cmd_Init ();
+
+    // get the developer cvar set as early as possible
+    com_developer = Cvar_Get("developer", "0", CVAR_TEMP);
+
+    // done early so bind command exists
+    CL_InitKeyCommands();
+
+    com_homepath = Cvar_Get("com_homepath", "", CVAR_INIT);
+
+	context = cb_create_context(Com_Init_after_FS_InitFilesystem, sizeof(init_data_t));
+	data = (init_data_t*)context->data;
+	data->after = after;
+
+    FS_InitFilesystem (context);
 }
 
 /*
@@ -3021,7 +3099,6 @@ Com_Frame
 */
 void Com_Frame( void )
 {
-
     int msec, minMsec;
     int timeVal, timeValSV;
     static int lastTime = 0, bias = 0;
@@ -3890,3 +3967,61 @@ void* Com_Bucket_Select_A_Random_Item(unsigned int bucket_handle) {
 void Com_Bucket_Select_A_Specific_Item(unsigned int bucket_handle, void* item) {
     Q_Bucket_Select_A_Specific_Item(bucket_handle, item);
 }
+
+#ifdef EMSCRIPTEN
+/*
+===================
+Com_ProxyCallback
+
+If a callback function is passed to our JS layer and its invocation
+is deferred (e.g. it's called as the result of a setTimeout), there
+will be no stack to unwind to if a longjmp is called. For this reason,
+callbacks passed to the JS layer should be proxied through this when
+invoked.
+===================
+*/
+extern "C" void Com_ProxyCallback(cb_context_t *context) {
+	int jmpval;
+
+	jmpval = setjmp(abortframe);
+	if (jmpval) {
+		return;
+	}
+    context->cb(context, 0);
+}
+
+
+/*
+==================
+Com_GetCDN
+==================
+*/
+extern "C" const char *Com_GetCDN(void) {
+#ifndef DEDICATED
+	const char *cdn = CL_GetCDN();
+
+	if (strlen(cdn)) {
+		return cdn;
+	}
+#endif
+
+	return Cvar_VariableString("fs_cdn");
+}
+
+/*
+==================
+Com_GetManifest
+==================
+*/
+extern "C" const char *Com_GetManifest(void) {
+#ifndef DEDICATED
+	const char *manifest = CL_GetManifest();
+	if (strlen(manifest)) {
+		return manifest;
+	}
+#endif
+	return Cvar_VariableString("fs_manifest");
+}
+
+
+#endif

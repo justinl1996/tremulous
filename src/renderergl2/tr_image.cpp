@@ -1952,7 +1952,8 @@ static GLenum PixelDataFormatFromInternalFormat(GLenum internalFormat)
 
 static void RawImage_UploadTexture(GLuint texture, byte *data, int x, int y,
         int width, int height, GLenum target, GLenum picFormat,
-        int numMips, GLenum internalFormat, imgType_t type, int/*imgFlags_t*/ flags, bool subtexture )
+        int numMips, GLenum internalFormat, imgType_t type, int/*imgFlags_t*/ flags,
+		bool subtexture)
 {
 	GLenum dataFormat, dataType;
 	bool rgtc = internalFormat == GL_COMPRESSED_RG_RGTC2;
@@ -1964,6 +1965,11 @@ static void RawImage_UploadTexture(GLuint texture, byte *data, int x, int y,
 
 	dataFormat = PixelDataFormatFromInternalFormat(internalFormat);
 	dataType = picFormat == GL_RGBA16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_BYTE;
+
+// HULK-SMASH! GLES requires that the internal format matches the data format.
+#ifdef EMSCRIPTEN
+	internalFormat = dataFormat;
+#endif
 
 	miplevel = 0;
 	do
@@ -1980,10 +1986,11 @@ static void RawImage_UploadTexture(GLuint texture, byte *data, int x, int y,
 			if (rgba8 && miplevel != 0 && r_colorMipLevels->integer)
 				R_BlendOverTexture((byte *)data, width * height, mipBlendColors[miplevel]);
 
-			if (rgba8 && rgtc)
+			if (rgba8 && rgtc) {
 				RawImage_UploadToRgtc2Texture(texture, miplevel, x, y, width, height, data);
-			else
-				qglTextureSubImage2DEXT(texture, target, miplevel, x, y, width, height, dataFormat, dataType, data);
+			} else {
+				qglTextureSubImage2DEXT(texture, target, miplevel, x, y, width, height, internalFormat, dataType, data);
+			}
 		}
 
 		if (!lastMip && numMips < 2)
@@ -2173,6 +2180,9 @@ image_t *R_CreateImage2( const char *name, byte *pic, int width, int height, GLe
 
 	// Allocate texture storage so we don't have to worry about it later.
 	dataFormat = PixelDataFormatFromInternalFormat(internalFormat);
+#ifdef EMSCRIPTEN
+	internalFormat = dataFormat;
+#endif
 	mipWidth = width;
 	mipHeight = height;
 	miplevel = 0;
@@ -2200,6 +2210,7 @@ image_t *R_CreateImage2( const char *name, byte *pic, int width, int height, GLe
 	// Upload data.
 	if (pic)
 		Upload32(pic, 0, 0, width, height, picFormat, numMips, image, scaled);
+
 
 	if (resampledBuffer != NULL)
 		ri.Hunk_FreeTempMemory(resampledBuffer);

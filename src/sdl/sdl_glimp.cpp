@@ -33,9 +33,9 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <stdlib.h>
 #include <math.h>
 
-#include "renderercommon/tr_common.h"
-#include "qcommon/cvar.h"
-#include "sys/sys_local.h"
+#include "../renderercommon/tr_common.h"
+#include "../qcommon/cvar.h"
+#include "../sys/sys_local.h"
 #include "sdl_icon.h"
 
 typedef enum
@@ -262,7 +262,7 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 #endif
 			);
 #endif
-
+#ifndef EMSCRIPTEN
 	// If a window exists, note its display index
 	if( SDL_window != NULL )
 	{
@@ -272,7 +272,8 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 			ri.Printf( PRINT_DEVELOPER, "SDL_GetWindowDisplayIndex() failed: %s\n", SDL_GetError() );
 		}
 	}
-
+#endif
+	Com_Printf("display index: %d\n", display);
 	if( display >= 0 && SDL_GetDesktopDisplayMode( display, &desktopMode ) == 0 )
 	{
 		glConfig.displayAspect = (float)desktopMode.w / (float)desktopMode.h;
@@ -326,6 +327,9 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 
 	ri.Printf (PRINT_ALL, "...setting mode %dx%d\n", glConfig.vidWidth, glConfig.vidHeight);
 
+	Com_Printf("desktopMode width: %d, height: %d\n", desktopMode.w, desktopMode.h);
+	Com_Printf("vidWidth: %d, vidHeight: %d\n", glConfig.vidWidth, glConfig.vidHeight);
+	Com_Printf("fullscreen: %d, centerWindow: %d\n", fullscreen, r_centerWindow->integer);
 	// Center window
 	if( r_centerWindow->integer && !fullscreen )
 	{
@@ -511,6 +515,12 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 		if (coreContext)
 		{
 			int profileMask, majorVersion, minorVersion;
+#ifdef EMSCRIPTEN
+			ri.Printf(PRINT_ALL, "Using WebGL2 (GL ES 3) context for emscripten\n");
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
 			SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &profileMask);
 			SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &majorVersion);
 			SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minorVersion);
@@ -519,6 +529,7 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#endif
 			if ((SDL_glContext = SDL_GL_CreateContext(SDL_window)) == NULL)
 			{
 				ri.Printf(PRINT_ALL, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
@@ -582,9 +593,9 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 		ri.Printf( PRINT_ALL, "Couldn't get a visual\n" );
 		return RSERR_INVALID_MODE;
 	}
-
-	GLimp_DetectAvailableModes();
-
+#ifndef EMSCRIPTEN
+	GLimp_DetectAvailableModes(); //Auriga: for some reason SDL_free in this function fails in web
+#endif
 	glstring = (char *) qglGetString (GL_RENDERER);
 	ri.Printf( PRINT_ALL, "GL_RENDERER: %s\n", glstring );
 

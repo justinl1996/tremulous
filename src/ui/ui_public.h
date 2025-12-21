@@ -25,7 +25,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef UI_PUBLIC_H
 #define UI_PUBLIC_H
 
-#include "qcommon/q_shared.h"
+#include "../qcommon/q_shared.h"
 
 #define UI_API_VERSION 6
 

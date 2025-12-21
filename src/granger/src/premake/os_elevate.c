@@ -233,6 +233,14 @@ static int do_elevate(lua_State *L)
 }
 #endif
 
+#if defined(PLATFORM_JS)
+static int do_elevate(lua_State *L)
+{
+	fprintf(stderr, "do_elevate not implemented yet!\n");
+	return 1;
+}
+#endif
+
 int os_elevate(lua_State* L)
 {
 	lua_pushboolean(L, do_elevate(L));

@@ -1,0 +1,12 @@
+Implement the following stubs:
+- Sys_CryptoRandomBytes
+- Sys_OpenWithDefault
+- Sys_DllExtension
+- Sys_Dialog
+- stdinIsATTY
+
+
+Commented out the following lines in the Makefile
+    #ifneq ($(BUILD_RENDERER_OPENGL2),0)
+    #  TARGETS += $(B)/$(CLIENTBIN)_opengl2$(FULLBINEXT)
+    #endif

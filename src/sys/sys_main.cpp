@@ -42,6 +42,11 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <cstring>
 #include <cstring>
 #include <iostream>
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#define SDL_HasMMXExt SDL_HasMMX
+#define SDL_Has3DNowExt SDL_Has3DNow
+#endif
 
 #include "lua.hpp"
 #include "sol.hpp"
@@ -55,19 +60,21 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #endif
 #endif
 
-#include "qcommon/files.h"
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
-#include "qcommon/vm.h"
+#include "../qcommon/files.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
+#include "../qcommon/vm.h"
 #ifndef DEDICATED
-#include "script/bind.h"
-#include "script/client.h"
-#include "script/http_client.h"
+#include "../script/bind.h"
+#include "../script/client.h"
+#ifdef USE_RESTCLIENT
+#include "../script/http_client.h"
 #endif
-#include "script/cmd.h"
-#include "script/cvar.h"
-#include "script/rapidjson.h"
-#include "script/nettle.h"
+#endif
+#include "../script/cmd.h"
+#include "../script/cvar.h"
+#include "../script/rapidjson.h"
+#include "../script/nettle.h"
 
 #include "dialog.h"
 #include "sys_loadlib.h"
@@ -658,7 +665,9 @@ void Sys_SigHandler( int signal )
 }
 
 #ifndef DEFAULT_BASEDIR
-# ifdef __APPLE__
+# if EMSCRIPTEN
+#  define DEFAULT_BASEDIR "/base"
+# elif __APPLE__
 #  define DEFAULT_BASEDIR Sys_StripAppBundle(Sys_BinaryPath())
 # else
 #  define DEFAULT_BASEDIR Sys_BinaryPath()
@@ -716,49 +725,29 @@ void SDLVersionCheck()
 }
 #endif
 
+/*
+=================
+Sys_Frame
+=================
+*/
+void Sys_Frame() {
+    try
+    {
+        Com_Frame( );
+    }
+    catch (sol::error& e)
+    {
+        Com_Printf(S_COLOR_YELLOW "%s\n", e.what());
+    }
+}
 
 /*
 =================
 main
 =================
 */
-int main( int argc, char **argv )
+static void main_after_Com_Init(cb_context_t *context, int status)
 {
-#ifndef DEDICATED
-    SDLVersionCheck();
-#endif
-    Sys_PlatformInit( );
-
-    // Set the initial time base
-    Sys_Milliseconds( );
-
-#ifdef __APPLE__
-    // This is passed if we are launched by double-clicking
-    if ( argc >= 2 )
-        if ( Q_strncmp( argv[1], "-psn", 4 ) == 0 )
-            argc = 1;
-#endif
-
-    Sys_ParseArgs( argc, argv );
-    Sys_SetBinaryPath( Sys_Dirname( argv[ 0 ] ) );
-    Sys_SetDefaultInstallPath( DEFAULT_BASEDIR );
-
-    // Concatenate the command line for passing to Com_Init
-    char args[MAX_STRING_CHARS];
-    args[0] = '\0';
-
-    for( int i = 1; i < argc; i++ )
-    {
-        const bool ws = strchr(argv[i], ' ') ? true : false;
-
-        if (ws) Q_strcat(args, sizeof(args), "\"");
-        Q_strcat(args, sizeof(args), argv[i]);
-        if (ws) Q_strcat(args, sizeof(args), "\"");
-        Q_strcat(args, sizeof(args), " " );
-    }
-
-    CON_Init( );
-    Com_Init( args );
     NET_Init( );
 
     lua.open_libraries
@@ -790,20 +779,68 @@ int main( int argc, char **argv )
 #ifndef DEDICATED
     script::client::init(std::move(lua));
     script::keybind::init(std::move(lua));
+#if USE_RESTCLIENT
     script::http_client::init(std::move(lua));
 #endif
+#endif
 
+#ifdef EMSCRIPTEN
+	int fps = 0;
+#ifdef DEDICATED
+	// HACK for now to prevent Browser lib from calling
+	// requestAnimationFrame on dedicated builds.
+	fps = 30;
+#endif
+	emscripten_set_main_loop(Sys_Frame, 90, 0);
+#else
     for ( ;; )
     {
-        try
-        { 
-            Com_Frame( );
-        } 
-        catch (sol::error& e)
-        {
-            Com_Printf(S_COLOR_YELLOW "%s\n", e.what());
-        }
+        Sys_Frame();
     }
+#endif
+}
+
+int main( int argc, char **argv )
+{
+#ifndef DEDICATED
+    SDLVersionCheck();
+#endif
+    Sys_PlatformInit( );
+
+    // Set the initial time base
+    Sys_Milliseconds( );
+
+#ifdef __APPLE__
+    // This is passed if we are launched by double-clicking
+    if ( argc >= 2 )
+        if ( Q_strncmp( argv[1], "-psn", 4 ) == 0 )
+            argc = 1;
+#endif
+
+    Sys_ParseArgs( argc, argv );
+    Sys_SetBinaryPath( Sys_Dirname( argv[ 0 ] ) );
+    Sys_SetDefaultInstallPath( DEFAULT_BASEDIR );
+
+    // Concatenate the command line for passing to Com_Init
+    char *args = new char[MAX_STRING_CHARS];
+    args[0] = '\0';
+
+    for( int i = 1; i < argc; i++ )
+    {
+        const bool ws = strchr(argv[i], ' ') ? true : false;
+
+        if (ws) Q_strcat(args, MAX_STRING_CHARS, "\"");
+        Q_strcat(args, MAX_STRING_CHARS, argv[i]);
+        if (ws) Q_strcat(args, MAX_STRING_CHARS, "\"");
+        Q_strcat(args, MAX_STRING_CHARS, " " );
+    }
+
+    CON_Init( );
+    Com_Init( args , cb_create_context_no_data(main_after_Com_Init));
+
+//#ifdef EMSCRIPTEN
+//	emscripten_set_main_loop( Sys_Frame, 0, 0 );
+//#endif
 
     return 0;
 }

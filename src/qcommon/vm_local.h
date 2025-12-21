@@ -202,3 +202,10 @@ const char *VM_ValueToSymbol( vm_t *vm, int value );
 void VM_LogSyscalls( int *args );
 
 void VM_BlockCopy(unsigned int dest, unsigned int src, size_t n);
+
+#ifdef EMSCRIPTEN
+qboolean VM_IsSuspendedCompiled(vm_t *vm);
+
+void VM_SuspendCompiled(vm_t *vm, unsigned pc, unsigned sp);
+int VM_ResumeCompiled(vm_t *vm);
+#endif

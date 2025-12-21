@@ -24,7 +24,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 // g_local.h -- local definitions for game module
 
-#include "qcommon/q_shared.h"
+#include "../qcommon/q_shared.h"
 #include "bg_public.h"
 #include "g_public.h"
 

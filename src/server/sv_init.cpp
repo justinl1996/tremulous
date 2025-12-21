@@ -25,7 +25,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "server.h"
 
-#include "qcommon/cvar.h"
+#include "../qcommon/cvar.h"
 
 // Attack log file is started when server is init (!= sv_running 1!)
 // we even log attacks when the server is waiting for rcon and doesn't run a map
@@ -558,93 +558,29 @@ clients along with it.
 This is NOT called for map_restart
 ================
 */
-void SV_SpawnServer(char *server)
-{
-    int i;
+typedef struct spawnserver_data_s {
+	char mapname[MAX_QPATH];
+	cb_context_t *after;
+} spawnserver_data_t;
+
+static void SV_SpawnServer_after_FS_Restart( cb_context_t *context, int status ) {
     int checksum;
-    char systemInfo[16384];
+    int i;
     const char *p;
+	spawnserver_data_t *data;
+	char mapname[MAX_QPATH];
+    char systemInfo[16384];
 
-    // shut down the existing game if it is running
-    SV_ShutdownGameProgs();
-
-    Com_Printf("------ Server Initialization ------\n");
-    Com_Printf("Server: %s\n", server);
-
-    // if not running a dedicated server CL_MapLoading will connect the client to the server
-    // also print some status stuff
-    CL_MapLoading();
-
-    // make sure all the client stuff is unloaded
-    CL_ShutdownAll(false);
-
-    // clear the whole hunk because we're (re)loading the server
-    Hunk_Clear();
-
-    // clear collision map data
-    CM_ClearMap();
-
-    // init client structures and svs.numSnapshotEntities
-    if (!Cvar_VariableValue("sv_running"))
-    {
-        SV_Startup();
-    }
-    else
-    {
-        // check for maxclients change
-        if (sv_maxclients->modified)
-        {
-            SV_ChangeMaxClients();
-        }
-    }
-
-    // clear pak references
-    FS_ClearPakReferences(0);
-
-    // allocate the snapshot entities on the hunk
-    svs.snapshotEntities = (entityState_t *)Hunk_Alloc(sizeof(entityState_t) * svs.numSnapshotEntities, h_high);
-    svs.nextSnapshotEntities = 0;
-
-    // toggle the server bit so clients can detect that a
-    // server has changed
-    svs.snapFlagServerBit ^= SNAPFLAG_SERVERCOUNT;
-
-    for (i = 0; i < sv_maxclients->integer; i++)
-    {
-        // save when the server started for each client already connected
-        if (svs.clients[i].state >= CS_CONNECTED)
-        {
-            svs.clients[i].oldServerTime = sv.time;
-        }
-    }
-
-    // wipe the entire per-level structure
-    SV_ClearServer();
-    for (i = 0; i < MAX_CONFIGSTRINGS; i++)
-    {
-        if (i <= CS_SYSTEMINFO)
-        {
-            alternateInfos[i][0][0] = alternateInfos[i][1][0] = '\0';
-        }
-        sv.configstrings[i].s = CopyString("");
-        sv.configstrings[i].restricted = false;
-        ::memset(&sv.configstrings[i].clientList, 0, sizeof(clientList_t));
-    }
-
-    // make sure we are not paused
-    Cvar_Set("cl_paused", "0");
-
-    // get a new checksum feed and restart the file system
-    sv.checksumFeed = (((int)rand() << 16) ^ rand()) ^ Com_Milliseconds();
-    FS_Restart(sv.checksumFeed);
+	data = (spawnserver_data_t*)context->data;
+	Q_strncpyz(mapname, data->mapname, MAX_QPATH);
 
     // advertise GPP-compatible extensions
     Cvar_Set("sv_gppExtension", "1");
 
-    CM_LoadMap(va("maps/%s.bsp", server), false, &checksum);
+    CM_LoadMap(va("maps/%s.bsp", mapname), false, &checksum);
 
     // set serverinfo visible name
-    Cvar_Set("mapname", server);
+    Cvar_Set("mapname", mapname);
 
     Cvar_Set("sv_mapChecksum", va("%i", checksum));
 
@@ -663,6 +599,7 @@ void SV_SpawnServer(char *server)
     sv.state = SS_LOADING;
 
     // load and spawn all other entities
+    Com_Printf("Initializing game...\n");
     SV_InitGameProgs();
 
     // run a few frames to allow everything to settle
@@ -776,6 +713,92 @@ void SV_SpawnServer(char *server)
 #endif
 
     Com_Printf("-----------------------------------\n");
+
+}
+
+void SV_SpawnServer(char *server, cb_context_t *after)
+{
+    int i;
+	cb_context_t       *context;
+	spawnserver_data_t *data;
+    // shut down the existing game if it is running
+    SV_ShutdownGameProgs();
+
+    Com_Printf("------ Server Initialization ------\n");
+    Com_Printf("Server: %s\n", server);
+
+    // if not running a dedicated server CL_MapLoading will connect the client to the server
+    // also print some status stuff
+    CL_MapLoading();
+
+    // make sure all the client stuff is unloaded
+    CL_ShutdownAll(false);
+
+    // clear the whole hunk because we're (re)loading the server
+    Hunk_Clear();
+
+    // clear collision map data
+    CM_ClearMap();
+
+    // init client structures and svs.numSnapshotEntities
+    if (!Cvar_VariableValue("sv_running"))
+    {
+        SV_Startup();
+    }
+    else
+    {
+        // check for maxclients change
+        if (sv_maxclients->modified)
+        {
+            SV_ChangeMaxClients();
+        }
+    }
+
+    // clear pak references
+    FS_ClearPakReferences(0);
+
+    // allocate the snapshot entities on the hunk
+    svs.snapshotEntities = (entityState_t *)Hunk_Alloc(sizeof(entityState_t) * svs.numSnapshotEntities, h_high);
+    svs.nextSnapshotEntities = 0;
+
+    // toggle the server bit so clients can detect that a
+    // server has changed
+    svs.snapFlagServerBit ^= SNAPFLAG_SERVERCOUNT;
+
+    for (i = 0; i < sv_maxclients->integer; i++)
+    {
+        // save when the server started for each client already connected
+        if (svs.clients[i].state >= CS_CONNECTED)
+        {
+            svs.clients[i].oldServerTime = sv.time;
+        }
+    }
+
+    // wipe the entire per-level structure
+    SV_ClearServer();
+    for (i = 0; i < MAX_CONFIGSTRINGS; i++)
+    {
+        if (i <= CS_SYSTEMINFO)
+        {
+            alternateInfos[i][0][0] = alternateInfos[i][1][0] = '\0';
+        }
+        sv.configstrings[i].s = CopyString("");
+        sv.configstrings[i].restricted = false;
+        ::memset(&sv.configstrings[i].clientList, 0, sizeof(clientList_t));
+    }
+
+    // make sure we are not paused
+    Cvar_Set("cl_paused", "0");
+
+    // get a new checksum feed and restart the file system
+    sv.checksumFeed = (((int)rand() << 16) ^ rand()) ^ Com_Milliseconds();
+
+	context = cb_create_context( SV_SpawnServer_after_FS_Restart, spawnserver_data_t );
+	data = (spawnserver_data_t *)context->data;
+    Q_strncpyz(data->mapname, server, MAX_QPATH);
+	data->after = after;
+
+    FS_Restart(sv.checksumFeed, context);
 }
 
 /**

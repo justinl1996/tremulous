@@ -162,7 +162,7 @@ typedef int intptr_t;
 #endif
 
 
-#include "qcommon/q_platform.h"
+#include "q_platform.h"
 
 //=============================================================
 
@@ -295,6 +295,8 @@ typedef struct {
 
 #define	MAX_NAME_LENGTH			32		// max length of a client name ignoring colors
 #define	MAX_HOSTNAME_LENGTH	80		// max length of a host name
+
+#define MAX_FQDN_NAME   253
 
 #define	MAX_SAY_TEXT	800
 
@@ -1101,7 +1103,7 @@ COLLISION DETECTION
 ==============================================================
 */
 
-#include "qcommon/surfaceflags.h"			// shared with the q3map utility
+#include "surfaceflags.h"			// shared with the q3map utility
 
 // plane types are used to speed some tests
 // 0-2 are axial planes

@@ -32,11 +32,11 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <csignal>
 
 #ifndef DEDICATED
-#include "client/client.h"
+#include "../client/client.h"
 #endif
-#include "qcommon/cvar.h"
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/cvar.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
 
 /*
 =============================================================
@@ -48,7 +48,7 @@ called before and after a stdout or stderr output
 =============================================================
 */
 
-extern bool stdinIsATTY;
+static bool stdinIsATTY;
 
 static bool stdin_active = false;
 // general flag to tell about tty console mode
@@ -77,6 +77,24 @@ static int hist_current = -1, hist_count = 0;
 #else
 #define TTY_CONSOLE_PROMPT "]"
 #endif
+
+/*
+==================
+CON_IsTTY
+==================
+*/
+extern "C" bool CON_IsTTY(void) {
+	return stdinIsATTY;
+}
+
+/*
+==================
+CON_SetIsTTY
+==================
+*/
+extern "C" void CON_SetIsTTY(bool isTTY) {
+	stdinIsATTY = isTTY;
+}
 
 /*
 ==================

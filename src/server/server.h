@@ -27,18 +27,18 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef SERVER_H
 #define SERVER_H 1
 
-#include "game/g_public.h"
-#include "qcommon/cmd.h"
-#include "qcommon/crypto.h"
-#include "qcommon/cvar.h"
-#include "qcommon/files.h"
-#include "qcommon/huffman.h"
-#include "qcommon/msg.h"
-#include "qcommon/net.h"
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
-#include "qcommon/vm.h"
-#include "sys/sys_shared.h"
+#include "../game/g_public.h"
+#include "../qcommon/cmd.h"
+#include "../qcommon/crypto.h"
+#include "../qcommon/cvar.h"
+#include "../qcommon/files.h"
+#include "../qcommon/huffman.h"
+#include "../qcommon/msg.h"
+#include "../qcommon/net.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
+#include "../qcommon/vm.h"
+#include "../sys/sys_shared.h"
 
 //=============================================================================
 
@@ -409,7 +409,7 @@ void SV_SetUserinfo(int index, const char *val);
 void SV_GetUserinfo(int index, char *buffer, int bufferSize);
 
 void SV_ChangeMaxClients(void);
-void SV_SpawnServer(char *server);
+void SV_SpawnServer(char *server, cb_context_t *after);
 void SV_WriteAttackLog(const char *log);
 
 #ifdef NDEBUG

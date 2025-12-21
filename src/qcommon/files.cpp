@@ -35,6 +35,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#define SDL_HasMMXExt SDL_HasMMX
+#define SDL_Has3DNowExt SDL_Has3DNow
+#endif
 
 #include "cmd.h"
 #include "cvar.h"
@@ -46,15 +51,22 @@
 #include "vm.h"
 
 #ifndef DEDICATED
-#include "client/cl_rest.h"
+#include "../client/cl_rest.h"
 #endif
-#include "sys/sys_shared.h"
+#include "../sys/sys_shared.h"
 
 using namespace std;
 
 #define MAX_ZPATH 256
 #define MAX_SEARCH_PATHS 4096
 #define MAX_FILEHASH_SIZE 1024
+
+#if EMSCRIPTEN
+extern "C" {
+    extern void Sys_FS_Startup(cb_context_t *after);
+    extern void Sys_FS_Shutdown(cb_context_t *after);
+};
+#endif
 
 static bool FS_IsDemoExt(const char *filename);
 static bool FS_IsExt(const char *filename, const char *ext, int namelen);
@@ -104,6 +116,12 @@ struct searchpath_t {
 static char fs_gamedir[MAX_OSPATH];  // this will be a single file name with no separators
 static cvar_t *fs_debug;
 static cvar_t *fs_homepath;
+
+#if EMSCRIPTEN
+static	cvar_t		*fs_cdn;
+static	cvar_t		*fs_manifest;
+static	cvar_t		*fs_completeManifest;
+#endif
 
 static cvar_t *fs_basepath;
 static cvar_t *fs_basegame;
@@ -576,9 +594,11 @@ Tests if path and file exists
 bool FS_FileInPathExists(const char *testpath)
 {
     FILE *filep;
-
+#if EMSCRIPTEN
+	filep = fopen( testpath, "rb" );
+#else
     filep = Sys_FOpen(testpath, "rb");
-
+#endif
     if (filep)
     {
         fclose(filep);
@@ -647,7 +667,11 @@ fileHandle_t FS_SV_FOpenFileWrite(const char *filename)
     }
 
     Com_DPrintf("writing to: %s\n", ospath);
-    fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "wb");
+#if EMSCRIPTEN
+	fsh[f].handleFiles.file.o = fopen( ospath, "wb" );
+#else
+	fsh[f].handleFiles.file.o = Sys_FOpen( ospath, "wb" );
+#endif
 
     Q_strncpyz(fsh[f].name, filename, sizeof(fsh[f].name));
 
@@ -689,8 +713,18 @@ long FS_SV_FOpenFileRead(const char *filename, fileHandle_t *fp)
     ospath[strlen(ospath) - 1] = '\0';
 
     Com_DPrintf("FS_SV_FOpenFileRead (fs_homepath): %s\n", ospath);
-
-    fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "rb");
+#if EMSCRIPTEN
+	qboolean exists = Sys_PathExists(ospath, qtrue);
+	if (!exists)
+	{
+		fsh[f].handleFiles.file.o = 0;
+	}
+	else {
+		fsh[f].handleFiles.file.o = fopen( ospath, "rb" );
+	}
+#else
+	fsh[f].handleFiles.file.o = Sys_FOpen( ospath, "rb" );
+#endif
     fsh[f].handleSync = false;
     if (!fsh[f].handleFiles.file.o)
     {
@@ -702,8 +736,18 @@ long FS_SV_FOpenFileRead(const char *filename, fileHandle_t *fp)
             ospath[strlen(ospath) - 1] = '\0';
 
             Com_DPrintf("FS_SV_FOpenFileRead (fs_basepath): %s\n", ospath);
-
-            fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "rb");
+#if EMSCRIPTEN
+			exists = Sys_PathExists(ospath, qtrue);
+			if (!exists)
+			{
+				fsh[f].handleFiles.file.o = 0;
+			}
+			else {
+				fsh[f].handleFiles.file.o = fopen( ospath, "rb" );
+			}
+#else
+			fsh[f].handleFiles.file.o = Sys_FOpen( ospath, "rb" );
+#endif
             fsh[f].handleSync = false;
         }
 
@@ -849,8 +893,11 @@ fileHandle_t FS_FOpenFileWrite(const char *filename)
     // enabling the following line causes a recursive function call loop
     // when running with +set logfile 1 +set developer 1
     // Com_DPrintf( "writing to: %s\n", ospath );
+#if EMSCRIPTEN
+    fsh[f].handleFiles.file.o = fopen(ospath, "wb");
+#else
     fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "wb");
-
+#endif
     Q_strncpyz(fsh[f].name, filename, sizeof(fsh[f].name));
 
     fsh[f].handleSync = false;
@@ -895,8 +942,11 @@ fileHandle_t FS_FOpenFileAppend(const char *filename)
     {
         return 0;
     }
-
+#if EMSCRIPTEN
+	fsh[f].handleFiles.file.o = fopen( ospath, "ab" );
+#else
     fsh[f].handleFiles.file.o = Sys_FOpen(ospath, "ab");
+#endif
     fsh[f].handleSync = false;
     if (!fsh[f].handleFiles.file.o)
     {
@@ -1050,6 +1100,7 @@ long FS_FOpenFileReadDir(
     char *netpath;
     FILE *filep;
     int len;
+    qboolean exists;
 
     searchpath_t *search = static_cast<searchpath_t *>(_search);
 
@@ -1101,8 +1152,21 @@ long FS_FOpenFileReadDir(
             dir = search->dir;
 
             netpath = FS_BuildOSPath(dir->path, dir->gamedir, filename);
-            filep = Sys_FOpen(netpath, "rb");
+#if EMSCRIPTEN
 
+			exists = Sys_PathExists(netpath, qtrue);
+			if (!exists)
+			{
+				return -1;
+			}
+#endif
+            if (strstr(filename, "ui.qvm"))
+                Com_Printf("exists ui.qvm: %s\n", netpath);
+#if EMSCRIPTEN
+            filep = fopen(netpath, "rb");
+#else
+            filep = Sys_FOpen(netpath, "rb");
+#endif
             if (filep)
             {
                 len = FS_fplength(filep);
@@ -1224,8 +1288,19 @@ long FS_FOpenFileReadDir(
         dir = search->dir;
 
         netpath = FS_BuildOSPath(dir->path, dir->gamedir, filename);
-        filep = Sys_FOpen(netpath, "rb");
+#if EMSCRIPTEN
+        exists = Sys_PathExists(netpath, qtrue);
+        if (!exists)
+        {
+            return -1;
+        }
+#endif
 
+#if EMSCRIPTEN
+        filep = fopen(netpath, "rb");
+#else
+        filep = Sys_FOpen(netpath, "rb");
+#endif
         if (filep == nullptr)
         {
             *file = 0;
@@ -3245,9 +3320,26 @@ FS_Shutdown
 Frees all resources.
 ================
 */
+typedef struct shutdown_data_s {
+	cb_context_t *after;
+} shutdown_data_t;
 
-void FS_Shutdown(bool closemfp)
+void FS_Shutdown_after_Sys_FS_Shutdown( cb_context_t *context, int status ) {
+	shutdown_data_t *data;
+	cb_context_t *after;
+
+	data = (shutdown_data_t*)context->data;
+	after = data->after;
+	cb_free_context(context);
+
+	cb_run(after, 0);
+}
+
+void FS_Shutdown(bool closemfp, cb_context_t *after)
 {
+	cb_context_t *context;
+	shutdown_data_t *data;
+
     for (int i = 0; i < MAX_FILE_HANDLES; i++)
     {
         if (fsh[i].fileSize) FS_FCloseFile(i);
@@ -3277,6 +3369,16 @@ void FS_Shutdown(bool closemfp)
     {
         fclose(missingFiles);
     }
+#endif
+
+	context = cb_create_context(FS_Shutdown_after_Sys_FS_Shutdown, shutdown_data_t);
+	data = (shutdown_data_t*)context->data;
+	data->after = after;
+
+#if EMSCRIPTEN
+	Sys_FS_Shutdown(context);
+#else
+	cb_run(context, 0);
 #endif
 }
 
@@ -3330,23 +3432,20 @@ static void FS_ReorderPurePaks(void)
 FS_Startup
 ================
 */
-static void FS_Startup(const char *gameName)
-{
-    Com_Printf("----- FS_Startup -----\n");
-    fs_packFiles = 0;
+typedef struct startup_data_s {
+	char gameName[MAX_OSPATH];
+	cb_context_t *after;
+} startup_data_t;
 
-    fs_debug = Cvar_Get("fs_debug", "0", 0);
-    fs_basepath = Cvar_Get("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT | CVAR_PROTECTED);
-    fs_basegame = Cvar_Get("fs_basegame", BASEGAME, CVAR_INIT);
+static void FS_Startup_after_Sys_FS_Startup( cb_context_t *context, int status ) {
+	startup_data_t *data;
+	char gameName[MAX_OSPATH];
+	cb_context_t *after;
 
-    const char *homePath = Sys_DefaultHomePath();
-    if (!homePath || !homePath[0])
-    {
-        homePath = fs_basepath->string;
-    }
-
-    fs_homepath = Cvar_Get("fs_homepath", homePath, CVAR_INIT | CVAR_PROTECTED);
-    fs_gamedirvar = Cvar_Get("fs_game", BASEGAME, CVAR_INIT | CVAR_SYSTEMINFO);
+	data = (startup_data_t*)context->data;
+	Q_strncpyz(gameName, data->gameName, MAX_OSPATH);
+	after = data->after;
+	cb_free_context(context);
 
 #ifdef DEDICATED
     // add search path elements in reverse priority order
@@ -3379,7 +3478,6 @@ static void FS_Startup(const char *gameName)
     }
 
 #else
-
     // add search path elements in reverse priority order
     if (fs_basepath->string[0])
     {
@@ -3469,6 +3567,54 @@ static void FS_Startup(const char *gameName)
 #endif
 
     Com_Printf("%d files in pk3 files\n", fs_packFiles);
+
+    cb_run(after, 0);
+}
+
+/*
+================
+FS_Startup
+================
+*/
+static void FS_Startup(const char *gameName, cb_context_t *after )
+{
+	cb_context_t *context;
+	startup_data_t *data;
+
+    Com_Printf("----- FS_Startup -----\n");
+    fs_packFiles = 0;
+
+    fs_debug = Cvar_Get("fs_debug", "0", 0);
+
+#if EMSCRIPTEN
+	fs_cdn = Cvar_Get("fs_cdn", "content.tremulous.online:9000", CVAR_INIT | CVAR_SERVERINFO);
+	fs_manifest = Cvar_Get("fs_manifest", "", CVAR_ROM | CVAR_SERVERINFO);
+	fs_completeManifest = Cvar_Get("fs_completeManifest", "", CVAR_ROM);
+    Com_Printf("Using content server: %s\n", fs_cdn->string);
+#endif
+
+    fs_basepath = Cvar_Get("fs_basepath", Sys_DefaultInstallPath(), CVAR_INIT | CVAR_PROTECTED);
+    fs_basegame = Cvar_Get("fs_basegame", BASEGAME, CVAR_INIT);
+    const char *homePath = Sys_DefaultHomePath();
+    if (!homePath || !homePath[0])
+    {
+        homePath = fs_basepath->string;
+    }
+
+    fs_homepath = Cvar_Get("fs_homepath", homePath, CVAR_INIT | CVAR_PROTECTED);
+    fs_gamedirvar = Cvar_Get("fs_game", BASEGAME, CVAR_INIT | CVAR_SYSTEMINFO);
+
+	// Setup callback.
+	context = cb_create_context(FS_Startup_after_Sys_FS_Startup, startup_data_t);
+	data = (startup_data_t*)context->data;
+	Q_strncpyz(data->gameName, gameName, MAX_OSPATH);
+	data->after = after;
+
+#if EMSCRIPTEN
+	Sys_FS_Startup(context); //Auriga: uhhhh
+#else
+	cb_run(context, 0);
+#endif
 }
 
 /*
@@ -3713,13 +3859,13 @@ void FS_PureServerSetLoadedPaks(const char *pakSums, const char *pakNames)
     {
         Com_DPrintf("Connected to a pure server.\n");
     }
-    else if (fs_reordered)
+    /*else if (fs_reordered)
     {
         // force a restart to make sure the search order will be correct
         Com_DPrintf("FS search reorder is required\n");
         FS_Restart(fs_checksumFeed);
         return;
-    }
+    }*/
 
     for (int i = 0; i < c; i++)
     {
@@ -3787,21 +3933,17 @@ Called only at inital startup, not when the filesystem
 is resetting due to a game change
 ================
 */
-void FS_InitFilesystem(void)
-{
-    // allow command line parms to override our defaults
-    // we have to specially handle this, because normal command
-    // line variable sets don't happen until after the filesystem
-    // has already been initialized
-    Com_StartupVariable("fs_basepath");
-    Com_StartupVariable("fs_homepath");
-    Com_StartupVariable("fs_game");
-    Com_StartupVariable("fs_pk3PrefixPairs");
+typedef struct init_filesystem_data_s {
+	cb_context_t *after;
+} init_filesystem_data_t;
 
-    if (!FS_FilenameCompare(Cvar_VariableString("fs_game"), BASEGAME)) Cvar_Set("fs_game", "");
+void FS_InitFilesystem_after_FS_Startup( cb_context_t *context, int status ) {
+	init_filesystem_data_t *data;
+	cb_context_t *after;
 
-    // try to start up normally
-    FS_Startup(BASEGAME);
+	data = (init_filesystem_data_t*)context->data;
+	after = data->after;
+	cb_free_context(context);
 
     // if we can't find default.cfg, assume that the paths are
     // busted and error out now, rather than getting an unreadable
@@ -3813,6 +3955,41 @@ void FS_InitFilesystem(void)
 
     Q_strncpyz(lastValidBase, fs_basegame->string, sizeof(lastValidBase));
     Q_strncpyz(lastValidGame, fs_gamedirvar->string, sizeof(lastValidGame));
+    Com_Printf("lastValidBase: %s\n", fs_basegame->string);
+    Com_Printf("lastValidGame: %s\n", fs_gamedirvar->string);
+
+	cb_run(after, 0);
+}
+
+/*
+================
+FS_InitFilesystem
+
+Called only at inital startup, not when the filesystem
+is resetting due to a game change
+================
+*/
+void FS_InitFilesystem( cb_context_t *after )
+{
+	cb_context_t *context;
+	init_filesystem_data_t *data;
+    // allow command line parms to override our defaults
+    // we have to specially handle this, because normal command
+    // line variable sets don't happen until after the filesystem
+    // has already been initialized
+    Com_StartupVariable("fs_basepath");
+    Com_StartupVariable("fs_homepath");
+    Com_StartupVariable("fs_game");
+    Com_StartupVariable("fs_pk3PrefixPairs");
+
+    if (!FS_FilenameCompare(Cvar_VariableString("fs_game"), BASEGAME)) Cvar_Set("fs_game", "");
+
+	// try to start up normally
+	context = cb_create_context(FS_InitFilesystem_after_FS_Startup, init_filesystem_data_t);
+	data = (init_filesystem_data_t*)context->data;
+	data->after = after;
+    // try to start up normally
+    FS_Startup(BASEGAME, context);
 }
 
 /*
@@ -3820,19 +3997,21 @@ void FS_InitFilesystem(void)
 FS_Restart
 ================
 */
-void FS_Restart(int checksumFeed)
-{
-    // free anything we currently have loaded
-    FS_Shutdown(false);
+typedef struct restart_data_s {
+	int checksumFeed;
+	cb_context_t *after;
+} restart_data_t;
 
+static void FS_Restart_after_FS_Startup( cb_context_t *context, int status ) {
+	restart_data_t *data;
+	cb_context_t *after;
+
+	data = (restart_data_t*)context->data;
+	after = data->after;
     // set the checksum feed
-    fs_checksumFeed = checksumFeed;
+    fs_checksumFeed = data->checksumFeed;
 
-    // clear pak references
-    FS_ClearPakReferences(0);
-
-    // try to start up normally
-    FS_Startup(BASEGAME);
+	cb_free_context(context);
 
     // if we can't find default.cfg, assume that the paths are
     // busted and error out now, rather than getting an unreadable
@@ -3846,8 +4025,10 @@ void FS_Restart(int checksumFeed)
             FS_PureServerSetLoadedPaks("", "");
             Cvar_Set("fs_basegame", lastValidBase);
             Cvar_Set("fs_game", lastValidGame);
+            Com_Printf("lastValidBase: %s\n", lastValidBase);
+            Com_Printf("lastValidGame: %s\n", lastValidGame);
             lastValidBase[0] = lastValidGame[0] = '\0';
-            FS_Restart(checksumFeed);
+            FS_Restart(fs_checksumFeed, context);
             Com_Error(ERR_DROP, "Invalid game folder");
             return;
         }
@@ -3865,6 +4046,36 @@ void FS_Restart(int checksumFeed)
 
     Q_strncpyz(lastValidBase, fs_basegame->string, sizeof(lastValidBase));
     Q_strncpyz(lastValidGame, fs_gamedirvar->string, sizeof(lastValidGame));
+    cb_run(after, 0);
+}
+
+static void FS_Restart_after_FS_Shutdown( cb_context_t *context, int status ) {
+	restart_data_t *data;
+
+	data = (restart_data_t*)context->data;
+
+    // clear pak references
+    FS_ClearPakReferences(0);
+
+	// reuse the same context
+	context->cb = FS_Restart_after_FS_Startup;
+
+    // try to start up normally
+    FS_Startup(BASEGAME, context);
+}
+
+void FS_Restart(int checksumFeed, cb_context_t *after)
+{
+	cb_context_t *context;
+	restart_data_t *data;
+
+	context = cb_create_context(FS_Restart_after_FS_Shutdown, restart_data_t);
+	data = (restart_data_t*)context->data;
+	data->checksumFeed = checksumFeed;
+	data->after = after;
+
+    // free anything we currently have loaded
+    FS_Shutdown(false, context);
 }
 
 /*
@@ -3875,27 +4086,58 @@ Restart if necessary
 Return true if restarting due to game directory changed, false otherwise
 =================
 */
-bool FS_ConditionalRestart(int checksumFeed, bool disconnect)
+typedef struct conditional_restart_data_s {
+	qboolean result;
+	cb_context_t *after;
+} conditional_restart_data_t;
+
+static void FS_ConditionalRestart_after_restart( cb_context_t *context, int status ) {
+	conditional_restart_data_t *data;
+	cb_context_t *after;
+	int result;
+
+	data = (conditional_restart_data_t*)context->data;
+	after = data->after;
+	result = data->result;
+	cb_free_context(context);
+
+	cb_run(after, result);
+}
+
+void FS_ConditionalRestart(int checksumFeed, bool disconnect, cb_context_t *after)
 {
+	cb_context_t *context;
+	conditional_restart_data_t *data;
+
+    context = cb_create_context(FS_ConditionalRestart_after_restart, conditional_restart_data_t);
+    data = (conditional_restart_data_t*)context->data;
+    data->after = after;
+
     if (fs_gamedirvar->modified)
     {
         if (FS_FilenameCompare(lastValidGame, fs_gamedirvar->string) &&
             (*lastValidGame || FS_FilenameCompare(fs_gamedirvar->string, BASEGAME)) &&
             (*fs_gamedirvar->string || FS_FilenameCompare(lastValidGame, BASEGAME)))
         {
-            Com_GameRestart(checksumFeed, disconnect);
-            return true;
+            Com_GameRestart(checksumFeed, disconnect, context);
+            return;
         }
         fs_gamedirvar->modified = false;
     }
 
+#ifndef EMSCRIPTEN
     if (checksumFeed != fs_checksumFeed)
-        FS_Restart(checksumFeed);
+    {
+        FS_Restart(checksumFeed, context);
+    }
+#endif
 
     else if (fs_numServerPaks && !fs_reordered)
         FS_ReorderPurePaks();
 
-    return false;
+//#ifdef EMSCRIPTEN
+    cb_run(context, 0);
+//#endif
 }
 
 /*

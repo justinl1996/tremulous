@@ -25,7 +25,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef CGAME_PUBLIC_H
 #define CGAME_PUBLIC_H
 
-#include "qcommon/q_shared.h"
+#include "../qcommon/q_shared.h"
 
 #define CMD_BACKUP 64
 #define CMD_MASK (CMD_BACKUP - 1)

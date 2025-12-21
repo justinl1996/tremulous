@@ -34,7 +34,7 @@ focusColor WINDOW_FOCUSCOLOR// vim:ft=menu
         onOpen
         {
             uiScript stopRefresh
-            bucketPlayLooped "sound/ui/main_menu_music" ui_mainMenuSelectedMusic
+            playlooped "sound/ui/heartbeat.wav"
         }
 
         onESC
@@ -221,6 +221,20 @@ focusColor WINDOW_FOCUSCOLOR// vim:ft=menu
             textstyle ITEM_TEXTSTYLE_NORMAL
             textscale .30
             rect 0 420 640 30
+            textalign ALIGN_CENTER
+            forecolor .75 .75 .75 .75
+            visible MENU_TRUE
+            decoration
+        }
+        itemDef
+        {
+            name copyright
+            type ITEM_TYPE_TEXT
+            text "Web Edition by greekman99 (Justin Luong)"
+            style WINDOW_STYLE_EMPTY
+            textstyle ITEM_TEXTSTYLE_NORMAL
+            textscale .30
+            rect 0 435 640 30
             textalign ALIGN_CENTER
             forecolor .75 .75 .75 .75
             visible MENU_TRUE

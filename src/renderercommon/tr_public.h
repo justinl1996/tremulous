@@ -24,7 +24,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #ifndef __TR_PUBLIC_H
 #define __TR_PUBLIC_H
 
-#include "renderercommon/tr_types.h"
+#include "tr_types.h"
 
 #define	REF_API_VERSION		8
 

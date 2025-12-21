@@ -71,7 +71,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "tr_common.h"
 
-#include "qcommon/qcommon.h"
+#include "../qcommon/qcommon.h"
 
 #ifdef BUILD_FREETYPE
 #include <ft2build.h>

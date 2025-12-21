@@ -25,7 +25,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "client.h"
 
-#include "qcommon/cdefs.h"
+#include "../qcommon/cdefs.h"
 
 int g_console_field_width = 78;
 
@@ -394,7 +394,7 @@ Cmd_CompleteTxtName
 */
 void Cmd_CompleteTxtName( char *args UNUSED, int argNum ) {
 	if( argNum == 2 ) {
-		Field_CompleteFilename( "", "txt", false, true );
+		Field_CompleteFilename( "", "txt", (qboolean)false, (qboolean)true );   // Cast as qbooleans for emscripten
 	}
 }
 

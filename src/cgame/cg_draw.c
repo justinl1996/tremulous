@@ -26,7 +26,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 // active (after loading) gameplay
 
 #include "cg_local.h"
-#include "ui/ui_shared.h"
+#include "../ui/ui_shared.h"
 
 menuDef_t *menuScoreboard = NULL;
 

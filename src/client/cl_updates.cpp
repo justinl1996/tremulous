@@ -6,8 +6,10 @@
 #include "nettle/rsa.h"
 #include "nettle/sha2.h"
 #include "rapidjson.h"
+#ifdef USE_RESTCLIENT
 #include "restclient/connection.h"
 #include "restclient/restclient.h"
+#endif
 #include "semantic_version.h"
 
 #include <iostream>
@@ -114,7 +116,7 @@ void UpdateManager::refresh()
     Cvar_Set("cl_latestDownload", "");
     Cvar_Set("cl_latestRelease", "");
     Cvar_Set("cl_latestSignature", "");
-
+#ifdef USE_RESTCLIENT
     RestClient::Response r = RestClient::get(url);
     if ( r.code != 200 )
     {
@@ -186,6 +188,9 @@ void UpdateManager::refresh()
             Cvar_Set("cl_latestSignature", dl.c_str());
         }
     }
+#else
+    return;
+#endif
 }
 
 void UpdateManager::extract(std::string extract_path, std::string path)
@@ -285,6 +290,7 @@ void UpdateManager::extract(std::string extract_path, std::string path)
 
 void UpdateManager::download()
 {
+#ifdef USE_RESTCLIENT
     cvar_t *cl_enableSignatureCheck = Cvar_Get("cl_enableSignatureCheck", "0", CVAR_ARCHIVE | CVAR_PROTECTED);
 
     // Check for and download signature
@@ -343,6 +349,7 @@ void UpdateManager::download()
     unlink(path.c_str());
 
     Cvar_SetValue("au_autoupdate_action", AU_ACT_RUN);
+#endif
 }
 
 void UpdateManager::validate_signature(std::string path, std::string signature_path)

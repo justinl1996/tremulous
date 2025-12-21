@@ -36,7 +36,6 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 
 #include "cl_updates.h"
 #ifdef USE_MUMBLE
-#include "libmumblelink.h"
 #endif
 
 #ifdef USE_MUMBLE
@@ -1086,7 +1085,7 @@ static void CL_CompleteDemoName(char *args, int argNum)
         char demoExt[16];
 
         Com_sprintf(demoExt, sizeof(demoExt), ".%s%d", DEMOEXT, PROTOCOL_VERSION);
-        Field_CompleteFilename("demos", demoExt, true, true);
+        Field_CompleteFilename("demos", demoExt, (qboolean)true, (qboolean)true);   // Cast as qbooleans for emscripten
     }
 }
 
@@ -1321,7 +1320,7 @@ static void CL_OldGame(void)
         // change back to previous fs_game
         cl_oldGameSet = false;
         Cvar_Set2("fs_game", cl_oldGame, true);
-        FS_ConditionalRestart(clc.checksumFeed, false);
+        FS_ConditionalRestart(clc.checksumFeed, false, NULL);
     }
 }
 
@@ -1446,11 +1445,12 @@ void CL_Disconnect(bool showMainMenu)
     }
 
     CL_UpdateGUID(NULL, 0);
-
+#ifndef EMSCRIPTEN
     if (!noGameRestart)
         CL_OldGame();
     else
         noGameRestart = false;
+#endif
 }
 
 /*
@@ -1721,7 +1721,7 @@ static void CL_CompleteRcon(char *args, int argNum)
         // Skip "rcon "
         char *p = Com_SkipTokens(args, 1, " ");
 
-        if (p > args) Field_CompleteCommand(p, true, true);
+        if (p > args) Field_CompleteCommand(p, (qboolean)true, (qboolean)true);    // Cast as qbooleans for emscripten
     }
 }
 
@@ -1884,10 +1884,16 @@ CL_DownloadsComplete
 Called when all downloading has been completed
 =================
 */
+void CL_DownloadsComplete_after_FS_Restart( cb_context_t *context, int status )
+{
+    // inform the server so we get new gamestate info
+    CL_AddReliableCommand("donedl", false);
+}
+
 static void CL_DownloadsComplete(void)
 {
     Com_Printf("Downloads complete\n");
-
+#ifdef USE_CURL
     // if we downloaded with cURL
     if (clc.cURLUsed)
     {
@@ -1897,24 +1903,21 @@ static void CL_DownloadsComplete(void)
         {
             if (clc.downloadRestart)
             {
-                if (!clc.activeCURLNotGameRelated) FS_Restart(clc.checksumFeed);
                 clc.downloadRestart = false;
+                if (!clc.activeCURLNotGameRelated) FS_Restart(clc.checksumFeed, cb_create_context_no_data(CL_DownloadsComplete_after_FS_Restart));
             }
             clc.cURLDisconnected = false;
             if (!clc.activeCURLNotGameRelated) CL_Reconnect_f();
             return;
         }
     }
-
+#endif
     // if we downloaded files we need to restart the file system
     if (clc.downloadRestart)
     {
         clc.downloadRestart = false;
 
-        FS_Restart(clc.checksumFeed);  // We possibly downloaded a pak, restart the file system to load it
-
-        // inform the server so we get new gamestate info
-        CL_AddReliableCommand("donedl", false);
+        FS_Restart(clc.checksumFeed, cb_create_context_no_data(CL_DownloadsComplete_after_FS_Restart));  // We possibly downloaded a pak, restart the file system to load it
 
         // by sending the donedl command we request a new gamestate
         // so we don't want to load stuff yet
@@ -2144,7 +2147,7 @@ void CL_NextDownload(void)
             *s++ = 0;
         else
             s = localName + strlen(localName);  // point at the nul byte
-
+#ifdef USE_CURL
         if (((cl_allowDownload->integer & DLF_ENABLE) && !(cl_allowDownload->integer & DLF_NO_REDIRECT)) ||
             prompt == DLP_CURL)
         {
@@ -2184,6 +2187,7 @@ void CL_NextDownload(void)
                 "configuration (cl_allowDownload is %d)\n",
                 cl_allowDownload->integer);
         }
+#endif
         if (!useCURL)
         {
             Com_Printf("Trying UDP download: %s; %s\n", localName, remoteName);
@@ -2864,6 +2868,155 @@ static void CL_ServersResponsePacket(const netadr_t *from, msg_t *msg, bool exte
 
     Com_Printf("%d servers parsed (total %d)\n", numservers, total);
 }
+
+static void CL_ServersWebResponsePacket(const netadr_t *from, msg_t *msg, bool extended)
+{
+    int i, count, length, total;
+    netadr_t addresses[MAX_SERVERSPERPACKET];
+    int numservers;
+    byte *buffptr;
+    byte *buffend;
+    byte *buffstart;
+    char label[MAX_FEATLABEL_CHARS] = "";
+    char domain[MAX_FQDN_NAME];
+
+    Com_DPrintf("CL_ServersWebResponsePacket from %s %s\n",
+            NET_AdrToStringwPort(*from),
+            extended ? " (extended)" : "");
+
+    if (cls.numglobalservers == -1)
+    {
+        // state to detect lack of servers or lack of response
+        cls.numglobalservers = 0;
+        cls.numGlobalServerAddresses = 0;
+        for (i = 0; i < 3; ++i)
+        {
+            cls.numAlternateMasterPackets[i] = 0;
+            cls.receivedAlternateMasterPackets[i] = 0;
+        }
+    }
+
+    // parse through server response string
+    numservers = 0;
+    buffptr = msg->data;
+    buffend = buffptr + msg->cursize;
+
+    // skip header
+    buffptr += 4;
+
+    // advance to initial token
+    // I considered using strchr for this but I don't feel like relying
+    // on its behaviour with '\0'
+    while (*buffptr && *buffptr != '\\' && *buffptr != '/')
+    {
+        buffptr++;
+
+        if (buffptr >= buffend) break;
+    }
+
+    if (*buffptr == '\0')
+    {
+        int ind = CL_GSRSequenceInformation(from->alternateProtocol, &buffptr);
+        if (ind >= 0)
+        {
+            // this denotes the start of new-syntax stuff
+            // have we already received this packet?
+            if (cls.receivedAlternateMasterPackets[from->alternateProtocol] & (1 << (ind - 1)))
+            {
+                Com_DPrintf(
+                    "CL_ServersResponsePacket: "
+                    "received packet %d again, ignoring\n",
+                    ind);
+                return;
+            }
+            // TODO: detect dropped packets and make another
+            // request
+            Com_DPrintf(
+                "CL_ServersResponsePacket:%s packet "
+                "%d of %d\n",
+                (from->alternateProtocol == 0 ? "" : from->alternateProtocol == 1 ? " alternate-1" : " alternate-2"),
+                ind, cls.numAlternateMasterPackets[from->alternateProtocol]);
+            cls.receivedAlternateMasterPackets[from->alternateProtocol] |= (1 << (ind - 1));
+
+            CL_GSRFeaturedLabel(&buffptr, label, sizeof(label));
+        }
+        // now skip to the server list
+        for (; buffptr < buffend && *buffptr != '\\' && *buffptr != '/'; buffptr++)
+            ;
+    }
+    while (buffptr + 1 < buffend)
+    {
+        // Domain name
+        if (*buffptr == '\\')
+        {
+            buffptr++;
+            // "EOT" at the end.
+            if (buffend - buffptr <= 4) break;
+
+            buffstart = buffptr;
+
+            for (length=0; buffptr < buffend && *buffptr != ':'; buffptr++) length++;
+
+            Q_strncpyz(domain, (const char *) buffstart, length + 1);
+        } else {
+            // syntax error!
+            break;
+        }
+        buffptr++;
+        addresses[numservers].port = (*buffptr++) << 8;
+        addresses[numservers].port += *buffptr++;
+        addresses[numservers].port = BigShort(addresses[numservers].port);
+
+        switch (NET_StringToAdr(domain, &addresses[numservers], NA_UNSPEC))
+        {
+            case 0:
+                Com_Printf("Couldn't resolve %s address\n", domain);
+                return;
+
+            case 2:
+                cls.updateServer.port = BigShort(PORT_MASTER);
+            default:
+                break;
+        }
+        Com_Printf("%s resolved to %s\n", domain, NET_AdrToStringwPort(addresses[numservers]));
+        // syntax check
+        if (*buffptr != '\\' && *buffptr != '/') break;
+
+        addresses[numservers].alternateProtocol = from->alternateProtocol;
+
+        numservers++;
+        if (numservers >= MAX_SERVERSPERPACKET) break;
+    }
+    count = cls.numglobalservers;
+
+    for (i = 0; i < numservers && count < MAX_GLOBAL_SERVERS; i++)
+    {
+        // build net address
+        serverInfo_t *server = &cls.globalServers[count];
+
+        CL_InitServerInfo(server, &addresses[i]);
+        Q_strncpyz(server->label, label, sizeof(server->label));
+        // advance to next slot
+        count++;
+    }
+
+    // if getting the global list
+    if (count >= MAX_GLOBAL_SERVERS && cls.numGlobalServerAddresses < MAX_GLOBAL_SERVERS)
+    {
+        // if we couldn't store the servers in the main list anymore
+        for (; i < numservers && cls.numGlobalServerAddresses < MAX_GLOBAL_SERVERS; i++)
+        {
+            // just store the addresses in an additional list
+            cls.globalServerAddresses[cls.numGlobalServerAddresses++] = addresses[i];
+        }
+    }
+
+    cls.numglobalservers = count;
+    total = count + cls.numGlobalServerAddresses;
+
+    Com_Printf("%d servers parsed (total %d)\n", numservers, total);
+}
+
 /*
 ==================
 CL_CheckTimeout
@@ -2963,7 +3116,7 @@ void CL_Frame(int msec)
             Cvar_Set("com_downloadPrompt", va("%d", com_downloadPrompt->integer | DLP_STALE));
         }
     }
-
+#ifdef USE_CURL
     if (clc.downloadCURLM)
     {
         CL_cURL_PerformDownload();
@@ -2983,7 +3136,7 @@ void CL_Frame(int msec)
             return;
         }
     }
-
+#endif
     if (clc.state == CA_DISCONNECTED && !(Key_GetCatcher() & KEYCATCH_UI) && !com_sv_running->integer && cls.ui)
     {
         // if disconnected, bring up the menu
@@ -3152,9 +3305,9 @@ void CL_ShutdownAll(bool shutdownRef)
     if (CL_VideoRecording()) CL_CloseAVI();
 
     if (clc.demorecording) CL_StopRecord_f();
-
+#ifdef USE_CURL
     CL_cURL_Shutdown();
-
+#endif
     // clear sounds
     S_DisableSounds();
     // shutdown CGame
@@ -3226,6 +3379,56 @@ we also have to reload the UI and CGame because the renderer
 doesn't know what graphics to reload
 =================
 */
+void CL_Vid_Restart_f_after_FS_ConditionalRestart(cb_context_t *context, int gameDirChanged)
+{
+    // if not running a server clear the whole hunk
+    if (com_sv_running->integer)
+    {
+        // clear all the client data on the hunk
+        Hunk_ClearToMark();
+    }
+    else
+    {
+        // clear the whole hunk
+        Hunk_Clear();
+    }
+
+    // shutdown the UI
+    CL_ShutdownUI();
+    // shutdown the CGame
+    CL_ShutdownCGame();
+    // shutdown the renderer and clear the renderer interface
+    CL_ShutdownRef();
+    // client is no longer pure untill new checksums are sent
+    CL_ResetPureClientAtServer();
+    // clear pak references
+    FS_ClearPakReferences(FS_UI_REF | FS_CGAME_REF);
+    // reinitialize the filesystem if the game directory or checksum has changed
+
+    cls.rendererStarted = false;
+    cls.uiStarted = false;
+    cls.cgameStarted = false;
+    cls.soundRegistered = false;
+
+    // unpause so the cgame definately gets a snapshot and renders a frame
+    Cvar_Set("cl_paused", "0");
+
+    // initialize the renderer interface
+    CL_InitRef();
+
+    // startup all the client stuff
+    CL_StartHunkUsers(false);
+
+    // start the cgame if connected
+    if (clc.state > CA_CONNECTED && clc.state != CA_CINEMATIC)
+    {
+        cls.cgameStarted = true;
+        CL_InitCGame();
+        // send pure checksums
+        CL_SendPureChecksums();
+    }
+}
+
 static void CL_Vid_Restart_f(void)
 {
     // Settings may have changed so stop recording now
@@ -3235,59 +3438,9 @@ static void CL_Vid_Restart_f(void)
     }
 
     if (clc.demorecording) CL_StopRecord_f();
-
     // don't let them loop during the restart
     S_StopAllSounds();
-
-    if (!FS_ConditionalRestart(clc.checksumFeed, true))
-    {
-        // if not running a server clear the whole hunk
-        if (com_sv_running->integer)
-        {
-            // clear all the client data on the hunk
-            Hunk_ClearToMark();
-        }
-        else
-        {
-            // clear the whole hunk
-            Hunk_Clear();
-        }
-
-        // shutdown the UI
-        CL_ShutdownUI();
-        // shutdown the CGame
-        CL_ShutdownCGame();
-        // shutdown the renderer and clear the renderer interface
-        CL_ShutdownRef();
-        // client is no longer pure untill new checksums are sent
-        CL_ResetPureClientAtServer();
-        // clear pak references
-        FS_ClearPakReferences(FS_UI_REF | FS_CGAME_REF);
-        // reinitialize the filesystem if the game directory or checksum has changed
-
-        cls.rendererStarted = false;
-        cls.uiStarted = false;
-        cls.cgameStarted = false;
-        cls.soundRegistered = false;
-
-        // unpause so the cgame definately gets a snapshot and renders a frame
-        Cvar_Set("cl_paused", "0");
-
-        // initialize the renderer interface
-        CL_InitRef();
-
-        // startup all the client stuff
-        CL_StartHunkUsers(false);
-
-        // start the cgame if connected
-        if (clc.state > CA_CONNECTED && clc.state != CA_CINEMATIC)
-        {
-            cls.cgameStarted = true;
-            CL_InitCGame();
-            // send pure checksums
-            CL_SendPureChecksums();
-        }
-    }
+    FS_ConditionalRestart(clc.checksumFeed, true, cb_create_context_no_data(CL_Vid_Restart_f_after_FS_ConditionalRestart));
 }
 
 /*
@@ -3965,6 +4118,15 @@ static void CL_ConnectionlessPacket(netadr_t from, msg_t *msg)
 
         return;
     }
+
+#ifdef EMSCRIPTEN
+    if (!Q_strncmp(c, "getserverswebResponse", 18))
+    {
+        CL_ServersWebResponsePacket(&from, msg, false);
+
+        return;
+    }
+#endif
 
     // list of servers sent back by a master server (extended)
     if (!Q_strncmp(c, "getserversExtResponse", 21))

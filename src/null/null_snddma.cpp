@@ -25,8 +25,8 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 // snddma_null.c
 // all other sound mixing is portable
 
-#include "qcommon/q_shared.h"
-#include "qcommon/qcommon.h"
+#include "../qcommon/q_shared.h"
+#include "../qcommon/qcommon.h"
 
 bool SNDDMA_Init(void)
 {

@@ -22,7 +22,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 ===========================================================================
 */
 
-#include "renderercommon/tr_common.h"
+#include "../renderercommon/tr_common.h"
 
 typedef unsigned int   ui32_t;
 

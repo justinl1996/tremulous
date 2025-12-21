@@ -386,9 +386,9 @@ IN_ActivateMouse
 */
 static void IN_ActivateMouse( void )
 {
-	if (!mouseAvailable || !SDL_WasInit( SDL_INIT_VIDEO ) )
+	if (!mouseAvailable || !SDL_WasInit( SDL_INIT_VIDEO ) ) {
 		return;
-
+	}
 	if( !mouseActive )
 	{
 		SDL_SetRelativeMouseMode( SDL_TRUE );
@@ -1039,7 +1039,6 @@ static void IN_ProcessEvents( void )
 
 	if( !SDL_WasInit( SDL_INIT_VIDEO ) )
 			return;
-
 	while( SDL_PollEvent( &e ) )
 	{
 		switch( e.type )
@@ -1134,8 +1133,10 @@ static void IN_ProcessEvents( void )
 						case 1:   b = K_MOUSE1;     break;
 						case 2:   b = K_MOUSE3;     break;
 						case 3:   b = K_MOUSE2;     break;
+#if !EMSCRIPTEN
 						case 4:   b = K_MOUSE4;     break;
 						case 5:   b = K_MOUSE5;     break;
+#endif
 						default:  b = K_AUX1 + ( e.button.button - 8 ) % 16; break;
 					}
 					Com_QueueEvent(in_eventTime, SE_KEY, b,
@@ -1248,10 +1249,11 @@ void IN_Frame( void )
 		IN_DeactivateMouse( );
 	}
 	else
-		IN_ActivateMouse( );
-
-	if( !mouseActive && cls.uiInterface != 2 )
 	{
+		IN_ActivateMouse( );
+	}
+	if( !mouseActive && cls.uiInterface != 2 )
+	{	
 		SDL_GetMouseState( &x, &y );
 		IN_SetUIMousePosition( x, y );
 	}
@@ -1283,10 +1285,9 @@ void IN_Init( void *windowData )
 		Com_Error( ERR_FATAL, "IN_Init called before SDL_Init( SDL_INIT_VIDEO )" );
 		return;
 	}
-
 	SDL_window = (SDL_Window *)windowData;
 
-	Com_DPrintf( "\n------- Input Initialization -------\n" );
+	Com_Printf( "\n------- Input Initialization -------\n" );
 
 	in_keyboardDebug = Cvar_Get( "in_keyboardDebug", "0", CVAR_ARCHIVE );
 
@@ -1307,7 +1308,7 @@ void IN_Init( void *windowData )
 	Cvar_SetValue( "com_minimized", appState & SDL_WINDOW_MINIMIZED );
 
 	IN_InitJoystick( );
-	Com_DPrintf( "------------------------------------\n" );
+	Com_Printf( "------------------------------------\n" );
 }
 
 /*
