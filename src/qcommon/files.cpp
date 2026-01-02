@@ -4125,15 +4125,17 @@ void FS_ConditionalRestart(int checksumFeed, bool disconnect, cb_context_t *afte
         fs_gamedirvar->modified = false;
     }
 
-#ifndef EMSCRIPTEN
+#ifdef EMSCRIPTEN
+    if (fs_numServerPaks && !fs_reordered)
+        FS_ReorderPurePaks();
+#else   
     if (checksumFeed != fs_checksumFeed)
     {
         FS_Restart(checksumFeed, context);
     }
-#endif
-
     else if (fs_numServerPaks && !fs_reordered)
         FS_ReorderPurePaks();
+#endif
 
 //#ifdef EMSCRIPTEN
     cb_run(context, 0);
