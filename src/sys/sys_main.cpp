@@ -666,7 +666,7 @@ void Sys_SigHandler( int signal )
 
 #ifndef DEFAULT_BASEDIR
 # if EMSCRIPTEN
-#  define DEFAULT_BASEDIR "/base"
+#  define DEFAULT_BASEDIR "/tremulous"
 # elif __APPLE__
 #  define DEFAULT_BASEDIR Sys_StripAppBundle(Sys_BinaryPath())
 # else
