@@ -98,9 +98,9 @@ var LibrarySys = {
 	Sys_FS_Startup: function (context) {
 		console.log("Sys_FS_Startup sys_node");
 		// mount a persistable fs into base if not already mounted
-		var name = Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK);
-		var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(name));
-		var localPath = PATH.join('.', fs_homepath);
+		var name = Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK);
+		var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(name));
+		var localPath = PATH.join('.', fs_basepath);
 		// make sure the local path exists
 		var mkdirp = function (p) {
 			try {
@@ -133,7 +133,7 @@ var LibrarySys = {
 		// mount up the local filesystem in emscripten
 		var dir;
 		try {
-			dir = FS.mkdir(fs_homepath, 0777);
+			dir = FS.mkdir(fs_basepath, 0777);
 		} catch (e) {
 			if (!(e instanceof FS.ErrnoError) || e.errno !== ERRNO_CODES.EEXIST) {
 				SYSC.Error('fatal', e.message);
@@ -141,7 +141,7 @@ var LibrarySys = {
 		}
 
 		try {
-			FS.mount(NODEFS, { root: localPath }, fs_homepath);
+			FS.mount(NODEFS, { root: localPath }, fs_basepath);
 		} catch (e) {
 			if (!(e instanceof FS.ErrnoError) || e.errno !== ERRNO_CODES.EBUSY) {
 				SYSC.Error('fatal', e.message);
@@ -159,8 +159,8 @@ var LibrarySys = {
 	},
 	Sys_FS_Shutdown__deps: ['$Browser', '$SYSC'],
 	Sys_FS_Shutdown: function (context) {
-		var name = Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK);
-		var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(name));
+		var name = Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK);
+		var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(name));
 
 		SYSC.FS_Shutdown(function (err) {
 			if (err) {

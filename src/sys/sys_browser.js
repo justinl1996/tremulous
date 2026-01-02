@@ -277,15 +277,32 @@ var LibrarySys = {
 	},
 	Sys_FS_Startup__deps: ['$Browser', '$FS', '$IDBFS', '$SYSC'],
 	Sys_FS_Startup: function (context) {
-		var name = Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK);
-		var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(name));
-
+		var basename = Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK);
+		var homename = Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK);
+		var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(basename));
+		var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(homename));
 		// mount a persistable filesystem into base
 		var dir;
+		try {
+			dir = FS.mkdir(fs_basepath);
+		} catch (e) {
+			if (!(e instanceof FS.ErrnoError) || e.errno !== ERRNO_CODES.EEXIST) {
+				SYSC.Error('fatal', e.message);
+			}
+		}
+
 		try {
 			dir = FS.mkdir(fs_homepath);
 		} catch (e) {
 			if (!(e instanceof FS.ErrnoError) || e.errno !== ERRNO_CODES.EEXIST) {
+				SYSC.Error('fatal', e.message);
+			}
+		}
+
+		try {
+			FS.mount(IDBFS, {}, fs_basepath);
+		} catch (e) {
+			if (!(e instanceof FS.ErrnoError) || e.errno !== ERRNO_CODES.EBUSY) {
 				SYSC.Error('fatal', e.message);
 			}
 		}
@@ -319,8 +336,8 @@ var LibrarySys = {
 	},
 	Sys_FS_Shutdown__deps: ['$Browser', '$FS', '$SYSC'],
 	Sys_FS_Shutdown: function (context) {
-		var name = Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK);
-		var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(name));
+		var name = Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK);
+		var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(name));
 
 		FS.syncfs(function (err) {
 			SYSC.FS_Shutdown(function (err) {
