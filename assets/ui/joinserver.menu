@@ -644,7 +644,7 @@
       textalign ALIGN_CENTER
       textvalign VALIGN_CENTER
       forecolor 1 1 1 1
-      visible MENU_TRUE
+      visible MENU_FALSE
       action
       {
         play "sound/misc/menu1.wav";

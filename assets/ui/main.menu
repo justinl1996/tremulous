@@ -133,7 +133,7 @@ focusColor WINDOW_FOCUSCOLOR// vim:ft=menu
             textalign ALIGN_RIGHT
             backcolor 0 0 0 0
             forecolor 1 1 1 1
-            visible MENU_TRUE
+            visible MENU_FALSE
             action
             {
                 play "sound/misc/menu1.wav";
@@ -152,7 +152,7 @@ focusColor WINDOW_FOCUSCOLOR// vim:ft=menu
             textscale .416
             textalign ALIGN_RIGHT
             forecolor 1 1 1 1
-            visible MENU_TRUE
+            visible MENU_FALSE
             action
             {
                 play "sound/misc/menu1.wav";
@@ -171,7 +171,7 @@ focusColor WINDOW_FOCUSCOLOR// vim:ft=menu
             textscale .416
             textalign ALIGN_RIGHT
             forecolor 1 1 1 1
-            visible MENU_TRUE
+            visible MENU_FALSE
             action
             {
                 play "sound/misc/menu1.wav";
@@ -190,7 +190,7 @@ focusColor WINDOW_FOCUSCOLOR// vim:ft=menu
             textscale .416
             textalign ALIGN_RIGHT
             forecolor 1 1 1 1
-            visible MENU_TRUE
+            visible MENU_FALSE
             action
             {
                 play "sound/misc/menu1.wav";
