@@ -5,6 +5,7 @@
 #
 COMPILE_PLATFORM=$(shell uname | sed -e 's/_.*//' | tr '[:upper:]' '[:lower:]' | sed -e 's/\//_/g')
 COMPILE_ARCH=$(shell uname -m | sed -e 's/i.86/x86/' | sed -e 's/^arm.*/arm/')
+EMSCRIPTEN=/home/auriga/Projects/WebTrem-old/emsdk/upstream/emscripten
 
 ifeq ($(COMPILE_PLATFORM),sunos)
   # Solaris uname and GNU uname differ
@@ -778,9 +779,9 @@ else # ifeq freebsd
 #############################################################################
 
 ifeq ($(PLATFORM),js)
-  CC=emcc
-  CXX=emcc
-  RANLIB=emranlib
+  CC=$(EMSCRIPTEN)/emcc
+  CXX=$(EMSCRIPTEN)/emcc
+  RANLIB=$(EMSCRIPTEN)/emranlib
   ARCH=js
   BINEXT=.js
 # debug optimize flags: --closure 0 --minify 0 -g
@@ -810,7 +811,7 @@ ifeq ($(PLATFORM),js)
     --js-library $(LIBSYSBROWSER) \
     -s INVOKE_RUN=0 \
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_VM_GetCurrent', '_VM_SetCurrent']" \
-    -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction', 'setCanvasSize']" \
+    -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
     -s LEGACY_GL_EMULATION=1 \
     -s WEBSOCKET_URL=wss:// \
     -s WEBSOCKET_SUBPROTOCOL=binary \
