@@ -18540,12 +18540,6 @@ namespace sol {
 			return isnum != 0 && magic == toplevel_magic;
 		}
 
-		inline bool is_toplevel(lua_State* L, int index = magic_index) {
-			int isnum = 0;
-			lua_Integer magic = lua_tointegerx(L, upvalue_index(index), &isnum);
-			return isnum != 0 && magic == toplevel_magic;
-		}
-
 		inline int runtime_object_call(lua_State* L, void*, usertype_metatable_core& umc, int runtimetarget) {
 			std::vector<object>& runtime = umc.runtime;
 			object& runtimeobj = runtime[runtimetarget];
