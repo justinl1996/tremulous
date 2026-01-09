@@ -108,7 +108,7 @@ var LibrarySysCommon = {
 			}
 		],*/
 		paks: [
-			{ src: 'data-web-1.3.1.pk3', dest: 'gpp/data-web-1.3.1.pk3', checksum: 2739852846 },
+			{ src: 'data-web-1.3.1.pk3', dest: 'gpp/data-web-1.3.1.pk3', checksum: 3282924353 },
 			{ src: 'vms-gpp-v1.3.0.pk3', dest: 'gpp/vms-gpp-v1.3.0.pk3', checksum: 651151608 },
 			{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
 			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
@@ -216,7 +216,7 @@ var LibrarySysCommon = {
 		DownloadAsset: function (asset, onprogress, onload) {
 			var root = SYSC.GetCDN();
 			var name = asset.name.replace(/(.+\/|)(.+?)$/, '$1' + asset.checksum + '-$2');
-			var url = 'http://' + root + '/assets/' + name;
+			var url = 'https://' + root + '/assets/' + name;
 
 			SYS.DoXHR(url, {
 				dataType: 'arraybuffer',
@@ -268,7 +268,7 @@ var LibrarySysCommon = {
 			var fs_game = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_game'), ALLOC_STACK)));
 			var com_basegame = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('com_basegame'), ALLOC_STACK)));
 			var mapname = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('mapname'), ALLOC_STACK)));
-			var url = "http://" + fs_cdn + '/assets/manifest.json';
+			var url = "https://" + fs_cdn + '/assets/manifest.json';
 			console.log("URL:", url);
 			/*function isInstaller(name) {
 				return SYSC.installers.some(function (installer) {

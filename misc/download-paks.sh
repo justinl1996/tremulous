@@ -26,7 +26,7 @@ download "https://github.com/GrangerHub/tremulous-data/archive/refs/tags/v1.1.0.
 
 # named "web" so it comes after "gpp"
 DATA_GRHUB="data-web-1.3.1.pk3"
-download "https://github.com/GrangerHub/tremulous-assets/releases/download/data-1.3.1/tremulous-grhub-1.3.1.pk3" \
+download "https://github.com/AurigaSyno/tremulous-assets/releases/download/data-web/data-web-1.3.1.pk3" \
 	 $DATA_GRHUB
 
 if [[ $dir == "./build/release-darwin-x86_64" ]]; then
