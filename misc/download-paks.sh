@@ -24,8 +24,8 @@ download() {
 DATA_110="data-1.1.0.zip"
 download "https://github.com/GrangerHub/tremulous-data/archive/refs/tags/v1.1.0.zip" $DATA_110
 
-# named "grhub" so it comes after "gpp"
-DATA_GRHUB="data-grhub-1.3.1.pk3"
+# named "web" so it comes after "gpp"
+DATA_GRHUB="data-web-1.3.1.pk3"
 download "https://github.com/GrangerHub/tremulous-assets/releases/download/data-1.3.1/tremulous-grhub-1.3.1.pk3" \
 	 $DATA_GRHUB
 
