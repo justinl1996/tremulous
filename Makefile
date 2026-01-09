@@ -884,6 +884,10 @@ ifneq ($(HAVE_VM_COMPILED),true)
   BASE_CFLAGS += -DNO_VM_COMPILED
   BUILD_GAME_QVM=0
 endif
+#Until I find a better way, but we can't turn HAVE_VM_COMPILED on
+ifeq ($(PLATFORM),js)
+  BUILD_GAME_QVM=1
+endif
 
 TARGETS =
 
