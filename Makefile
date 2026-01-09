@@ -5,7 +5,7 @@
 #
 COMPILE_PLATFORM=$(shell uname | sed -e 's/_.*//' | tr '[:upper:]' '[:lower:]' | sed -e 's/\//_/g')
 COMPILE_ARCH=$(shell uname -m | sed -e 's/i.86/x86/' | sed -e 's/^arm.*/arm/')
-EMSCRIPTEN=/home/auriga/Projects/WebTrem-old/emsdk/upstream/emscripten
+EMSCRIPTEN=/home/auriga/Projects/emsdk/upstream/emscripten
 
 ifeq ($(COMPILE_PLATFORM),sunos)
   # Solaris uname and GNU uname differ
@@ -348,7 +348,7 @@ USE_GIT=
 ifeq ($(wildcard .git),.git)
   GIT_REV=$(shell git describe --tag | sed -e 's/-/_/g')
   ifneq ($(GIT_REV),)
-    VERSION:=$(GIT_REV)
+    #VERSION:=$(GIT_REV)
     USE_GIT=1
   endif
 endif
@@ -791,7 +791,7 @@ ifeq ($(PLATFORM),js)
 
   BUILD_STANDALONE=1
 
-  HAVE_VM_COMPILED=true
+  HAVE_VM_COMPILED=false
 
   USE_CURL=0
   USE_CODEC_VORBIS=0
@@ -806,6 +806,7 @@ ifeq ($(PLATFORM),js)
   LIBSYSCOMMON=$(SYSDIR)/sys_common.js
   LIBSYSBROWSER=$(SYSDIR)/sys_browser.js
   LIBSYSNODE=$(SYSDIR)/sys_node.js
+  #LIBVMCOMPILED=$(CMDIR)/vm_js.js     --js-library $(LIBVMCOMPILED) \
 
   CLIENT_LDFLAGS += --js-library $(LIBSYSCOMMON) \
     --js-library $(LIBSYSBROWSER) \
