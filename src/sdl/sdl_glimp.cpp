@@ -593,9 +593,9 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 		ri.Printf( PRINT_ALL, "Couldn't get a visual\n" );
 		return RSERR_INVALID_MODE;
 	}
-#ifndef EMSCRIPTEN
-	GLimp_DetectAvailableModes(); //Auriga: for some reason SDL_free in this function fails in web
-#endif
+
+	GLimp_DetectAvailableModes();
+
 	glstring = (char *) qglGetString (GL_RENDERER);
 	ri.Printf( PRINT_ALL, "GL_RENDERER: %s\n", glstring );
 
