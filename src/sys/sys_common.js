@@ -312,8 +312,6 @@ var LibrarySysCommon = {
 		SaveFile: function (name, buffer, callback) {
 			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
 			var localPath = PATH.join(fs_basepath, name);
-			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
-			var localPath = PATH.join(fs_basepath, name);
 			try {
 				FS.mkdir(PATH.dirname(localPath), 0777);
 			} catch (e) {
@@ -350,8 +348,6 @@ var LibrarySysCommon = {
 			return paks;
 		},
 		ValidatePak: function (pak) {
-			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
-			var localPath = PATH.join(fs_basepath, pak.dest);
 			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
 			var localPath = PATH.join(fs_basepath, pak.dest);
 			var crc = SYSC.CRC32File(localPath);
