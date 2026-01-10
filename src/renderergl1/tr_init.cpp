@@ -166,6 +166,8 @@ int		max_polys;
 cvar_t	*r_maxpolyverts;
 int		max_polyverts;
 
+cvar_t	*r_printGLInfo;
+
 #define GENERIC_HW_R_PICMIP_DEFAULT				"0"
 #define GENERIC_HW_R_TEXTUREMODE_DEFAULT	"GL_LINEAR_MIPMAP_LINEAR"
 
@@ -1075,6 +1077,8 @@ void R_Register( void )
 	r_maxpolys = ri.Cvar_Get( "r_maxpolys", va("%d", MAX_POLYS), 0);
 	r_maxpolyverts = ri.Cvar_Get( "r_maxpolyverts", va("%d", MAX_POLYVERTS), 0);
 
+	r_printGLInfo = ri.Cvar_Get("r_printGLInfo", "0", CVAR_ARCHIVE);
+
 	// make sure all the commands added here are also
 	// removed in R_Shutdown
 	ri.Cmd_AddCommand( "imagelist", R_ImageList_f );
@@ -1176,7 +1180,9 @@ void R_Init( void ) {
 		ri.Printf (PRINT_ALL, "glGetError() = 0x%x\n", err);
 
 	// print info
-	GfxInfo_f();
+	if ( r_printGLInfo->integer )
+		GfxInfo_f();
+		
 	ri.Printf( PRINT_ALL, "----- finished R_Init -----\n" );
 }
 
