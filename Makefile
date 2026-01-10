@@ -107,8 +107,9 @@ else
 endif
 export CROSS_COMPILING
 
+# Always name the version to be alphabetically *after* gpp1
 ifndef VERSION
-VERSION=1.3.0
+VERSION=v1.3.0
 endif
 
 ifndef PACKAGE
@@ -344,9 +345,9 @@ endif
 # Add git version info
 USE_GIT=
 ifeq ($(wildcard .git),.git)
-  GIT_REV=$(shell git describe --tag)
+  GIT_REV=$(shell git describe --tag | sed -e 's/-/_/g')
   ifneq ($(GIT_REV),)
-    VERSION:=$(GIT_REV)
+    #VERSION:=$(GIT_REV)
     USE_GIT=1
   endif
 endif
@@ -777,9 +778,9 @@ else # ifeq freebsd
 #############################################################################
 
 ifeq ($(PLATFORM),js)
-  CC=emcc
-  CXX=emcc
-  RANLIB=emranlib
+  CC=/emcc
+  CXX=/emcc
+  RANLIB=/emranlib
   ARCH=js
   BINEXT=.js
 # debug optimize flags: --closure 0 --minify 0 -g
@@ -792,7 +793,7 @@ ifeq ($(PLATFORM),js)
   HAVE_VM_COMPILED=false
 
   USE_CURL=0
-  USE_CODEC_VORBIS=0
+  USE_CODEC_VORBIS=1
   USE_CODEC_OPUS=1
   USE_MUMBLE=0
   USE_VOIP=0
@@ -804,12 +805,13 @@ ifeq ($(PLATFORM),js)
   LIBSYSCOMMON=$(SYSDIR)/sys_common.js
   LIBSYSBROWSER=$(SYSDIR)/sys_browser.js
   LIBSYSNODE=$(SYSDIR)/sys_node.js
+  #LIBVMCOMPILED=$(CMDIR)/vm_js.js     --js-library $(LIBVMCOMPILED) \
 
   CLIENT_LDFLAGS += --js-library $(LIBSYSCOMMON) \
     --js-library $(LIBSYSBROWSER) \
     -s INVOKE_RUN=0 \
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_VM_GetCurrent', '_VM_SetCurrent']" \
-    -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction', 'setCanvasSize']" \
+    -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
     -s LEGACY_GL_EMULATION=1 \
     -s WEBSOCKET_URL=wss:// \
     -s WEBSOCKET_SUBPROTOCOL=binary \
@@ -881,6 +883,10 @@ ifneq ($(HAVE_VM_COMPILED),true)
   BASE_CFLAGS += -DNO_VM_COMPILED
   BUILD_GAME_QVM=0
 endif
+#Until I find a better way, but we can't turn HAVE_VM_COMPILED on
+ifeq ($(PLATFORM),js)
+  BUILD_GAME_QVM=1
+endif
 
 TARGETS =
 
@@ -930,11 +936,6 @@ ifneq ($(BUILD_GAME_QVM_11),0)
     $(B)/$(BASEGAME)_11/vm/cgame.qvm \
     $(B)/$(BASEGAME)_11/vm/ui.qvm \
 	$(B)/$(BASEGAME)_11/vms-1.1.0-$(VERSION).pk3
-endif
-
-ifneq ($(BUILD_DATA_PK3),0)
-  TARGETS += \
-    $(B)/$(BASEGAME)/data-$(VERSION).pk3
 endif
 
 ifeq ($(USE_OPENAL),1)
@@ -1339,14 +1340,18 @@ endif
 	@echo "  Output:"
 	$(call print_list, $(NAKED_TARGETS))
 	@echo ""
+	@echo "Downloading maps and assets"
+	@(misc/download-paks.sh $(B))
+	@echo ""
 	@$(MAKE) $(TARGETS) $(B).zip $(B)/$(CLIENTBINSH) $(B)/$(SERVERBINSH) V=$(V)
 
 $(B).zip: $(TARGETS)
+	${echo_cmd} "Packaging files into $(B).zip"
 ifeq ($(PLATFORM),darwin)
-	@("./make-macosx-app.sh" release $(ARCH); if [ "$$?" -eq 0 ] && [ -d "$(B)/Tremulous.app" ]; then rm -f $@; cd $(B) && zip --symlinks -qr9 ../../$@ GPL COPYING CC `find "Tremulous.app" -print | sed -e "s!$(B)/!!g"`; else rm -f $@; cd $(B) && zip -qr9 ../../$@ $(NAKED_TARGETS); fi)
+	@("./make-macosx-app.sh" release $(ARCH); if [ "$$?" -eq 0 ] && [ -d "$(B)/Tremulous.app" ]; then rm -f $@; cd $(B) && zip --symlinks -qr9 ../../$@ GPL COPYING CC `find "Tremulous.app" -print | sed -e "s!$(B)/!!g"`; else rm -f $@; cd $(B) && zip -qr9 ../../$@ $(NAKED_TARGETS) gpp/*.pk3; fi)
 else
 	@rm -f $@
-	@(cd $(B) && zip -qr9 ../../$@ $(NAKED_TARGETS))
+	@(cd $(B) && zip -qr9 ../../$@ $(NAKED_TARGETS) gpp/*.pk3)
 	@echo "Created $@"
 endif
 
@@ -2751,15 +2756,6 @@ $(B)/$(BASEGAME)_11/vms-1.1.0-$(VERSION).pk3: $(B)/$(BASEGAME)_11/vm/ui.qvm $(B)
 
 
 #############################################################################
-## Assets Package
-#############################################################################
-
-$(B)/$(BASEGAME)/data-$(VERSION).pk3: $(ASSETS_DIR)/ui/main.menu
-	$(echo_cmd) "Created $@"
-	@(cd $(ASSETS_DIR) && zip -qr data-$(VERSION).pk3 *)
-	@mv $(ASSETS_DIR)/data-$(VERSION).pk3 $(B)/$(BASEGAME)
-
-#############################################################################
 ## CLIENT/SERVER RULES
 #############################################################################
 
@@ -3093,7 +3089,6 @@ endif
 	$(OBJ_D_FILES) $(TOOLSOBJ_D_FILES) $(B)/scripts 
 
 # removing zip files from phony for install target not recreating them as root
-#	$(B)/$(BASEGAME)/data-$(VERSION).pk3 \
 #	$(B)/$(BASEGAME)_11/vms-$(VERSION).pk3 \
 #	$(B)/$(BASEGAME)/vms-$(VERSION).pk3 \
 #	$(B).zip

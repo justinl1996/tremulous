@@ -605,8 +605,12 @@ var LibraryVM = {
 				EmitStatement('{{{ makeSetValue("' + OFFSET_STR(addr) + '", 0, "' + value + '", "i8") }}};');
 			}
 
+			// function EmitBlockCopy(dest, src, bytes) {
+			// 	EmitStatement('{{{ makeCopyValues("' + OFFSET_STR(dest) + '", "' + OFFSET_STR(src) + '", "' + bytes + '", "i8") }}};');
+			// }
 			function EmitBlockCopy(dest, src, bytes) {
-				EmitStatement('{{{ makeCopyValues("' + OFFSET_STR(dest) + '", "' + OFFSET_STR(src) + '", "' + bytes + '", "i8") }}};');
+				// Generate code that uses HEAP8.set() for efficient copying
+				EmitStatement('HEAP8.set(HEAP8.subarray(' + OFFSET_STR(src) + ', ' + OFFSET_STR(src) + ' + ' + bytes + '), ' + OFFSET_STR(dest) + ');');
 			}
 
 			EmitStatement('(function () {');

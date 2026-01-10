@@ -108,11 +108,10 @@ var LibrarySysCommon = {
 			}
 		],*/
 		paks: [
-			//{ src: 'data-1.3.0.pk3', dest: 'gpp/data-1.3.0.pk3', checksum: 2577176428 },
-			//{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
-			//{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
-			{ src: 'vms-1.3.0.pk3', dest: 'gpp/vms-v1.3.0.pk3', checksum: 2244438303 },
-			{ src: 'data-1.3.0.pk3', dest: 'gpp/data-1.3.0.pk3', checksum: 370375385 },
+			{ src: 'data-web-1.3.1.pk3', dest: 'gpp/data-web-1.3.1.pk3', checksum: 3282924353 },
+			{ src: 'vms-gpp-v1.3.0.pk3', dest: 'gpp/vms-gpp-v1.3.0.pk3', checksum: 651151608 },
+			{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
+			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
 			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
 			{ src: 'map-atcs-1.1.0.pk3', dest: 'gpp/map-atcs-1.1.0.pk3', checksum: 1649092924 },
 			{ src: 'map-karith-1.1.0.pk3', dest: 'gpp/map-karith-1.1.0.pk3', checksum: 3322431863 },
@@ -380,8 +379,10 @@ var LibrarySysCommon = {
 		},
 		/*ValidateInstaller: function (installer) {
 			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
+			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
 			for (var i = 0; i < installer.paks.length; i++) {
 				var pak = installer.paks[i];
+				var localPath = PATH.join(fs_basepath, pak.dest);
 				var localPath = PATH.join(fs_basepath, pak.dest);
 				var crc = SYSC.CRC32File(localPath);
 				if (crc !== pak.checksum) {
@@ -470,6 +471,8 @@ var LibrarySysCommon = {
 			});
 		},
 		/*ValidatePak: function (asset) {
+			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
+			var localPath = PATH.join(fs_basepath, asset.name);
 			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
 			var localPath = PATH.join(fs_basepath, asset.name);
 			var crc = SYSC.CRC32File(localPath);
