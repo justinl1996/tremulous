@@ -216,7 +216,7 @@ var LibrarySysCommon = {
 		DownloadAsset: function (asset, onprogress, onload) {
 			var root = SYSC.GetCDN();
 			var name = asset.name.replace(/(.+\/|)(.+?)$/, '$1' + asset.checksum + '-$2');
-			var url = 'https://' + root + '/assets/' + name;
+			var url = 'http://' + root + '/assets/' + name;
 
 			SYS.DoXHR(url, {
 				dataType: 'arraybuffer',
@@ -268,7 +268,7 @@ var LibrarySysCommon = {
 			var fs_game = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_game'), ALLOC_STACK)));
 			var com_basegame = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('com_basegame'), ALLOC_STACK)));
 			var mapname = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('mapname'), ALLOC_STACK)));
-			var url = "https://" + fs_cdn + '/assets/manifest.json';
+			var url = "http://" + fs_cdn + '/assets/manifest.json';
 			console.log("URL:", url);
 			/*function isInstaller(name) {
 				return SYSC.installers.some(function (installer) {
@@ -309,9 +309,15 @@ var LibrarySysCommon = {
 				}
 			});
 		},
-		SaveFile: function (name, buffer, callback) {
-			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
-			var localPath = PATH.join(fs_basepath, name);
+		SaveFile: function (name, buffer, homepath, callback) {
+			if (homepath) {
+				var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
+				var localPath = PATH.join(fs_homepath, name);
+			}
+			else {
+				var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
+				var localPath = PATH.join(fs_basepath, name);
+			}
 			try {
 				FS.mkdir(PATH.dirname(localPath), 0777);
 			} catch (e) {
@@ -492,7 +498,7 @@ var LibrarySysCommon = {
 			}, function (loaded, total) {
 				SYS.LoadingProgress(loaded / total);
 			}, function (asset, data, next) {
-				SYSC.SaveFile(asset.dest, data, next);
+				SYSC.SaveFile(asset.dest, data, false, next);
 			}, function (err) {
 				SYS.LoadingDescription(null);
 				setTimeout(function () {
@@ -669,8 +675,130 @@ var LibrarySysCommon = {
 		}
 		return 0;
 		//Auriga: Need to check for format of .so.1.2.3..., but I don't have the skill to do that :P
+	},
+	Sys_DownloadAndSaveAsset: function (localName, remoteName, onprogress, onassetend) {
+		const localNameStr = Module.UTF8ToString(localName);
+		const remoteNameStr = Module.UTF8ToString(remoteName);``
+
+		SYS.DoXHR( remoteNameStr, {
+			dataType: 'arraybuffer',
+			onprogress: function(loaded, total) {
+				{{{ makeDynCall('vii', 'onprogress') }}}(loaded, total);
+			},
+			onload: function(err, data) {
+				if (err) {
+					console.log("DownloadAndSaveAsset, Error! returning"); //REMOVE
+					{{{ makeDynCall('vi', 'onassetend') }}}(err);
+					return;
+				}
+				console.log("DownloadAndSaveAsset: Downloaded file and saving"); //REMOVE
+				SYS.SaveFile(localNameStr, data, true, 0);
+				{{{ makeDynCall('vi', 'onassetend') }}}(0);
+			}
+		});
 	}
 };
 
 autoAddDeps(LibrarySysCommon, '$SYSC');
 mergeInto(LibraryManager.library, LibrarySysCommon);
+
+	//Localname is the name of the pk3 as it should be saved in filesystem
+	//Remote name is the name it will have on the webserver
+	// Sys_DownloadAndSaveAsset: function (dlurl, localName, remoteName, onprogress, onassetend) {
+	// 	var url = dlurl + remoteName;
+
+	// 	function finishDownload(data) {
+	// 		SYS.SaveFile(localName, data, true, next);
+	// 		callback();
+	// 	}
+
+	// 	SYS.LoadingDescription('downloading ' + localName);
+	// 	SYS.DoXHR( url, {
+	// 		dataType: 'arraybuffer',
+	// 		//onprogress: 
+	// 		onprogress: function(loaded, total) {
+	// 			SYS.LoadingProgress(loaded / total); //I'm not 100% sure this will look okay
+	// 			//can we hook this into ?
+	// 				// clc.downloadSize = (int)dltotal;
+	// 				// Cvar_SetValue( "cl_downloadSize", clc.downloadSize );
+	// 				// clc.downloadCount = (int)dlnow;
+	// 				// Cvar_SetValue( "cl_downloadCount", clc.downloadCount );
+	// 		},
+	// 		onload: function(err, data) {
+	// 			SYS.LoadingDescription(null);
+
+	// 			if (err) return callback(err);
+	// 			finishDownload(data);
+	// 		}
+	// 	});
+
+	// }
+
+// SyncFiles: function (callback) {
+// 			var downloads = SYSC.DirtyPaks(callback);
+// 			//downloads = downloads.concat(SYSC.DirtyQVM(callback));
+// 			SYSC.DownloadAssets(downloads, function (asset) {
+// 				SYS.LoadingDescription('loading ' + asset.name);//onstartasset
+// 			}, function (loaded, total) {
+// 				SYS.LoadingProgress(loaded / total);//onprogress
+// 			}, function (asset, data, next) {
+// 				SYSC.SaveFile(asset.dest, data, false, next);//onendasset
+// 			}, function (err) {
+// 				SYS.LoadingDescription(null);//callback
+// 				setTimeout(function () {
+// 					callback(err);
+// 				});
+// 			});
+// 		},
+
+// DownloadAssets: function (assets, onstartasset, onprogress, onendasset, callback) {
+// 			var progress = [];
+
+// 			function downloadedBytes() {
+// 				return progress.reduce(function (a, b) { return a + b; });
+// 			}
+
+// 			function totalBytes() {
+// 				return assets.reduce(function (a, b) { return a + b.compressed; }, 0);
+// 			}
+
+// 			function nextDownload() {
+// 				nextDownload.pos = nextDownload.pos == undefined ? 0 : nextDownload.pos + 1;
+
+// 				if (nextDownload.pos >= assets.length) {
+// 					return callback();
+// 				}
+
+// 				var asset = assets[nextDownload.pos];
+
+// 				onstartasset(asset);
+
+// 				SYSC.DownloadAsset(asset, function (loaded, total) {//onprogress
+// 					progress[nextDownload.pos] = loaded;
+
+// 					onprogress(downloadedBytes(), totalBytes()); 
+// 				}, function (err, data) {//onload
+// 					if (err) return callback(err);
+
+// 					onendasset(asset, data, function (err) { 
+// 						if (err) return callback(err);
+
+// 						setTimeout(nextDownload);
+// 					});
+// 				});
+// 			}
+
+// 			nextDownload();
+// 		},
+
+// DownloadAsset: function (asset, onprogress, onload) {
+// 			var root = SYSC.GetCDN();
+// 			var name = asset.name.replace(/(.+\/|)(.+?)$/, '$1' + asset.checksum + '-$2');
+// 			var url = 'https://' + root + '/assets/' + name;
+
+// 			SYS.DoXHR(url, {
+// 				dataType: 'arraybuffer',
+// 				onprogress: onprogress,
+// 				onload: onload
+// 			});
+// 		},

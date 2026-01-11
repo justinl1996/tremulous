@@ -1893,6 +1893,24 @@ void CL_DownloadsComplete_after_FS_Restart( cb_context_t *context, int status )
 static void CL_DownloadsComplete(void)
 {
     Com_Printf("Downloads complete\n");
+#ifdef EMSCRIPTEN
+    // if we downloaded with cURL
+    if (clc.XHRUsed)
+    {
+        clc.XHRUsed = false;
+        if (clc.XHRDisconnected)
+        {
+            if (clc.downloadRestart)
+            {
+                clc.downloadRestart = false;
+                /*if (!clc.activeCURLNotGameRelated)*/ FS_Restart(clc.checksumFeed, cb_create_context_no_data(CL_DownloadsComplete_after_FS_Restart));
+            }
+            clc.XHRDisconnected = false;
+            /*if (!clc.activeCURLNotGameRelated)*/ CL_Reconnect_f();
+            return;
+        }
+    }
+#endif
 #ifdef USE_CURL
     // if we downloaded with cURL
     if (clc.cURLUsed)
@@ -2009,6 +2027,7 @@ void CL_NextDownload(void)
     char *s;
     char *remoteName, *localName;
     bool useCURL = false;
+    bool useXHR = false;
     int prompt;
     int remaining;
 
@@ -2188,7 +2207,42 @@ void CL_NextDownload(void)
                 cl_allowDownload->integer);
         }
 #endif
-        if (!useCURL)
+#ifdef EMSCRIPTEN
+        if (((cl_allowDownload->integer & DLF_ENABLE) && !(cl_allowDownload->integer & DLF_NO_REDIRECT)) ||
+            prompt == DLP_CURL)
+        {
+            Com_Printf("Trying XHR download: %s; %s\n", localName, remoteName);
+            if (clc.sv_allowDownload & DLF_NO_REDIRECT)
+            {
+                Com_Printf(
+                    "WARNING: server does not "
+                    "allow download redirection "
+                    "(sv_allowDownload is %d)\n",
+                    clc.sv_allowDownload);
+            }
+            else if (!*clc.sv_dlURL)
+            {
+                Com_Printf(
+                    "WARNING: server allows "
+                    "download redirection, but does not "
+                    "have sv_dlURL set\n");
+            }
+            else
+            {
+                CL_XHR_StartDownload(localName, va("%s/%s", clc.sv_dlURL, remoteName));
+                useXHR = true;
+            }
+        }
+        else if (!(clc.sv_allowDownload & DLF_NO_REDIRECT))
+        {
+            Com_Printf(
+                "WARNING: server allows download "
+                "redirection, but it disabled by client "
+                "configuration (cl_allowDownload is %d)\n",
+                cl_allowDownload->integer);
+        }
+#endif
+        if (!useCURL && !useXHR)
         {
             Com_Printf("Trying UDP download: %s; %s\n", localName, remoteName);
 
@@ -3116,6 +3170,29 @@ void CL_Frame(int msec)
             Cvar_Set("com_downloadPrompt", va("%d", com_downloadPrompt->integer | DLP_STALE));
         }
     }
+#ifdef EMSCRIPTEN
+    if (clc.downloadXHR)
+    {
+        //Auriga: We don't really have anything to do but just wait for a callback
+        //since the XHR request runs asyncronously
+
+        // we can't process frames normally when in disconnected download mode
+        // since the ui vm expects clc.state to be CA_CONNECTED
+        if (clc.XHRDisconnected)
+        {
+            cls.realFrametime = msec;
+            cls.frametime = msec;
+            cls.realtime += cls.frametime;
+
+            SCR_UpdateScreen();
+            S_Update();
+            Con_RunConsole();
+
+            cls.framecount++;
+            return;
+        }
+    }
+#endif
 #ifdef USE_CURL
     if (clc.downloadCURLM)
     {
