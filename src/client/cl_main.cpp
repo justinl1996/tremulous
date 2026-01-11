@@ -1888,6 +1888,14 @@ void CL_DownloadsComplete_after_FS_Restart( cb_context_t *context, int status )
 {
     // inform the server so we get new gamestate info
     CL_AddReliableCommand("donedl", false);
+
+#ifdef EMSCRIPTEN
+    if(clc.XHRDisconnected)
+    {
+        clc.XHRDisconnected = false;
+        if (!clc.activeXHRNotGameRelated) CL_Reconnect_f();
+    }
+#endif
 }
 
 static void CL_DownloadsComplete(void)
@@ -1905,8 +1913,6 @@ static void CL_DownloadsComplete(void)
                 clc.downloadRestart = false;
                 if (!clc.activeXHRNotGameRelated) FS_Restart(clc.checksumFeed, cb_create_context_no_data(CL_DownloadsComplete_after_FS_Restart));
             }
-            clc.XHRDisconnected = false;
-            if (!clc.activeXHRNotGameRelated) CL_Reconnect_f();
             return;
         }
     }
