@@ -693,7 +693,7 @@ var LibrarySysCommon = {
 					return;
 				}
 				console.log("DownloadAndSaveAsset: Downloaded file and saving"); //REMOVE
-				SYS.SaveFile(localNameStr, data, true, 0);
+				SYSC.SaveFile(localNameStr, data, true, 0);
 				{{{ makeDynCall('vi', 'onassetend') }}}(0);
 				return;
 			},
