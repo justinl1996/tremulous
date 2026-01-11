@@ -678,7 +678,7 @@ var LibrarySysCommon = {
 	},
 	Sys_DownloadAndSaveAsset: function (localName, remoteName, onprogress, onassetend) {
 		const localNameStr = Module.UTF8ToString(localName);
-		const remoteNameStr = Module.UTF8ToString(remoteName);``
+		const remoteNameStr = Module.UTF8ToString(remoteName);
 		console.log("DownloadAndSaveAsset called");
 
 		SYS.DoXHR( remoteNameStr, {
