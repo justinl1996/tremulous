@@ -295,6 +295,7 @@ struct clientConnection_t {
     CURLM *downloadCURLM;
 #endif
     bool activeCURLNotGameRelated;
+    bool activeXHRNotGameRelated;
     int sv_allowDownload;
     char sv_dlURL[MAX_CVAR_VALUE_STRING];
     int downloadNumber;  // Unused ??

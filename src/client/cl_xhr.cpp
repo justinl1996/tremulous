@@ -1,5 +1,6 @@
 /*
 ===========================================================================
+Copyright (C) 2006 Tony J. White (tjw@tjw.org)
 Copyright (C) 2000-2013 Darklegion Development
 Copyright (C) 2015-2019 GrangerHub
 And the dudes that worked on the web port
@@ -56,10 +57,11 @@ void CL_XHR_FinishedCallback(int err)
 {
 	Com_Printf("CL_XHR_FinishedCallback called, err: %d\n", err);//REMOVE
 	if(err != 0) {
-		Com_Error(ERR_DROP, "CL_XHR_Download: %d", err);
+		Com_Error(ERR_DROP, "CL_XHR_Download failed with err code %d", err);
 		clc.XHRUsed = false;
 	}
 	else {
+		clc.downloadRestart = true;
 		CL_NextDownload();
 	}
 
@@ -76,7 +78,7 @@ void CL_XHR_StartDownload(const char *localName, const char *remoteURL)
 	clc.XHRUsed = true;
 
     Com_Printf("URL: %s\n", remoteURL);
-	Com_DPrintf("***** CL_XHR_BeginDownload *****\n"
+	Com_DPrintf("***** CL_XHR_StartDownload *****\n"
 		"Localname: %s\n"
 		"RemoteURL: %s\n"
 		"****************************\n", localName, remoteURL);

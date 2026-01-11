@@ -1894,7 +1894,7 @@ static void CL_DownloadsComplete(void)
 {
     Com_Printf("Downloads complete\n");
 #ifdef EMSCRIPTEN
-    // if we downloaded with cURL
+    // if we downloaded with XHR
     if (clc.XHRUsed)
     {
         clc.XHRUsed = false;
@@ -1903,10 +1903,10 @@ static void CL_DownloadsComplete(void)
             if (clc.downloadRestart)
             {
                 clc.downloadRestart = false;
-                /*if (!clc.activeCURLNotGameRelated)*/ FS_Restart(clc.checksumFeed, cb_create_context_no_data(CL_DownloadsComplete_after_FS_Restart));
+                if (!clc.activeXHRNotGameRelated) FS_Restart(clc.checksumFeed, cb_create_context_no_data(CL_DownloadsComplete_after_FS_Restart));
             }
             clc.XHRDisconnected = false;
-            /*if (!clc.activeCURLNotGameRelated)*/ CL_Reconnect_f();
+            if (!clc.activeXHRNotGameRelated) CL_Reconnect_f();
             return;
         }
     }
@@ -2032,7 +2032,7 @@ void CL_NextDownload(void)
     int remaining;
 
     // A download has finished, check whether this matches a referenced checksum
-    if (*clc.downloadName && !clc.activeCURLNotGameRelated)
+    if (*clc.downloadName && !clc.activeCURLNotGameRelated && !clc.activeXHRNotGameRelated)
     {
         char *zippath = FS_BuildOSPath(Cvar_VariableString("fs_homepath"), clc.downloadName, "");
         zippath[strlen(zippath) - 1] = '\0';
