@@ -39,7 +39,7 @@ CL_XHR_ProgressCallback
 */
 void CL_XHR_ProgressCallback(int loaded, int total)
 {
-	Com_Printf("CL_XHR_ProgressCallback called"); //REMOVE
+	Com_Printf("CL_XHR_ProgressCallback called\n"); //REMOVE
 	clc.downloadSize = (int)total;
 	Cvar_SetValue( "cl_downloadSize", clc.downloadSize );
 	clc.downloadCount = (int)loaded;
@@ -54,8 +54,8 @@ CL_XHR_FinishedCallback
 */
 void CL_XHR_FinishedCallback(int err)
 {
-	Com_Printf("CL_XHR_FinishedCallback called, err: %d", err);//REMOVE
-	if(err) {
+	Com_Printf("CL_XHR_FinishedCallback called, err: %d\n", err);//REMOVE
+	if(err != 0) {
 		Com_Error(ERR_DROP, "CL_XHR_Download: %d", err);
 		clc.XHRUsed = false;
 	}

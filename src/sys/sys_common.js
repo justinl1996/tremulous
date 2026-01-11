@@ -679,6 +679,7 @@ var LibrarySysCommon = {
 	Sys_DownloadAndSaveAsset: function (localName, remoteName, onprogress, onassetend) {
 		const localNameStr = Module.UTF8ToString(localName);
 		const remoteNameStr = Module.UTF8ToString(remoteName);``
+		console.log("DownloadAndSaveAsset called");
 
 		SYS.DoXHR( remoteNameStr, {
 			dataType: 'arraybuffer',
@@ -687,13 +688,19 @@ var LibrarySysCommon = {
 			},
 			onload: function(err, data) {
 				if (err) {
-					console.log("DownloadAndSaveAsset, Error! returning"); //REMOVE
+					console.log("DownloadAndSaveAsset, Onload Error! returning"); //REMOVE
 					{{{ makeDynCall('vi', 'onassetend') }}}(err);
 					return;
 				}
 				console.log("DownloadAndSaveAsset: Downloaded file and saving"); //REMOVE
 				SYS.SaveFile(localNameStr, data, true, 0);
 				{{{ makeDynCall('vi', 'onassetend') }}}(0);
+				return;
+			},
+			onerror: function(err) {
+				console.log("DownloadAndSaveAsset, Error! returning"); //REMOVE
+				{{{ makeDynCall('vi', 'onassetend') }}}(err);
+				return;
 			}
 		});
 	}
