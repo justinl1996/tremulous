@@ -132,12 +132,38 @@ static bool GetNews(bool begin)
     Cvar_Set("cl_newsString", clc.newsString);
     return finished;
 #endif
-    //Cvar_Set("cl_newsString", "^1You must compile your client with CURL support to use this feature");
-    Cvar_Set("cl_newsString", "^1This is the tremulous port to the web. Many thanks to megamind, Auriga and inolen (quakejs) for their assistance");
-    
-    return true;
-}
+#ifdef EMSCRIPTEN
+    if (begin)
+    {  // if not already using xhr, start the download
+        if (!clc.XHRUsed)
+        {
+            clc.activeXHRNotGameRelated = true;
+            CL_XHR_StartDownload("news.dat", "https://cherubim.dev/tremulous/clientnews.txt");
+            return false;
+        }
+    }
 
+    if (!clc.XHRUsed && FS_SV_FOpenFileRead("news.dat", &fileIn))
+    {
+        readSize = FS_Read(clc.newsString, sizeof(clc.newsString), fileIn);
+        FS_FCloseFile(fileIn);
+        clc.newsString[readSize] = '\0';
+        if (readSize > 0)
+        {
+            finished = true;
+            clc.XHRUsed = false;
+            clc.activeXHRNotGameRelated = false;
+        }
+    }
+    if (!finished) strcpy(clc.newsString, "Retrieving...");
+    Cvar_Set("cl_newsString", clc.newsString);
+    return finished;
+#endif
+    //Cvar_Set("cl_newsString", "^1You must compile your client with CURL support to use this feature");
+    //Cvar_Set("cl_newsString", "^1This is the tremulous port to the web. Many thanks to megamind, Auriga and inolen (quakejs) for their assistance");
+    
+    //return true;
+}
 /*
 ====================
 LAN_ResetPings
