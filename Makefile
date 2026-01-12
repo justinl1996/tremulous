@@ -778,9 +778,9 @@ else # ifeq freebsd
 #############################################################################
 
 ifeq ($(PLATFORM),js)
-  CC=/emcc
-  CXX=/emcc
-  RANLIB=/emranlib
+  CC=emcc
+  CXX=emcc
+  RANLIB=emranlib
   ARCH=js
   BINEXT=.js
 # debug optimize flags: --closure 0 --minify 0 -g
