@@ -3587,8 +3587,6 @@ static void FS_Startup(const char *gameName, cb_context_t *after )
     fs_debug = Cvar_Get("fs_debug", "0", 0);
 
 #if EMSCRIPTEN
-	//fs_cdn = Cvar_Get("fs_cdn", "127.0.0.1", CVAR_INIT | CVAR_SERVERINFO); //Auriga: Use 127.0.0.1, nodejs does not like localhost in some cases
-	//fs_cdn = Cvar_Get("fs_cdn", "cdn.tremulo.us", CVAR_INIT | CVAR_SERVERINFO);
 	fs_cdn = Cvar_Get("fs_cdn", "content.tremulous.online:9000", CVAR_INIT | CVAR_SERVERINFO);
 	fs_manifest = Cvar_Get("fs_manifest", "", CVAR_ROM | CVAR_SERVERINFO);
 	fs_completeManifest = Cvar_Get("fs_completeManifest", "", CVAR_ROM);
@@ -3613,7 +3611,7 @@ static void FS_Startup(const char *gameName, cb_context_t *after )
 	data->after = after;
 
 #if EMSCRIPTEN
-	Sys_FS_Startup(context);
+	Sys_FS_Startup(context); //Auriga: uhhhh
 #else
 	cb_run(context, 0);
 #endif
@@ -3957,11 +3955,10 @@ void FS_InitFilesystem_after_FS_Startup( cb_context_t *context, int status ) {
 
     Q_strncpyz(lastValidBase, fs_basegame->string, sizeof(lastValidBase));
     Q_strncpyz(lastValidGame, fs_gamedirvar->string, sizeof(lastValidGame));
-
     Com_Printf("lastValidBase: %s\n", fs_basegame->string);
     Com_Printf("lastValidGame: %s\n", fs_gamedirvar->string);
 
-    cb_run(after, 0);
+	cb_run(after, 0);
 }
 
 /*

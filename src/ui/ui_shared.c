@@ -1943,7 +1943,7 @@ void Script_playLoopedBucket(itemDef_t *item, char **args)
         DC->setCVar(selected_list_cvar, selected_list_cvar_string);
     }
 
-    if(val[0] != '\0') {
+    if(val) {
         strcpy(play_looped_sound_path, va("%s/%s", sound_bucket_directory, val));
         DC->stopBackgroundTrack();
         DC->startBackgroundTrack(play_looped_sound_path, play_looped_sound_path);

@@ -3934,11 +3934,11 @@ Bucket Selection System
 */
 
 static void *Z_PlaceHolderAlloc(int size) {
-    return Z_Malloc(size);
+    Z_Malloc(size);
 }
 
 unsigned int Com_Bucket_Create_Bucket(void) {
-    return Q_Bucket_Create_Bucket(Z_PlaceHolderAlloc, Z_Free);
+    Q_Bucket_Create_Bucket(Z_PlaceHolderAlloc, Z_Free);
 }
 
 void Com_Bucket_Delete_Bucket(unsigned int bucket_handle) {
@@ -3961,7 +3961,7 @@ void Com_Bucket_Remove_Item_From_Bucket(
 }
 
 void* Com_Bucket_Select_A_Random_Item(unsigned int bucket_handle) {
-    return Q_Bucket_Select_A_Random_Item(bucket_handle);
+    Q_Bucket_Select_A_Random_Item(bucket_handle);
 }
 
 void Com_Bucket_Select_A_Specific_Item(unsigned int bucket_handle, void* item) {
