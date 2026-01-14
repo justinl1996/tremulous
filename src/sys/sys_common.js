@@ -592,7 +592,7 @@ var LibrarySysCommon = {
 			var filename = _S_Malloc(matches[i].length + 1);
 
 			//writeStringToMemory(matches[i], filename);
-			Module.stringToUTF8(matches[i], filename, (matches.length + 1) * 4);
+			Module.stringToUTF8(matches[i], filename, matches[i].length + 1);
 
 			// write the string's pointer back to the main array
 			{{{ makeSetValue('list', 'i*4', 'filename', 'i32') }}};
