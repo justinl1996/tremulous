@@ -490,9 +490,67 @@ var LibrarySysCommon = {
 				return asset.name.indexOf('.pk3') !== -1 && !SYSC.ValidatePak(asset);
 			});
 		},*/
+		ClearBaseDir: function () {
+			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
+			var localPath = PATH.join(fs_basepath, "gpp"); //FIXME: replace gpp with where we get our basename string
+			var ext = ".pk3";
+			var contents;
+
+			console.log("ClearBaseDir localPath: ", localPath); //REMOVE WHEN DONE
+
+			try {
+				contents = FS.readdir(localPath);
+			} catch (e) {
+				console.log("Failed to clear base directory: ", e);
+				return;
+			}
+
+			var pk3files = [];
+			for (var i = 0; i < contents.length; i++) {
+				var name = contents[i];
+				var stat = FS.stat(PATH.join(directory, name));
+
+				if (dironly && !FS.isDir(stat.mode)) {
+					continue;
+				}
+
+				if ((!ext || name.lastIndexOf(ext) === (name.length - ext.length))) {
+					pk3files.push(name);
+				}
+			}
+
+			if(!matches.length) //Directory is clean
+				return;
+
+			for (var i = 0; i < matches.length; i++) {
+				var inList = false;
+				filePath = PATH.join("gpp", matches[i]); //FIXME: replace gpp with where we get our basename string
+
+				for(var j = 0; j < SYSC.paks.length; j++) {
+					var pak = SYSC.paks[j];
+
+					console.log("Comparison: ", filePath, pak.dest); //REMOVE WHEN DONE
+					if (filePath === pak.dest) { // gpp/filename === pak.dest(gpp/filename)
+						inList = true;
+						break;
+					}
+				}
+
+				if (!inList) {
+					console.log("Removing unused asset ", matches[i]);
+					absDir = PATH.join(localPath, matches[i]); // fs_basepath/gpp + filename
+					FS.unlink(absDir);
+				}
+			}
+		},
 		SyncFiles: function (callback) {
 			var downloads = SYSC.DirtyPaks(callback);
 			//downloads = downloads.concat(SYSC.DirtyQVM(callback));
+
+			//Remove any files in base that don't belong
+			SYSC.ClearBaseDir();
+
+			//Download all base files we need from CDN
 			SYSC.DownloadAssets(downloads, function (asset) {
 				SYS.LoadingDescription('loading ' + asset.name);
 			}, function (loaded, total) {
