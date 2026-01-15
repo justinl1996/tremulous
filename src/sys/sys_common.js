@@ -216,7 +216,7 @@ var LibrarySysCommon = {
 		DownloadAsset: function (asset, onprogress, onload) {
 			var root = SYSC.GetCDN();
 			var name = asset.name.replace(/(.+\/|)(.+?)$/, '$1' + asset.checksum + '-$2');
-			var url = 'https://' + root + '/assets/' + name;
+			var url = 'http://' + root + '/assets/' + name;
 
 			SYS.DoXHR(url, {
 				dataType: 'arraybuffer',
@@ -268,7 +268,7 @@ var LibrarySysCommon = {
 			var fs_game = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_game'), ALLOC_STACK)));
 			var com_basegame = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('com_basegame'), ALLOC_STACK)));
 			var mapname = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('mapname'), ALLOC_STACK)));
-			var url = "https://" + fs_cdn + '/assets/manifest.json';
+			var url = "http://" + fs_cdn + '/assets/manifest.json';
 			console.log("URL:", url);
 			/*function isInstaller(name) {
 				return SYSC.installers.some(function (installer) {
@@ -508,23 +508,24 @@ var LibrarySysCommon = {
 			var pk3files = [];
 			for (var i = 0; i < contents.length; i++) {
 				var name = contents[i];
-				var stat = FS.stat(PATH.join(directory, name));
+				// var stat = FS.stat(PATH.join(localPath, name));
 
-				if (dironly && !FS.isDir(stat.mode)) {
-					continue;
-				}
+				// if (dironly && !FS.isDir(stat.mode)) {
+				// 	continue;
+				// }
 
-				if ((!ext || name.lastIndexOf(ext) === (name.length - ext.length))) {
+				//if ((!ext || name.lastIndexOf(ext) === (name.length - ext.length))) {
+				if (name.lastIndexOf(ext) === (name.length - ext.length)) {
 					pk3files.push(name);
 				}
 			}
 
-			if(!matches.length) //Directory is clean
+			if(!pk3files.length) //Directory is clean
 				return;
 
-			for (var i = 0; i < matches.length; i++) {
+			for (var i = 0; i < pk3files.length; i++) {
 				var inList = false;
-				filePath = PATH.join("gpp", matches[i]); //FIXME: replace gpp with where we get our basename string
+				filePath = PATH.join("gpp", pk3files[i]); //FIXME: replace gpp with where we get our basename string
 
 				for(var j = 0; j < SYSC.paks.length; j++) {
 					var pak = SYSC.paks[j];
@@ -537,8 +538,8 @@ var LibrarySysCommon = {
 				}
 
 				if (!inList) {
-					console.log("Removing unused asset ", matches[i]);
-					absDir = PATH.join(localPath, matches[i]); // fs_basepath/gpp + filename
+					console.log("Removing unused asset ", pk3files[i]);
+					absDir = PATH.join(localPath, pk3files[i]); // fs_basepath/gpp + filename
 					FS.unlink(absDir);
 				}
 			}
