@@ -785,7 +785,8 @@ ifeq ($(PLATFORM),js)
   BINEXT=.js
 # debug optimize flags: --closure 0 --minify 0 -g
 
-  OPTIMIZEVM += -O3
+  #OPTIMIZEVM += -O3
+  OPTIMIZEVM += -O1 #FIXME: Issue https://github.com/justinl1996/tremulous/issues/8
   #OPTIMIZEVM += -O0 -g
   OPTIMIZE = $(OPTIMIZEVM)
 
@@ -810,6 +811,7 @@ ifeq ($(PLATFORM),js)
 
   CLIENT_LDFLAGS += --js-library $(LIBSYSCOMMON) \
     --js-library $(LIBSYSBROWSER) \
+    -s WASM=1 \
     -s INVOKE_RUN=0 \
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_VM_GetCurrent', '_VM_SetCurrent']" \
     -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
@@ -829,6 +831,7 @@ ifeq ($(PLATFORM),js)
 
   SERVER_LDFLAGS += --js-library $(LIBSYSCOMMON) \
     --js-library $(LIBSYSNODE) \
+    -s WASM=0 \
     -s INVOKE_RUN=1 \
     -s EXPORTED_FUNCTIONS="['_main', '_malloc', '_free', '_atof', '_Com_Printf', '_Com_Error', '_Com_ProxyCallback', '_Com_GetCDN', '_Com_GetManifest', '_Z_Malloc', '_Z_Free', '_S_Malloc', '_Cvar_Set', '_Cvar_VariableString', '_CON_SetIsTTY', '_VM_GetCurrent', '_VM_SetCurrent']" \
     -s EXPORTED_RUNTIME_METHODS="['callMain', 'run', 'allocate', 'UTF8ToString', 'stringToUTF8', 'addFunction']" \
@@ -848,11 +851,10 @@ ifeq ($(PLATFORM),js)
     -s SIDE_MODULE=1 \
     $(OPTIMIZE)
 
-  CLIENT_CFLAGS += -s USE_SDL=2 -s WASM=1 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS=['png','jpg']
+  CLIENT_CFLAGS += -s USE_SDL=2 -s USE_SDL_IMAGE=2 -s SDL2_IMAGE_FORMATS=['png','jpg']
   CLIENT_LIBS += -lidbfs.js
   SHLIBCFLAGS=-fPIC
   SERVER_LIBS += -lnodefs.js
-  SERVER_CFLAGS += -s WASM=0
 
 else # ifeq js
 
