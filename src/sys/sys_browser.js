@@ -159,6 +159,15 @@ var LibrarySys = {
 					opts.onload(err, data);
 				}
 			};
+			req.onerror = function () {
+				//var err = new Error();
+
+				if (opts.onload)
+					opts.onload(-1, null); //Auriga: Not good error handling, but it'll work for now
+
+				if (opts.onerror)
+					opts.onerror(-1);
+			}
 			req.send(null);
 		},
 		LoadingDescription: function (desc) {

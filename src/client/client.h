@@ -273,7 +273,13 @@ struct clientConnection_t {
 #ifdef EMSCRIPTEN
 	char fs_cdn[MAX_OSPATH];
 	char fs_manifest[BIG_INFO_STRING];
+
+    bool downloadXHR;
+    bool XHRUsed;
+    bool XHRDisconnected;
 #endif
+
+    char downloadURL[MAX_OSPATH];
 
     // file transfer from server
     fileHandle_t download;
@@ -285,11 +291,11 @@ struct clientConnection_t {
     bool cURLUsed;
     bool cURLDisconnected;
 
-    char downloadURL[MAX_OSPATH];
     CURL *downloadCURL;
     CURLM *downloadCURLM;
 #endif
     bool activeCURLNotGameRelated;
+    bool activeXHRNotGameRelated;
     int sv_allowDownload;
     char sv_dlURL[MAX_CVAR_VALUE_STRING];
     int downloadNumber;  // Unused ??
@@ -723,5 +729,12 @@ bool CL_VideoRecording(void);
 //
 void CL_WriteDemoMessage(msg_t *msg, int headerBytes);
 int CL_ScaledMilliseconds(void);
+
+//
+// cl_xhr.c
+//
+#ifdef EMSCRIPTEN
+void CL_XHR_StartDownload(const char *localName, const char *remoteURL);
+#endif
 
 #endif

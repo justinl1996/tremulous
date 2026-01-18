@@ -786,6 +786,7 @@ ifeq ($(PLATFORM),js)
 # debug optimize flags: --closure 0 --minify 0 -g
 
   OPTIMIZEVM += -O3
+  #OPTIMIZEVM += -O0 -g
   OPTIMIZE = $(OPTIMIZEVM)
 
   BUILD_STANDALONE=1
@@ -1933,6 +1934,8 @@ Q3OBJ = \
   $(B)/client/snd_openal.o \
   \
   $(B)/client/cl_curl.o \
+  \
+  $(B)/client/cl_xhr.o \
   \
   $(B)/client/sv_ccmds.o \
   $(B)/client/sv_client.o \
