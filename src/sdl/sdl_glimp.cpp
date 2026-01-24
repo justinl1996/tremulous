@@ -535,9 +535,22 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 				ri.Printf(PRINT_ALL, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
 				ri.Printf(PRINT_ALL, "Reverting to default context\n");
 
+#ifdef EMSCRIPTEN
+				ri.Printf(PRINT_ALL, "Trying WebGL1 backup context for emscripten...\n");
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+
+				if ((SDL_glContext = SDL_GL_CreateContext(SDL_window)) == NULL)
+				{
+					ri.Printf(PRINT_ALL, "Failed to create WebGL1 context: %s\n", SDL_GetError());
+					//FIXME:Give up?
+				}
+#else
 				SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, profileMask);
 				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, majorVersion);
 				SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minorVersion);
+#endif
 			}
 			else
 			{
