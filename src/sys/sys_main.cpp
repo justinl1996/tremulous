@@ -284,7 +284,11 @@ static __attribute__ ((noreturn)) void Sys_Exit( int exitCode )
 
     Sys_PlatformExit( );
 
+#ifdef EMSCRIPTEN
+    emscripten_force_exit( exitCode );
+#else
     exit( exitCode );
+#endif
 }
 
 /*
@@ -666,7 +670,7 @@ void Sys_SigHandler( int signal )
 
 #ifndef DEFAULT_BASEDIR
 # if EMSCRIPTEN
-#  define DEFAULT_BASEDIR "/tremulous"
+#  define DEFAULT_BASEDIR "/tremulous_base"
 # elif __APPLE__
 #  define DEFAULT_BASEDIR Sys_StripAppBundle(Sys_BinaryPath())
 # else
