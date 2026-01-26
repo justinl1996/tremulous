@@ -138,7 +138,7 @@ static bool GetNews(bool begin)
         if (!clc.XHRUsed)
         {
             clc.activeXHRNotGameRelated = true;
-            CL_XHR_StartDownload("news.dat", "https://cherubim.dev/tremulous/clientnews.txt");
+            CL_XHR_StartDownload("news.dat", "https://content.tremulous.online/news.txt");
             return false;
         }
     }
