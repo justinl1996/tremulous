@@ -2984,7 +2984,7 @@ static void CL_ServersWebResponsePacket(const netadr_t *from, msg_t *msg, bool e
             if (cls.receivedAlternateMasterPackets[from->alternateProtocol] & (1 << (ind - 1)))
             {
                 Com_DPrintf(
-                    "CL_ServersResponsePacket: "
+                    "CL_ServersWebResponsePacket: "
                     "received packet %d again, ignoring\n",
                     ind);
                 return;
@@ -2992,7 +2992,7 @@ static void CL_ServersWebResponsePacket(const netadr_t *from, msg_t *msg, bool e
             // TODO: detect dropped packets and make another
             // request
             Com_DPrintf(
-                "CL_ServersResponsePacket:%s packet "
+                "CL_ServersWebResponsePacket:%s packet "
                 "%d of %d\n",
                 (from->alternateProtocol == 0 ? "" : from->alternateProtocol == 1 ? " alternate-1" : " alternate-2"),
                 ind, cls.numAlternateMasterPackets[from->alternateProtocol]);
@@ -3022,10 +3022,6 @@ static void CL_ServersWebResponsePacket(const netadr_t *from, msg_t *msg, bool e
             // syntax error!
             break;
         }
-        buffptr++;
-        addresses[numservers].port = (*buffptr++) << 8;
-        addresses[numservers].port += *buffptr++;
-        addresses[numservers].port = BigShort(addresses[numservers].port);
 
         switch (NET_StringToAdr(domain, &addresses[numservers], NA_UNSPEC))
         {
@@ -3038,6 +3034,12 @@ static void CL_ServersWebResponsePacket(const netadr_t *from, msg_t *msg, bool e
             default:
                 break;
         }
+
+        buffptr++;
+        addresses[numservers].port = (*buffptr++) << 8;
+        addresses[numservers].port += *buffptr++;
+        addresses[numservers].port = BigShort(addresses[numservers].port);
+
         Com_Printf("%s resolved to %s\n", domain, NET_AdrToStringwPort(addresses[numservers]));
         // syntax check
         if (*buffptr != '\\' && *buffptr != '/') break;
