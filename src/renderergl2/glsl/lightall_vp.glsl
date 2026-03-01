@@ -1,3 +1,4 @@
+precision mediump float;
 attribute vec4 attr_TexCoord0;
 #if defined(USE_LIGHTMAP) || defined(USE_TCGEN)
 attribute vec4 attr_TexCoord1;

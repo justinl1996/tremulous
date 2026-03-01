@@ -240,6 +240,7 @@ void GL_State( unsigned long stateBits )
 	//
 	if ( diff & GLS_POLYMODE_LINE )
 	{
+#ifndef EMSCRIPTEN
 		if ( stateBits & GLS_POLYMODE_LINE )
 		{
 			qglPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
@@ -248,6 +249,7 @@ void GL_State( unsigned long stateBits )
 		{
 			qglPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 		}
+#endif
 	}
 
 	//
@@ -1221,8 +1223,9 @@ const void	*RB_DrawBuffer( const void *data ) {
 	if (glRefConfig.framebufferObject)
 		FBO_Bind(NULL);
 
+#ifndef EMSCRIPTEN
 	qglDrawBuffer( cmd->buffer );
-
+#endif
 	// clear screen for debugging
 	if ( r_clear->integer ) {
 		qglClearColor( 1, 0, 0.5, 1 );

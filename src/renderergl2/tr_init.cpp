@@ -905,7 +905,12 @@ void GL_SetDefaultState( void )
 	glState.currentVao = NULL;
 	glState.vertexAttribsEnabled = 0;
 
+#ifdef EMSCRIPTEN
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+#else
 	qglPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
+#endif
 	qglDepthMask( GL_TRUE );
 	qglDisable( GL_DEPTH_TEST );
 	qglEnable( GL_SCISSOR_TEST );

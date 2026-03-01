@@ -1,3 +1,4 @@
+precision mediump float;
 uniform vec4  u_Color;
 
 varying float var_Scale;

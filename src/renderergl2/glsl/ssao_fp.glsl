@@ -1,3 +1,4 @@
+precision mediump float;
 uniform sampler2D u_ScreenDepthMap;
 
 uniform vec4   u_ViewInfo; // zfar / znear, zfar, 1/width, 1/height

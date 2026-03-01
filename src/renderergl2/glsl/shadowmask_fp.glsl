@@ -1,3 +1,4 @@
+precision mediump float;
 uniform sampler2D u_ScreenDepthMap;
 
 uniform sampler2DShadow u_ShadowMap;
