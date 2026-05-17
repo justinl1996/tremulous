@@ -57,6 +57,10 @@ int demo_protocols[] = { PROTOCOL_VERSION, 70, 69, 0 };
 #define DEF_COMHUNKMEGS_S XSTRING(DEF_COMHUNKMEGS)
 #define DEF_COMZONEMEGS_S XSTRING(DEF_COMZONEMEGS)
 
+#ifndef GIT_HASH
+#define GIT_HASH "unknown"
+#endif
+
 int com_argc;
 char* com_argv[MAX_NUM_ARGVS+1];
 
@@ -2853,6 +2857,8 @@ void Com_Init( char *commandLine, cb_context_t *after )
     if ( setjmp (abortframe) ) {
         Sys_Error ("Error during initialization");
     }
+
+    Com_Printf("Compiled version: %s\n", GIT_HASH);
 
     // Clear queues
     ::memset( &eventQueue[ 0 ], 0, MAX_QUEUED_EVENTS * sizeof( sysEvent_t ) );

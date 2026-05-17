@@ -346,6 +346,8 @@ endif
 USE_GIT=
 ifeq ($(wildcard .git),.git)
   GIT_REV=$(shell git describe --tag | sed -e 's/-/_/g')
+  GIT_HASH=$(shell git rev-parse --short HEAD 2> /dev/null || echo unknown)
+
   ifneq ($(GIT_REV),)
     #VERSION:=$(GIT_REV)
     USE_GIT=1
@@ -1077,6 +1079,7 @@ else
 endif
 
 BASE_CFLAGS += -DPRODUCT_VERSION=\\\"$(VERSION)\\\"
+BASE_CFLAGS += -DGIT_HASH=\\\"$(GIT_HASH)\\\"
 
 ifeq ($(V),1)
 echo_cmd=@:
