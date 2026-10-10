@@ -1066,6 +1066,12 @@ ifeq ($(BUILD_STANDALONE),1)
   BASE_CFLAGS += -DSTANDALONE
 endif
 
+# native dedicated servers for the web port (behind websockify, using the
+# web master server): make WEB_SERVER=1 BUILD_CLIENT=0
+ifeq ($(WEB_SERVER),1)
+  BASE_CFLAGS += -DWEB_SERVER
+endif
+
 ifeq ($(GENERATE_DEPENDENCIES),1)
   DEPEND_CFLAGS = -MMD
 else

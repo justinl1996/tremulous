@@ -496,7 +496,7 @@ var LibrarySysCommon = {
 			var ext = ".pk3";
 			var contents;
 
-			//console.log("ClearBaseDir localPath: ", localPath);
+			console.log("ClearBaseDir localPath: ", localPath);
 
 			try {
 				contents = FS.readdir(localPath);

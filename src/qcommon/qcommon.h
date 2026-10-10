@@ -87,12 +87,24 @@ extern int demo_protocols[];
 #endif
 #endif
 
+#ifdef WEB_SERVER
+// game servers for the web port sit behind websockify, which takes the usual
+// ports for the browsers' websocket connections, and talk to the web master
+// server's UDP port
+#define	PORT_MASTER			40700
+#define	PORT_SERVER			40720
+#define	ALT1PORT_MASTER			40700
+#define	ALT1PORT_SERVER			40721
+#define	ALT2PORT_MASTER			40710
+#define	ALT2PORT_SERVER			40722
+#else
 #define	PORT_MASTER			30700
 #define	PORT_SERVER			30720
 #define	ALT1PORT_MASTER			30700
 #define	ALT1PORT_SERVER			30721
 #define	ALT2PORT_MASTER			30710
 #define	ALT2PORT_SERVER			30722
+#endif
 #define	NUM_SERVER_PORTS	4		// broadcast scan this many ports after
 									// PORT_SERVER so a single machine can
 									// run multiple servers

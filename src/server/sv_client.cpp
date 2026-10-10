@@ -1245,6 +1245,12 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 
 		cl->gotCP = true;
 
+#ifdef WEB_SERVER
+		// browsers only keep the paks the web client lists, which never
+		// match the server's set exactly, so don't hold that against them
+		bGood = true;
+#endif
+
 		if (bGood) {
 			cl->pureAuthentic = 1;
 		} 
