@@ -1046,6 +1046,12 @@ static void SV_CalcPings( void ) {
 			cl->ping = 999;
 			continue;
 		}
+		if ( cl->netchan.remoteAddress.type == NA_BOT ) {
+			cl->ping = 0;
+			ps = SV_GameClientNum( i );
+			ps->ping = cl->ping;
+			continue;
+		}
 
 		total = 0;
 		count = 0;
@@ -1097,6 +1103,11 @@ static void SV_CheckTimeouts( void ) {
 	for (i=0,cl=svs.clients ; i < sv_maxclients->integer ; i++,cl++) {
 		// message times may be wrong across a changelevel
 		if (cl->lastPacketTime > svs.time) {
+			cl->lastPacketTime = svs.time;
+		}
+
+		// bots never time out
+		if (cl->state == CS_ACTIVE && cl->netchan.remoteAddress.type == NA_BOT) {
 			cl->lastPacketTime = svs.time;
 		}
 

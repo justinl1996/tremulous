@@ -727,6 +727,14 @@ void SV_SendClientMessages(void)
 
         if (!c->state) continue;  // not connected
 
+        if (c->netchan.remoteAddress.type == NA_BOT)
+        {
+            // bots read the game state directly, so nothing is sent; treat
+            // every reliable command as delivered so the queue never overflows
+            c->reliableAcknowledge = c->reliableSequence;
+            continue;
+        }
+
         if (svs.time - c->lastSnapshotTime < c->snapshotMsec * com_timescale->value) continue; // It's not time yet
 
         if (*c->downloadName) continue;  // Client is downloading, don't send snapshots

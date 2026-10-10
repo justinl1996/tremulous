@@ -98,6 +98,81 @@ void SV_GameDropClient( int clientNum, const char *reason ) {
 	SV_DropClient( svs.clients + clientNum, reason );	
 }
 
+/*
+==================
+SV_BotAllocateClient
+
+Reserves a client slot for a bot. Bots never send or receive packets, the
+game module drives them directly.
+==================
+*/
+int SV_BotAllocateClient( void ) {
+	int			i;
+	client_t	*cl;
+
+	// find a client slot, leaving the private slots for real players
+	for ( i = sv_privateClients->integer, cl = svs.clients + i; i < sv_maxclients->integer; i++, cl++ ) {
+		if ( cl->state == CS_FREE ) {
+			break;
+		}
+	}
+
+	if ( i == sv_maxclients->integer ) {
+		return -1;
+	}
+
+	::memset( cl, 0, sizeof( *cl ) );
+	cl->gentity = SV_GentityNum( i );
+	cl->gentity->s.number = i;
+	cl->state = CS_ACTIVE;
+	cl->lastPacketTime = svs.time;
+	cl->netchan.remoteAddress.type = NA_BOT;
+	cl->rate = 16384;
+	cl->snapshotMsec = 50;
+
+	return i;
+}
+
+/*
+==================
+SV_BotFreeClient
+==================
+*/
+void SV_BotFreeClient( int clientNum ) {
+	client_t	*cl;
+
+	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
+		Com_Error( ERR_DROP, "SV_BotFreeClient: bad clientNum: %i", clientNum );
+	}
+
+	cl = &svs.clients[clientNum];
+	cl->state = CS_FREE;
+	cl->name[0] = 0;
+	if ( cl->gentity ) {
+		cl->gentity->r.svFlags &= ~SVF_BOT;
+	}
+}
+
+/*
+==================
+SV_BotClientCommand
+==================
+*/
+static void SV_BotClientCommand( int clientNum, const char *command ) {
+	client_t	*cl;
+
+	if ( clientNum < 0 || clientNum >= sv_maxclients->integer ) {
+		return;
+	}
+
+	cl = &svs.clients[clientNum];
+	if ( cl->state != CS_ACTIVE || cl->netchan.remoteAddress.type != NA_BOT ) {
+		return;
+	}
+
+	SV_ExecuteClientCommand( cl, command, true );
+}
+
 
 /*
 =================
@@ -445,6 +520,15 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
             return 0;
         case G_REMOVECOMMAND:
             Cmd_RemoveCommand( (const char*)VMA(1) );
+            return 0;
+
+        case G_BOT_ALLOCATE_CLIENT:
+            return SV_BotAllocateClient();
+        case G_BOT_FREE_CLIENT:
+            SV_BotFreeClient( args[1] );
+            return 0;
+        case G_BOT_CLIENT_COMMAND:
+            SV_BotClientCommand( args[1], (const char*)VMA(2) );
             return 0;
 
         case TRAP_MEMSET:

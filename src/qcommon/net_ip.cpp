@@ -455,7 +455,7 @@ bool NET_CompareBaseAdrMask(netadr_t a, netadr_t b, int netmask)
 
     if (a.type != b.type) return false;
 
-    if (a.type == NA_LOOPBACK) return true;
+    if (a.type == NA_LOOPBACK || a.type == NA_BOT) return true;
 
     if (a.type == NA_IP)
     {
@@ -509,6 +509,8 @@ const char *NET_AdrToString(netadr_t a)
 
     if (a.type == NA_LOOPBACK)
         Com_sprintf(s, sizeof(s), "loopback");
+    else if (a.type == NA_BOT)
+        Com_sprintf(s, sizeof(s), "bot");
     else if (a.type == NA_IP || a.type == NA_IP6)
     {
         struct sockaddr_storage sadr;
@@ -527,6 +529,8 @@ const char *NET_AdrToStringwPort(netadr_t a)
 
     if (a.type == NA_LOOPBACK)
         Com_sprintf(s, sizeof(s), "loopback");
+    else if (a.type == NA_BOT)
+        Com_sprintf(s, sizeof(s), "bot");
     else if (a.type == NA_IP)
         Com_sprintf(s, sizeof(s), "%s:%hu", NET_AdrToString(a), ntohs(a.port));
     else if (a.type == NA_IP6)

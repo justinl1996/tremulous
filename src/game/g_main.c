@@ -59,6 +59,12 @@ vmCvar_t  g_gravity;
 vmCvar_t  g_cheats;
 vmCvar_t  g_knockback;
 vmCvar_t  g_inactivity;
+
+vmCvar_t  bot_minplayers;
+vmCvar_t  bot_skill;
+vmCvar_t  bot_navBudget;
+vmCvar_t  bot_builders;
+vmCvar_t  bot_debug;
 vmCvar_t  g_debugMove;
 vmCvar_t  g_debugDamage;
 vmCvar_t  g_motd;
@@ -199,6 +205,12 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_gravity, "g_gravity", "800", 0, 0, qtrue, cv_gravity },
   { &g_knockback, "g_knockback", "1000", 0, 0, qtrue  },
   { &g_inactivity, "g_inactivity", "0", 0, 0, qtrue },
+
+  { &bot_minplayers, "bot_minplayers", "0", CVAR_SERVERINFO, 0, qfalse },
+  { &bot_skill, "bot_skill", "3", CVAR_ARCHIVE, 0, qfalse },
+  { &bot_navBudget, "bot_navBudget", "5", CVAR_ARCHIVE, 0, qfalse },
+  { &bot_builders, "bot_builders", "1", CVAR_ARCHIVE, 0, qfalse },
+  { &bot_debug, "bot_debug", "0", 0, 0, qfalse },
   { &g_debugMove, "g_debugMove", "0", 0, 0, qfalse },
   { &g_debugDamage, "g_debugDamage", "0", 0, 0, qfalse },
   { &g_motd, "g_motd", "", 0, 0, qfalse },
@@ -319,7 +331,7 @@ Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2 )
       return 0;
 
     case GAME_CLIENT_CONNECT:
-      return (intptr_t)ClientConnect( arg0, arg1 );
+      return (intptr_t)ClientConnect( arg0, arg1, arg2 );
 
     case GAME_CLIENT_THINK:
       ClientThink( arg0 );
@@ -556,6 +568,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
   memset( &level, 0, sizeof( level ) );
   level.time = levelTime;
   level.startTime = levelTime;
+
+  G_BotInit( );
   level.alienStage2Time = level.alienStage3Time =
     level.humanStage2Time = level.humanStage3Time = level.startTime;
 
@@ -2423,6 +2437,9 @@ void G_RunFrame( int levelTime )
   CheckCvars( );
   // now we are done spawning
   level.spawning = qfalse;
+
+  // bots decide what to do and move before everything else runs
+  G_BotRunFrame( msec );
 
   //
   // go through all allocated objects

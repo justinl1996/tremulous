@@ -29,6 +29,8 @@ set( GAME_SOURCES
     g_active.c
     g_admin.c
     g_admin.h
+    g_bot.c
+    g_bot_nav.c
     g_buildable.c
     g_client.c
     g_cmds.c

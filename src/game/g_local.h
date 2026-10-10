@@ -300,6 +300,7 @@ typedef struct
   clientConnected_t   connected;
   usercmd_t           cmd;                // we would lose angles if not persistant
   qboolean            localClient;        // true if "ip" info key is "localhost"
+  qboolean            isBot;              // server-side bot, see g_bot.c
   qboolean            stickySpec;         // don't stop spectating a player after they get killed
   qboolean            pmoveFixed;         //
   char                netname[ MAX_COLORFUL_NAME_LENGTH ];
@@ -1036,7 +1037,7 @@ int  G_TimeTilSuddenDeath( void );
 //
 // g_client.c
 //
-const char *ClientConnect( int clientNum, qboolean firstTime );
+const char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot );
 char *ClientUserinfoChanged( int clientNum, qboolean forceName );
 void ClientDisconnect( int clientNum );
 void ClientBegin( int clientNum );
@@ -1051,6 +1052,7 @@ void G_UnlaggedCalc( int time, gentity_t *skipEnt );
 void G_UnlaggedOn( gentity_t *attacker, vec3_t muzzle, float range );
 void G_UnlaggedOff( void );
 void ClientThink( int clientNum );
+void ClientThink_real( gentity_t *ent );
 void ClientEndFrame( gentity_t *ent );
 void G_RunClient( gentity_t *ent );
 
@@ -1100,6 +1102,36 @@ void G_namelog_update_score( gclient_t *client );
 void G_namelog_update_name( gclient_t *client );
 void G_namelog_cleanup( void );
 
+//
+// g_bot.c
+//
+void      G_BotInit( void );
+void      G_BotRunFrame( int msec );
+void      G_BotConnect( int clientNum );
+void      G_BotDisconnect( int clientNum );
+qboolean  G_AddBot( const char *name, team_t team, int skill );
+void      Svcmd_AddBot_f( void );
+void      Svcmd_KickBots_f( void );
+void      Svcmd_BotStatus_f( void );
+
+//
+// g_bot_nav.c
+//
+#define NAVLINK_JUMP 1  // the link needs a jump to cross
+
+void      G_BotNavInit( void );
+void      G_BotNavFrame( int budgetMsec );
+void      G_BotNavDump( void );
+void      G_BotNavTrace( void );
+qboolean  G_BotNavInHazard( const vec3_t origin );
+int       G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxPath );
+int       G_BotNavNearestNode( const vec3_t origin );
+int       G_BotNavNumNodes( void );
+void      G_BotNavNodeOrigin( int node, vec3_t out );
+int       G_BotNavLinkFlags( int from, int to );
+void      G_BotNavRemoveLink( int from, int to );
+qboolean  G_BotNavRandomNodeNear( const vec3_t origin, float minDist, float maxDist, vec3_t out );
+
 //some maxs
 #define MAX_FILEPATH      144
 
@@ -1128,6 +1160,12 @@ extern  vmCvar_t  g_gravity;
 extern  vmCvar_t  g_speed;
 extern  vmCvar_t  g_knockback;
 extern  vmCvar_t  g_inactivity;
+
+extern  vmCvar_t  bot_minplayers;
+extern  vmCvar_t  bot_skill;
+extern  vmCvar_t  bot_navBudget;
+extern  vmCvar_t  bot_builders;
+extern  vmCvar_t  bot_debug;
 extern  vmCvar_t  g_debugMove;
 extern  vmCvar_t  g_debugDamage;
 extern  vmCvar_t  g_synchronousClients;
@@ -1255,3 +1293,6 @@ void      trap_SnapVector( float *v );
 void      trap_AddCommand( const char *cmdName );
 void      trap_RemoveCommand( const char *cmdName );
 int       trap_FS_GetFilteredFiles( const char *path, const char *extension, const char *filter, char *listbuf, int bufsize );
+int       trap_BotAllocateClient( void );
+void      trap_BotFreeClient( int clientNum );
+void      trap_BotClientCommand( int clientNum, const char *command );

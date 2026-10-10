@@ -41,7 +41,8 @@ enum netadrtype_t {
     NA_IP,
     NA_IP6,
     NA_MULTICAST6,
-    NA_UNSPEC
+    NA_UNSPEC,
+    NA_BOT  // server-side bot client, never sent packets
 };
 
 typedef enum { NS_CLIENT, NS_SERVER } netsrc_t;

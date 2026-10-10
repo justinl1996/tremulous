@@ -2662,6 +2662,8 @@ GOBJ_ = \
   $(B)/$(BASEGAME)/game/bg_alloc.o \
   $(B)/$(BASEGAME)/game/bg_voice.o \
   $(B)/$(BASEGAME)/game/g_active.o \
+  $(B)/$(BASEGAME)/game/g_bot.o \
+  $(B)/$(BASEGAME)/game/g_bot_nav.o \
   $(B)/$(BASEGAME)/game/g_client.o \
   $(B)/$(BASEGAME)/game/g_cmds.o \
   $(B)/$(BASEGAME)/game/g_combat.o \

@@ -1138,9 +1138,11 @@ and will eventually get to ClientBegin.
 firstTime will be qtrue the very first time a client connects
 to the server machine, but qfalse on map changes and tournement
 restarts.
+
+isBot is set for server-side bots (see g_bot.c)
 ============
 */
-const char *ClientConnect( int clientNum, qboolean firstTime )
+const char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot )
 {
   char      *value;
   char      *userInfoError;
@@ -1159,6 +1161,7 @@ const char *ClientConnect( int clientNum, qboolean firstTime )
 
   ent->client = client;
   memset( client, 0, sizeof( *client ) );
+  client->pers.isBot = isBot;
 
   trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
 
@@ -1190,7 +1193,7 @@ const char *ClientConnect( int clientNum, qboolean firstTime )
   }
 
   // check for admin ban
-  if( G_admin_ban_check( ent, reason, sizeof( reason ) ) )
+  if( !isBot && G_admin_ban_check( ent, reason, sizeof( reason ) ) )
   {
     return va( "%s", reason );
   }
@@ -1198,7 +1201,7 @@ const char *ClientConnect( int clientNum, qboolean firstTime )
   // check for a password
   value = Info_ValueForKey( userinfo, "password" );
 
-  if( g_password.string[ 0 ] && Q_stricmp( g_password.string, "none" ) &&
+  if( !isBot && g_password.string[ 0 ] && Q_stricmp( g_password.string, "none" ) &&
       strcmp( g_password.string, value ) != 0 )
     return "Invalid password";
 
@@ -1210,6 +1213,9 @@ const char *ClientConnect( int clientNum, qboolean firstTime )
     return "Invalid GUID";
 
   client->pers.connected = CON_CONNECTING;
+
+  if( isBot )
+    G_BotConnect( clientNum );
 
   // read or initialize the session data
   if( firstTime || level.newSession )
@@ -1685,6 +1691,12 @@ void ClientDisconnect( int clientNum )
       ent->client->ps.persistant[ PERS_SPECSTATE ] = SPECTATOR_NOT;
 
   trap_SetConfigstring( CS_PLAYERS + clientNum, "");
+
+  if( ent->client->pers.isBot )
+  {
+    G_BotDisconnect( clientNum );
+    ent->client->pers.isBot = qfalse;
+  }
 
   CalculateRanks( );
 }

@@ -546,7 +546,7 @@ void NET_SendPacket(netsrc_t sock, int length, const void *data, netadr_t to)
         NET_SendLoopPacket(sock, length, data, to);
         return;
     }
-    if (to.type == NA_BAD)
+    if (to.type == NA_BAD || to.type == NA_BOT)
     {
         return;
     }

@@ -469,7 +469,7 @@ gotnewcl:
 	Q_strncpyz( newcl->userinfo, userinfo, sizeof(newcl->userinfo) );
 
 	// get the game a chance to reject this connection or modify the userinfo
-	denied = VM_Call( sv.gvm, GAME_CLIENT_CONNECT, clientNum, true ); // firstTime = true
+	denied = VM_Call( sv.gvm, GAME_CLIENT_CONNECT, clientNum, true, false ); // firstTime = true, isBot = false
 	if ( denied ) {
 		// we can't just use VM_ArgPtr, because that is only valid inside a VM_Call
 		char *str = (char*)VM_ExplicitArgPtr( sv.gvm, denied );
@@ -546,18 +546,21 @@ or crashing -- SV_FinalMessage() will handle that
 void SV_DropClient( client_t *drop, const char *reason ) {
 	int		i;
 	challenge_t	*challenge;
+	const bool isBot = drop->netchan.remoteAddress.type == NA_BOT;
 
 	if ( drop->state == CS_ZOMBIE ) {
 		return;		// already dropped
 	}
 
-	// see if we already have a challenge for this ip
-	challenge = &svs.challenges[0];
+	if ( !isBot ) {
+		// see if we already have a challenge for this ip
+		challenge = &svs.challenges[0];
 
-	for (i = 0 ; i < MAX_CHALLENGES ; i++, challenge++) {
-		if ( NET_CompareAdr( drop->netchan.remoteAddress, challenge->adr ) ) {
-			::memset(challenge, 0, sizeof(*challenge));
-			break;
+		for (i = 0 ; i < MAX_CHALLENGES ; i++, challenge++) {
+			if ( NET_CompareAdr( drop->netchan.remoteAddress, challenge->adr ) ) {
+				::memset(challenge, 0, sizeof(*challenge));
+				break;
+			}
 		}
 	}
 
@@ -570,6 +573,13 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 	// call the prog function for removing a client
 	// this will remove the body, among other things
 	VM_Call( sv.gvm, GAME_CLIENT_DISCONNECT, drop - svs.clients );
+
+	// bots have no connection to shut down, free the slot right away
+	if ( isBot ) {
+		SV_SetUserinfo( drop - svs.clients, "" );
+		SV_BotFreeClient( drop - svs.clients );
+		return;
+	}
 
 	// add the disconnect command
 	SV_SendServerCommand( drop, "disconnect \"%s\"", reason);

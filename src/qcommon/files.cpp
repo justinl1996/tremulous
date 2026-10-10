@@ -4134,7 +4134,9 @@ void FS_ConditionalRestart(int checksumFeed, bool disconnect, cb_context_t *afte
 #else
     if (checksumFeed != fs_checksumFeed)
     {
+        // FS_Restart runs (and frees) context once it's done
         FS_Restart(checksumFeed, context);
+        return;
     }
     else if (fs_numServerPaks && !fs_reordered)
         FS_ReorderPurePaks();

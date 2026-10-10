@@ -523,7 +523,7 @@ qboolean ClientInactivityTimer( gentity_t *ent )
 {
   gclient_t *client = ent->client;
 
-  if( ! g_inactivity.integer )
+  if( ! g_inactivity.integer || client->pers.isBot )
   {
     // give everyone some time, so if the operator sets g_inactivity during
     // gameplay, everyone isn't kicked

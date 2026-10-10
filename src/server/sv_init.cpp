@@ -619,15 +619,21 @@ static void SV_SpawnServer_after_FS_Restart( cb_context_t *context, int status )
         if (svs.clients[i].state >= CS_CONNECTED)
         {
             char *denied;
+            bool isBot = svs.clients[i].netchan.remoteAddress.type == NA_BOT;
 
             // connect the client again
-            denied =
-                (char *)VM_ExplicitArgPtr(sv.gvm, VM_Call(sv.gvm, GAME_CLIENT_CONNECT, i, false));  // firstTime = false
+            denied = (char *)VM_ExplicitArgPtr(
+                sv.gvm, VM_Call(sv.gvm, GAME_CLIENT_CONNECT, i, false, isBot));  // firstTime = false
             if (denied)
             {
                 // this generally shouldn't happen, because the client
                 // was connected before the level change
                 SV_DropClient(&svs.clients[i], denied);
+            }
+            else if (isBot)
+            {
+                // bots have no gamestate to download, put them straight into the world
+                SV_ClientEnterWorld(&svs.clients[i], NULL);
             }
             else
             {
@@ -962,7 +968,8 @@ void SV_FinalMessage(const char *message)
         int i;
         for (i = 0, cl = svs.clients; i < sv_maxclients->integer; i++, cl++)
         {
-            if (cl->state >= CS_CONNECTED)
+            // bots have no connection to send anything over
+            if (cl->state >= CS_CONNECTED && cl->netchan.remoteAddress.type != NA_BOT)
             {
                 // don't send a disconnect to a local client
                 if (cl->netchan.remoteAddress.type != NA_LOOPBACK)

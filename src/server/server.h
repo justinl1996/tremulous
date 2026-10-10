@@ -433,6 +433,12 @@ void SV_FreeClient(client_t *client);
 void SV_DropClient(client_t *drop, const char *reason);
 
 void SV_ExecuteClientCommand(client_t *cl, const char *s, bool clientOK);
+
+//
+// sv_game.c (bots)
+//
+int SV_BotAllocateClient(void);
+void SV_BotFreeClient(int clientNum);
 void SV_ClientThink(client_t *cl, usercmd_t *cmd);
 
 int SV_WriteDownloadToClient(client_t *cl, msg_t *msg);

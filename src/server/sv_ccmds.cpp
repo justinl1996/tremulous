@@ -215,7 +215,8 @@ static void SV_MapRestart_f( void ) {
 		SV_AddServerCommand( client, "map_restart\n" );
 
 		// connect the client again, without the firstTime flag
-		denied = (char*)VM_ExplicitArgPtr( sv.gvm, VM_Call( sv.gvm, GAME_CLIENT_CONNECT, i, false ) );
+		denied = (char*)VM_ExplicitArgPtr( sv.gvm, VM_Call( sv.gvm, GAME_CLIENT_CONNECT, i, false,
+			client->netchan.remoteAddress.type == NA_BOT ) );
 		if ( denied ) {
 			// this generally shouldn't happen, because the client
 			// was connected before the level change
