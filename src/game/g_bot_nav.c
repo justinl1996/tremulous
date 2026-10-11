@@ -66,6 +66,7 @@ typedef struct
   int     cellX, cellY;
   short   links[ NAV_MAX_LINKS ];
   byte    linkFlags[ NAV_MAX_LINKS ];
+  byte    linkFails[ NAV_MAX_LINKS ];   // times bots got stuck trying it
   int     numLinks;
   int     hashNext;
 } navNode_t;
@@ -88,6 +89,18 @@ static vec3_t         hurtMins[ NAV_MAX_HURT ], hurtMaxs[ NAV_MAX_HURT ];
 static int            numHurt;
 
 static int            observedNode[ MAX_CLIENTS ];
+
+// structures go up and come down during a game, so rather than build them
+// into the graph, nodes and links they're in the way of are marked blocked
+static byte           nodeBlocked[ NAV_MAX_NODES ];  // 1 << team whose structure is there
+static int            obstacleSignature;
+static int            nextObstacleTime;
+static int            navVersion;
+
+// scratch space for G_BotNavWouldBlock
+static int            footStamp[ NAV_MAX_NODES ];
+static int            visitStamp[ NAV_MAX_NODES ];
+static int            wouldBlockStamp;
 static int            nextObserveTime;
 static int            buildMsec;
 static qboolean       buildReported;
@@ -192,7 +205,21 @@ static void NavAddLink( int from, int to, int flags )
 
   node->links[ node->numLinks ] = to;
   node->linkFlags[ node->numLinks ] = flags;
+  node->linkFails[ node->numLinks ] = 0;
   node->numLinks++;
+}
+
+static qboolean NavHasLink( int from, int to )
+{
+  int i;
+
+  for( i = 0; i < nodes[ from ].numLinks; i++ )
+  {
+    if( nodes[ from ].links[ i ] == to )
+      return qtrue;
+  }
+
+  return qfalse;
 }
 
 /*
@@ -369,6 +396,50 @@ static qboolean NavTryStep( const vec3_t from, const vec3_t to, vec3_t ground, i
   return qfalse;
 }
 
+// bigger aliens don't fit everywhere a human does. The largest box that can
+// make the same move is recorded on each link
+static const float navSizeWidth[ NAV_NUM_SIZES ] = { 15.0f, 18.0f, 20.0f, 22.0f, 26.0f, 32.0f };
+static const float navSizeTop[ NAV_NUM_SIZES ] = { 32.0f, 32.0f, 32.0f, 32.0f, 32.0f, 68.0f };
+
+int G_BotNavSizeClass( const vec3_t mins, const vec3_t maxs )
+{
+  float width = MAX( maxs[ 0 ], -mins[ 0 ] );
+  float height = maxs[ 2 ] - mins[ 2 ];
+  int   size;
+
+  for( size = 0; size < NAV_NUM_SIZES - 1; size++ )
+  {
+    if( width <= navSizeWidth[ size ] && height <= navSizeTop[ size ] + 24.0f )
+      break;
+  }
+
+  return size;
+}
+
+static int NavLinkSize( const vec3_t from, const vec3_t to, float landZ )
+{
+  vec3_t  savedMins, savedMaxs, ground;
+  int     size, flags;
+
+  VectorCopy( navMins, savedMins );
+  VectorCopy( navMaxs, savedMaxs );
+
+  // most of a map is open, so try the biggest first
+  for( size = NAV_NUM_SIZES - 1; size > 0; size-- )
+  {
+    VectorSet( navMins, -navSizeWidth[ size ] + 1.0f, -navSizeWidth[ size ] + 1.0f, savedMins[ 2 ] );
+    VectorSet( navMaxs, navSizeWidth[ size ] - 1.0f, navSizeWidth[ size ] - 1.0f, navSizeTop[ size ] );
+
+    if( NavTryStep( from, to, ground, &flags ) &&
+        fabs( ground[ 2 ] - landZ ) < NAV_LEVEL_DIST )
+      break;
+  }
+
+  VectorCopy( savedMins, navMins );
+  VectorCopy( savedMaxs, navMaxs );
+  return size;
+}
+
 static void NavExpandNode( int n )
 {
   int     i, m, flags;
@@ -388,6 +459,10 @@ static void NavExpandNode( int n )
     m = NavFindNodeInCell( x, y, ground[ 2 ] );
     if( m < 0 )
       m = NavAddNode( ground );
+
+    // only worth testing sizes for a link we don't have yet
+    if( m >= 0 && !NavHasLink( n, m ) )
+      flags |= NavLinkSize( nodes[ n ].origin, to, ground[ 2 ] ) << NAVLINK_SIZE_SHIFT;
 
     NavAddLink( n, m, flags );
   }
@@ -489,6 +564,13 @@ void G_BotNavInit( void )
   buildReported = qfalse;
   numRequeue = 0;
   nextMoverCheckTime = 0;
+  wouldBlockStamp = 0;
+  memset( footStamp, 0, sizeof( footStamp ) );
+  memset( visitStamp, 0, sizeof( visitStamp ) );
+  obstacleSignature = 0;
+  nextObstacleTime = 0;
+  navVersion = 0;
+  memset( nodeBlocked, 0, sizeof( nodeBlocked ) );
   memset( moverWasOpen, 0, sizeof( moverWasOpen ) );
 
   for( i = 0; i < NAV_HASH_SIZE; i++ )
@@ -608,9 +690,11 @@ static void NavObserve( gentity_t *ent )
     vec3_t  ground;
     int     flags;
 
-    if( NavTryStep( nodes[ last ].origin, nodes[ n ].origin, ground, &flags ) &&
+    if( !NavHasLink( last, n ) &&
+        NavTryStep( nodes[ last ].origin, nodes[ n ].origin, ground, &flags ) &&
         fabs( ground[ 2 ] - nodes[ n ].origin[ 2 ] ) < NAV_LEVEL_DIST )
-      NavAddLink( last, n, flags );
+      NavAddLink( last, n, flags | ( NavLinkSize( nodes[ last ].origin, nodes[ n ].origin,
+                                                  nodes[ n ].origin[ 2 ] ) << NAVLINK_SIZE_SHIFT ) );
   }
 }
 
@@ -645,6 +729,285 @@ static void NavCheckDoors( void )
   }
 }
 
+// does a player moving from a to b hit the box? (slab test against the box
+// grown by the player's size)
+static qboolean NavSegmentHitsBox( const vec3_t a, const vec3_t b,
+                                   const vec3_t mins, const vec3_t maxs )
+{
+  float tmin = 0.0f, tmax = 1.0f, d, t1, t2, tmp;
+  int   i;
+
+  for( i = 0; i < 3; i++ )
+  {
+    d = b[ i ] - a[ i ];
+    if( fabs( d ) < 0.001f )
+    {
+      if( a[ i ] < mins[ i ] || a[ i ] > maxs[ i ] )
+        return qfalse;
+      continue;
+    }
+
+    t1 = ( mins[ i ] - a[ i ] ) / d;
+    t2 = ( maxs[ i ] - a[ i ] ) / d;
+    if( t1 > t2 )
+    {
+      tmp = t1;
+      t1 = t2;
+      t2 = tmp;
+    }
+
+    if( t1 > tmin )
+      tmin = t1;
+    if( t2 < tmax )
+      tmax = t2;
+    if( tmin > tmax )
+      return qfalse;
+  }
+
+  return qtrue;
+}
+
+static void NavBlockBox( const vec3_t absmin, const vec3_t absmax, team_t team )
+{
+  vec3_t  mins, maxs;
+  int     x, y, n, i;
+  int     x0, x1, y0, y1;
+
+  // the space a player's origin can't be in without touching the box
+  VectorSubtract( absmin, navMaxs, mins );
+  VectorSubtract( absmax, navMins, maxs );
+
+  // links reach at most a cell and a bit, so look one cell further out
+  x0 = NavCell( mins[ 0 ] ) - 2;
+  x1 = NavCell( maxs[ 0 ] ) + 2;
+  y0 = NavCell( mins[ 1 ] ) - 2;
+  y1 = NavCell( maxs[ 1 ] ) + 2;
+
+  for( x = x0; x <= x1; x++ )
+  {
+    for( y = y0; y <= y1; y++ )
+    {
+      for( n = hashHeads[ NavHash( x, y ) ]; n >= 0; n = nodes[ n ].hashNext )
+      {
+        if( nodes[ n ].cellX != x || nodes[ n ].cellY != y )
+          continue;
+
+        if( nodes[ n ].origin[ 0 ] >= mins[ 0 ] && nodes[ n ].origin[ 0 ] <= maxs[ 0 ] &&
+            nodes[ n ].origin[ 1 ] >= mins[ 1 ] && nodes[ n ].origin[ 1 ] <= maxs[ 1 ] &&
+            nodes[ n ].origin[ 2 ] >= mins[ 2 ] && nodes[ n ].origin[ 2 ] <= maxs[ 2 ] )
+          nodeBlocked[ n ] |= 1 << team;
+
+        for( i = 0; i < nodes[ n ].numLinks; i++ )
+        {
+          if( NavSegmentHitsBox( nodes[ n ].origin, nodes[ nodes[ n ].links[ i ] ].origin,
+                                 mins, maxs ) )
+            nodes[ n ].linkFlags[ i ] |= ( team == TEAM_ALIENS ) ?
+                                         NAVLINK_BLOCKED_ALIENS : NAVLINK_BLOCKED_HUMANS;
+        }
+      }
+    }
+  }
+}
+
+// re-mark what's blocked when structures have been built or destroyed
+// can players walk over the top of it? (telenodes, medistations, boosters)
+static qboolean NavStepOver( gentity_t *ent )
+{
+  return ent->r.absmax[ 2 ] - ent->r.absmin[ 2 ] <= NAV_STEP + 1.0f;
+}
+
+static void NavUpdateObstacles( void )
+{
+  gentity_t *ent;
+  int       i, n, signature;
+
+  // new nodes and links need checking too
+  signature = numNodes;
+
+  for( i = MAX_CLIENTS, ent = g_entities + MAX_CLIENTS; i < level.num_entities; i++, ent++ )
+  {
+    if( !ent->inuse || ent->s.eType != ET_BUILDABLE || !ent->r.linked || !ent->r.contents ||
+        NavStepOver( ent ) )
+      continue;
+
+    signature = signature * 31 + i * 7 + (int)ent->r.absmin[ 0 ] +
+                (int)ent->r.absmin[ 1 ] * 3 + (int)ent->r.absmin[ 2 ] * 5;
+  }
+
+  if( signature == obstacleSignature )
+    return;
+  obstacleSignature = signature;
+
+  for( n = 0; n < numNodes; n++ )
+  {
+    nodeBlocked[ n ] = 0;
+    for( i = 0; i < nodes[ n ].numLinks; i++ )
+      nodes[ n ].linkFlags[ i ] &= ~NAVLINK_BLOCKED;
+  }
+
+  for( i = MAX_CLIENTS, ent = g_entities + MAX_CLIENTS; i < level.num_entities; i++, ent++ )
+  {
+    if( !ent->inuse || ent->s.eType != ET_BUILDABLE || !ent->r.linked || !ent->r.contents ||
+        NavStepOver( ent ) )
+      continue;
+
+    NavBlockBox( ent->r.absmin, ent->r.absmax, ent->buildableTeam );
+  }
+
+  // let bots know their paths may be out of date
+  navVersion++;
+}
+
+/*
+===============
+G_BotNavWouldBlock
+
+Would a structure in this box cut off the walkable area around it? The
+nodes and links it would block are taken out, then the nodes left on its
+edge must still be able to reach each other nearby
+===============
+*/
+qboolean G_BotNavWouldBlock( const vec3_t absmin, const vec3_t absmax )
+{
+  vec3_t  mins, maxs;
+  int     edge[ 64 ], numEdge = 0;
+  int     queue[ 1024 ], head = 0, tail = 0;
+  int     x, y, n, i, m;
+  int     cx0, cx1, cy0, cy1;
+
+  VectorSubtract( absmin, navMaxs, mins );
+  VectorSubtract( absmax, navMins, maxs );
+
+  wouldBlockStamp++;
+  cx0 = NavCell( mins[ 0 ] ) - 1;
+  cx1 = NavCell( maxs[ 0 ] ) + 1;
+  cy0 = NavCell( mins[ 1 ] ) - 1;
+  cy1 = NavCell( maxs[ 1 ] ) + 1;
+
+  // nodes the structure would sit on
+  for( x = cx0; x <= cx1; x++ )
+  {
+    for( y = cy0; y <= cy1; y++ )
+    {
+      for( n = hashHeads[ NavHash( x, y ) ]; n >= 0; n = nodes[ n ].hashNext )
+      {
+        if( nodes[ n ].cellX == x && nodes[ n ].cellY == y &&
+            nodes[ n ].origin[ 0 ] >= mins[ 0 ] && nodes[ n ].origin[ 0 ] <= maxs[ 0 ] &&
+            nodes[ n ].origin[ 1 ] >= mins[ 1 ] && nodes[ n ].origin[ 1 ] <= maxs[ 1 ] &&
+            nodes[ n ].origin[ 2 ] >= mins[ 2 ] && nodes[ n ].origin[ 2 ] <= maxs[ 2 ] )
+          footStamp[ n ] = wouldBlockStamp;
+      }
+    }
+  }
+
+  // nodes around it that would lose a link
+  for( x = cx0 - 1; x <= cx1 + 1; x++ )
+  {
+    for( y = cy0 - 1; y <= cy1 + 1; y++ )
+    {
+      for( n = hashHeads[ NavHash( x, y ) ]; n >= 0; n = nodes[ n ].hashNext )
+      {
+        if( nodes[ n ].cellX != x || nodes[ n ].cellY != y ||
+            footStamp[ n ] == wouldBlockStamp || nodeBlocked[ n ] ||
+            fabs( nodes[ n ].origin[ 2 ] - ( mins[ 2 ] + maxs[ 2 ] ) * 0.5f ) > 128.0f )
+          continue;
+
+        for( i = 0; i < nodes[ n ].numLinks; i++ )
+        {
+          m = nodes[ n ].links[ i ];
+          if( footStamp[ m ] == wouldBlockStamp ||
+              NavSegmentHitsBox( nodes[ n ].origin, nodes[ m ].origin, mins, maxs ) )
+            break;
+        }
+
+        if( i < nodes[ n ].numLinks && numEdge < ARRAY_LEN( edge ) )
+          edge[ numEdge++ ] = n;
+      }
+    }
+  }
+
+  if( numEdge < 2 )
+    return qfalse;
+
+  // walk around it from one edge node, staying close by
+  visitStamp[ edge[ 0 ] ] = wouldBlockStamp;
+  queue[ tail++ ] = edge[ 0 ];
+
+  while( head < tail )
+  {
+    n = queue[ head++ ];
+
+    for( i = 0; i < nodes[ n ].numLinks; i++ )
+    {
+      m = nodes[ n ].links[ i ];
+
+      if( visitStamp[ m ] == wouldBlockStamp || footStamp[ m ] == wouldBlockStamp ||
+          nodeBlocked[ m ] || ( nodes[ n ].linkFlags[ i ] & NAVLINK_BLOCKED ) ||
+          NavSegmentHitsBox( nodes[ n ].origin, nodes[ m ].origin, mins, maxs ) )
+        continue;
+
+      // a detour much longer than this doesn't count
+      if( nodes[ m ].cellX < cx0 - 6 || nodes[ m ].cellX > cx1 + 6 ||
+          nodes[ m ].cellY < cy0 - 6 || nodes[ m ].cellY > cy1 + 6 )
+        continue;
+
+      if( tail >= ARRAY_LEN( queue ) )
+        break;
+
+      visitStamp[ m ] = wouldBlockStamp;
+      queue[ tail++ ] = m;
+    }
+  }
+
+  for( i = 1; i < numEdge; i++ )
+  {
+    if( visitStamp[ edge[ i ] ] != wouldBlockStamp )
+      return qtrue;
+  }
+
+  return qfalse;
+}
+
+/*
+===============
+G_BotNavOpenGround
+
+Is there walkable floor all around a structure's footprint, rather than it
+being on a bridge, a ledge or in a corridor?
+===============
+*/
+qboolean G_BotNavOpenGround( const vec3_t absmin, const vec3_t absmax )
+{
+  int     x, y, n, cells = 0, floored = 0;
+  int     x0 = NavCell( absmin[ 0 ] - NAV_GRID ), x1 = NavCell( absmax[ 0 ] + NAV_GRID );
+  int     y0 = NavCell( absmin[ 1 ] - NAV_GRID ), y1 = NavCell( absmax[ 1 ] + NAV_GRID );
+  float   floorZ = absmin[ 2 ] - navMins[ 2 ];
+
+  for( x = x0; x <= x1; x++ )
+  {
+    for( y = y0; y <= y1; y++ )
+    {
+      cells++;
+      for( n = hashHeads[ NavHash( x, y ) ]; n >= 0; n = nodes[ n ].hashNext )
+      {
+        if( nodes[ n ].cellX == x && nodes[ n ].cellY == y &&
+            fabs( nodes[ n ].origin[ 2 ] - floorZ ) < NAV_LEVEL_DIST )
+        {
+          floored++;
+          break;
+        }
+      }
+    }
+  }
+
+  return floored * 10 >= cells * 9;
+}
+
+int G_BotNavVersion( void )
+{
+  return navVersion;
+}
+
 void G_BotNavFrame( int budgetMsec )
 {
   int        start, i;
@@ -672,6 +1035,12 @@ void G_BotNavFrame( int budgetMsec )
   {
     nextMoverCheckTime = level.time + 1000;
     NavCheckDoors( );
+  }
+
+  if( level.time >= nextObstacleTime )
+  {
+    nextObstacleTime = level.time + 500;
+    NavUpdateObstacles( );
   }
 
   if( expandCursor >= numNodes && !numRequeue )
@@ -720,13 +1089,32 @@ void G_BotNavDump( void )
 
   for( n = 0; n < numNodes; n++ )
   {
-    len = Com_sprintf( line, sizeof( line ), "%d %.0f %.0f %.0f", n,
-                       nodes[ n ].origin[ 0 ], nodes[ n ].origin[ 1 ], nodes[ n ].origin[ 2 ] );
+    len = Com_sprintf( line, sizeof( line ), "%d %.0f %.0f %.0f%s", n,
+                       nodes[ n ].origin[ 0 ], nodes[ n ].origin[ 1 ], nodes[ n ].origin[ 2 ],
+                       nodeBlocked[ n ] ? " B" : "" );
     for( i = 0; i < nodes[ n ].numLinks && len < sizeof( line ) - 16; i++ )
       len += Com_sprintf( line + len, sizeof( line ) - len, " %d:%d",
                           nodes[ n ].links[ i ], nodes[ n ].linkFlags[ i ] );
     Q_strcat( line, sizeof( line ), "\n" );
     trap_FS_Write( line, strlen( line ), f );
+  }
+
+  // and the structures, for working out what's in the way
+  {
+    gentity_t *ent;
+
+    for( n = MAX_CLIENTS, ent = g_entities + MAX_CLIENTS; n < level.num_entities; n++, ent++ )
+    {
+      if( !ent->inuse || ent->s.eType != ET_BUILDABLE )
+        continue;
+
+      Com_sprintf( line, sizeof( line ), "buildable %s %d %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f\n",
+                   BG_Buildable( ent->s.modelindex )->name, ent->buildableTeam,
+                   ent->r.currentOrigin[ 0 ], ent->r.currentOrigin[ 1 ], ent->r.currentOrigin[ 2 ],
+                   ent->r.absmin[ 0 ], ent->r.absmin[ 1 ], ent->r.absmin[ 2 ],
+                   ent->r.absmax[ 0 ], ent->r.absmax[ 1 ], ent->r.absmax[ 2 ] );
+      trap_FS_Write( line, strlen( line ), f );
+    }
   }
 
   trap_FS_FCloseFile( f );
@@ -817,8 +1205,9 @@ qboolean G_BotNavRandomNodeNear( const vec3_t origin, float minDist, float maxDi
   return count > 0;
 }
 
-// forget a link bots keep getting stuck on
-void G_BotNavRemoveLink( int from, int to )
+// a bot got stuck on a link. Rather than forget it, which could cut off an
+// area it's the only way into, make routes avoid it when they can
+void G_BotNavLinkFailed( int from, int to )
 {
   navNode_t *node;
   int       i;
@@ -829,13 +1218,8 @@ void G_BotNavRemoveLink( int from, int to )
   node = &nodes[ from ];
   for( i = 0; i < node->numLinks; i++ )
   {
-    if( node->links[ i ] == to )
-    {
-      node->numLinks--;
-      node->links[ i ] = node->links[ node->numLinks ];
-      node->linkFlags[ i ] = node->linkFlags[ node->numLinks ];
-      return;
-    }
+    if( node->links[ i ] == to && node->linkFails[ i ] < 4 )
+      node->linkFails[ i ]++;
   }
 }
 
@@ -863,11 +1247,30 @@ static qboolean NavVisible( const vec3_t a, const vec3_t b )
   return tr.fraction >= 1.0f;
 }
 
-int G_BotNavNearestNode( const vec3_t origin )
+// can something of this size walk straight from a point to a node?
+static qboolean NavFits( const vec3_t from, const vec3_t to, int size )
+{
+  trace_t tr;
+  vec3_t  mins, maxs, a, b;
+
+  VectorSet( mins, -navSizeWidth[ size ] + 1.0f, -navSizeWidth[ size ] + 1.0f, navMins[ 2 ] );
+  VectorSet( maxs, navSizeWidth[ size ] - 1.0f, navSizeWidth[ size ] - 1.0f, navSizeTop[ size ] );
+  VectorCopy( from, a );
+  VectorCopy( to, b );
+  a[ 2 ] += NAV_STEP;
+  b[ 2 ] += NAV_STEP;
+
+  trap_Trace( &tr, a, mins, maxs, b, ENTITYNUM_NONE, NAV_MASK );
+  return !tr.allsolid && tr.fraction >= 1.0f;
+}
+
+// the closest few nodes to a point, visible ones first and nearest first.
+// If none are in sight, the single closest node a little further out
+static int NavNearestNodes( const vec3_t origin, int *out, int maxOut, int size )
 {
   int     cx = NavCell( origin[ 0 ] );
   int     cy = NavCell( origin[ 1 ] );
-  int     x, y, n, r, tries;
+  int     x, y, n, r, count;
   int     best;
   float   d, bestDist;
   int     candidates[ 4 ];
@@ -887,6 +1290,10 @@ int G_BotNavNearestNode( const vec3_t origin )
         for( n = hashHeads[ NavHash( x, y ) ]; n >= 0; n = nodes[ n ].hashNext )
         {
           if( nodes[ n ].cellX != x || nodes[ n ].cellY != y )
+            continue;
+
+          // inside a structure, so no use as a start or end point
+          if( nodeBlocked[ n ] )
             continue;
 
           if( fabs( nodes[ n ].origin[ 2 ] - origin[ 2 ] ) > 128.0f )
@@ -923,17 +1330,42 @@ int G_BotNavNearestNode( const vec3_t origin )
       }
     }
 
-    for( tries = 0; tries < numCandidates; tries++ )
+    count = 0;
+    for( i = 0; i < numCandidates && count < maxOut; i++ )
     {
-      if( NavVisible( origin, nodes[ candidates[ tries ] ].origin ) )
-        return candidates[ tries ];
+      if( NavVisible( origin, nodes[ candidates[ i ] ].origin ) &&
+          ( size < 0 || NavFits( origin, nodes[ candidates[ i ] ].origin, size ) ) )
+        out[ count++ ] = candidates[ i ];
     }
 
+    // nothing we fit straight to, settle for something in sight
+    if( !count && size >= 0 )
+    {
+      for( i = 0; i < numCandidates && count < maxOut; i++ )
+      {
+        if( NavVisible( origin, nodes[ candidates[ i ] ].origin ) )
+          out[ count++ ] = candidates[ i ];
+      }
+    }
+
+    if( count )
+      return count;
+
     if( best >= 0 && r > 1 )
-      return best;
+    {
+      out[ 0 ] = best;
+      return 1;
+    }
   }
 
-  return -1;
+  return 0;
+}
+
+int G_BotNavNearestNode( const vec3_t origin )
+{
+  int node;
+
+  return NavNearestNodes( origin, &node, 1, -1 ) ? node : -1;
 }
 
 /*
@@ -1005,9 +1437,58 @@ number of nodes. If the goal can't be reached, the path leads to the
 closest reachable node instead. Returns 0 if there is no usable path.
 ===============
 */
-int G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxPath )
+static int NavFindPathSized( const vec3_t start, const vec3_t goal, int *path, int maxPath,
+                             int size, team_t team );
+
+/*
+===============
+G_BotNavFindPath
+
+As NavFindPathSized, but if nothing big enough leads towards the goal the
+route for a human sized player is used instead. The size checks err on the
+side of caution, so the bot may well fit.
+===============
+*/
+int G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxPath, int size, team_t team )
 {
+  int     length, smallLength;
+  int     smallPath[ 128 ];
+  vec3_t  end;
+  float   dist, smallDist;
+
+  length = NavFindPathSized( start, goal, path, maxPath, size, team );
+  if( size == 0 )
+    return length;
+
+  dist = 1e9f;
+  if( length > 0 )
+    dist = Distance( nodes[ path[ length - 1 ] ].origin, goal );
+
+  if( dist < 200.0f )
+    return length;
+
+  smallLength = NavFindPathSized( start, goal, smallPath, MIN( maxPath, ARRAY_LEN( smallPath ) ), 0, team );
+  if( !smallLength )
+    return length;
+
+  VectorCopy( nodes[ smallPath[ smallLength - 1 ] ].origin, end );
+  smallDist = Distance( end, goal );
+  if( smallDist + 200.0f >= dist )
+    return length;
+
+  memcpy( path, smallPath, smallLength * sizeof( int ) );
+  return smallLength;
+}
+
+static int NavFindPathSized( const vec3_t start, const vec3_t goal, int *path, int maxPath,
+                             int size, team_t team )
+{
+  // our own structures are in the way, the enemy's are there to be destroyed
+  int     linkBlock = ( team == TEAM_ALIENS ) ? NAVLINK_BLOCKED_ALIENS :
+                      ( team == TEAM_HUMANS ) ? NAVLINK_BLOCKED_HUMANS : NAVLINK_BLOCKED;
+  int     nodeBlock = ( team == TEAM_ALIENS || team == TEAM_HUMANS ) ? 1 << team : 0xff;
   int     startNode, goalNode;
+  int     starts[ 4 ], numStarts;
   int     n, m, i, expanded;
   int     closest;
   float   closestDist, h, g;
@@ -1016,7 +1497,10 @@ int G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxP
   if( !navInitialised || numNodes == 0 )
     return 0;
 
-  startNode = G_BotNavNearestNode( start );
+  // start from a few nodes around us, the nearest one may be boxed in by
+  // our own structures when there's an easy way out in another direction
+  numStarts = NavNearestNodes( start, starts, ARRAY_LEN( starts ), size );
+  startNode = numStarts ? starts[ 0 ] : -1;
   goalNode = G_BotNavNearestNode( goal );
   if( startNode < 0 || goalNode < 0 )
     return 0;
@@ -1024,13 +1508,24 @@ int G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxP
   searchStamp++;
   heapSize = 0;
 
-  gScore[ startNode ] = 0.0f;
-  cameFrom[ startNode ] = -1;
-  openStamp[ startNode ] = searchStamp;
-  HeapPush( startNode, Distance( nodes[ startNode ].origin, nodes[ goalNode ].origin ) );
-
   closest = startNode;
   closestDist = Distance( nodes[ startNode ].origin, nodes[ goalNode ].origin );
+
+  for( i = 0; i < numStarts; i++ )
+  {
+    n = starts[ i ];
+    gScore[ n ] = Distance( start, nodes[ n ].origin );
+    cameFrom[ n ] = -1;
+    openStamp[ n ] = searchStamp;
+    h = Distance( nodes[ n ].origin, nodes[ goalNode ].origin );
+    HeapPush( n, gScore[ n ] + h );
+
+    if( h < closestDist )
+    {
+      closest = n;
+      closestDist = h;
+    }
+  }
   expanded = 0;
 
   while( heapSize > 0 && expanded < NAV_SEARCH_LIMIT )
@@ -1058,12 +1553,17 @@ int G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxP
     for( i = 0; i < nodes[ n ].numLinks; i++ )
     {
       m = nodes[ n ].links[ i ];
-      if( closedStamp[ m ] == searchStamp )
+      if( closedStamp[ m ] == searchStamp ||
+          ( nodes[ n ].linkFlags[ i ] & linkBlock ) || ( nodeBlocked[ m ] & nodeBlock ) ||
+          ( ( nodes[ n ].linkFlags[ i ] & NAVLINK_SIZE_MASK ) >> NAVLINK_SIZE_SHIFT ) < size )
         continue;
 
       g = gScore[ n ] + Distance( nodes[ n ].origin, nodes[ m ].origin );
       if( nodes[ n ].linkFlags[ i ] & NAVLINK_JUMP )
         g += NAV_GRID;
+
+      // links bots have got stuck on are a last resort
+      g += nodes[ n ].linkFails[ i ] * 500.0f;
 
       if( openStamp[ m ] == searchStamp && g >= gScore[ m ] )
         continue;

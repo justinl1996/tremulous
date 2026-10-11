@@ -1118,18 +1118,28 @@ void      Svcmd_BotStatus_f( void );
 // g_bot_nav.c
 //
 #define NAVLINK_JUMP 1  // the link needs a jump to cross
+#define NAVLINK_BLOCKED_ALIENS 32  // an alien structure is in the way
+#define NAVLINK_BLOCKED_HUMANS 64  // a human structure is in the way
+#define NAVLINK_BLOCKED ( NAVLINK_BLOCKED_ALIENS | NAVLINK_BLOCKED_HUMANS )
+#define NAVLINK_SIZE_SHIFT 2  // largest size class that fits through the link
+#define NAVLINK_SIZE_MASK ( 7 << NAVLINK_SIZE_SHIFT )
+#define NAV_NUM_SIZES 6    // humans and dretches, basilisks, grangers, marauders, dragoons, tyrants
 
 void      G_BotNavInit( void );
 void      G_BotNavFrame( int budgetMsec );
 void      G_BotNavDump( void );
 void      G_BotNavTrace( void );
 qboolean  G_BotNavInHazard( const vec3_t origin );
-int       G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxPath );
+int       G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxPath, int size, team_t team );
+int       G_BotNavSizeClass( const vec3_t mins, const vec3_t maxs );
+qboolean  G_BotNavWouldBlock( const vec3_t absmin, const vec3_t absmax );
+qboolean  G_BotNavOpenGround( const vec3_t absmin, const vec3_t absmax );
 int       G_BotNavNearestNode( const vec3_t origin );
 int       G_BotNavNumNodes( void );
 void      G_BotNavNodeOrigin( int node, vec3_t out );
 int       G_BotNavLinkFlags( int from, int to );
-void      G_BotNavRemoveLink( int from, int to );
+int       G_BotNavVersion( void );
+void      G_BotNavLinkFailed( int from, int to );
 qboolean  G_BotNavRandomNodeNear( const vec3_t origin, float minDist, float maxDist, vec3_t out );
 
 //some maxs

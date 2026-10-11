@@ -42,7 +42,7 @@ Cvars:
   bot_minplayers  keep at least this many players on each team, using bots
   bot_skill       default skill for new bots (1-5)
   bot_builders    bots on each team that build and repair the base
-  bot_debug       print where and how bots die, to find map hazards
+  bot_debug       print where and how bots die or get stuck, to find map problems
   bot_navBudget   msec per frame spent building the navigation graph
 ===========================================================================
 */
@@ -88,6 +88,7 @@ typedef struct
   vec3_t    pathGoal;
   int       nextPathTime;
   int       nextShortcutTime;
+  int       pathVersion;      // obstacles change the graph, repath when they do
 
   // enemy
   int       enemy;
@@ -797,15 +798,31 @@ static qboolean BotCanWalkTo( gentity_t *self, const vec3_t target )
 {
   trace_t tr;
   vec3_t  start, end;
+  int     pass = self->s.number;
+  int     i;
 
   VectorCopy( self->r.currentOrigin, start );
   start[ 2 ] += 18.0f;
   VectorCopy( target, end );
   end[ 2 ] += 18.0f;
 
-  trap_Trace( &tr, start, self->r.mins, self->r.maxs, end, self->s.number,
-              CONTENTS_SOLID | CONTENTS_PLAYERCLIP );
-  return tr.fraction >= 1.0f;
+  // structures are in the way, other players will move
+  for( i = 0; i < 4; i++ )
+  {
+    trap_Trace( &tr, start, self->r.mins, self->r.maxs, end, pass, MASK_PLAYERSOLID );
+
+    if( tr.fraction >= 1.0f )
+      return qtrue;
+
+    if( tr.startsolid || tr.entityNum >= MAX_CLIENTS )
+      return qfalse;
+
+    // carry on past the player from where we hit them
+    pass = tr.entityNum;
+    VectorCopy( tr.endpos, start );
+  }
+
+  return qfalse;
 }
 
 // returns the direction to walk in, and whether to jump
@@ -818,10 +835,13 @@ static qboolean BotPathDirection( gentity_t *self, botState_t *bs,
   VectorCopy( self->r.currentOrigin, origin );
   *jump = qfalse;
 
-  if( level.time >= bs->nextPathTime ||
+  if( level.time >= bs->nextPathTime || bs->pathVersion != G_BotNavVersion( ) ||
       DistanceSquared( goal, bs->pathGoal ) > Square( 128.0f ) )
   {
-    bs->pathLength = G_BotNavFindPath( origin, goal, bs->path, BOT_MAX_PATH );
+    bs->pathVersion = G_BotNavVersion( );
+    bs->pathLength = G_BotNavFindPath( origin, goal, bs->path, BOT_MAX_PATH,
+                                       G_BotNavSizeClass( self->r.mins, self->r.maxs ),
+                                       self->client->pers.teamSelection );
     bs->pathIndex = 0;
     VectorCopy( goal, bs->pathGoal );
     bs->nextPathTime = level.time + 2000 + rand( ) % 1000;
@@ -922,17 +942,46 @@ static void BotCheckStuck( gentity_t *self, botState_t *bs, qboolean moving )
 
   bs->nextStuckTime = level.time + 1000;
 
+  // pressing up against an enemy we're fighting isn't being stuck
+  if( moving && bs->enemy >= 0 && bs->enemyVisible &&
+      Distance( g_entities[ bs->enemy ].r.currentOrigin, self->r.currentOrigin ) < 150.0f )
+    moving = qfalse;
+
   if( moving && Distance( self->r.currentOrigin, bs->lastPos ) < 32.0f )
   {
     bs->stuckCount++;
+
+    if( bot_debug.integer )
+    {
+      gentity_t *near = NULL;
+      float     d, nearDist = 0.0f;
+      int       i;
+
+      for( i = 0; i < botNumBuildables; i++ )
+      {
+        d = Distance( botBuildables[ i ]->r.currentOrigin, self->r.currentOrigin );
+        if( !near || d < nearDist )
+        {
+          near = botBuildables[ i ];
+          nearDist = d;
+        }
+      }
+
+      G_Printf( "botstuck: %s %s at (%.0f %.0f %.0f) goal %d path %d/%d near %s %.0f\n",
+                BG_TeamName( self->client->pers.teamSelection ),
+                BG_Class( self->client->ps.stats[ STAT_CLASS ] )->name,
+                self->r.currentOrigin[ 0 ], self->r.currentOrigin[ 1 ], self->r.currentOrigin[ 2 ],
+                bs->goal, bs->pathIndex, bs->pathLength,
+                near ? BG_Buildable( near->s.modelindex )->name : "none", nearDist );
+    }
     bs->unstuckUntil = level.time + 600 + rand( ) % 600;
     bs->strafeDir = ( rand( ) & 1 ) ? 1.0f : -1.0f;
 
     if( bs->stuckCount >= 3 )
     {
-      // give up on this route, and stop anyone else trying the same link
+      // give up on this route, and steer everyone away from the same link
       if( bs->pathIndex > 0 && bs->pathIndex < bs->pathLength )
-        G_BotNavRemoveLink( bs->path[ bs->pathIndex - 1 ], bs->path[ bs->pathIndex ] );
+        G_BotNavLinkFailed( bs->path[ bs->pathIndex - 1 ], bs->path[ bs->pathIndex ] );
       if( bs->pathIndex < bs->pathLength )
         bs->pathIndex++;
       bs->nextPathTime = 0;
@@ -1458,7 +1507,7 @@ static qboolean BotPickSite( team_t team, const vec3_t origin, float minDist, fl
   // check we can get there
   for( i = 0; i < numBest; i++ )
   {
-    n = G_BotNavFindPath( origin, best[ i ], path, ARRAY_LEN( path ) );
+    n = G_BotNavFindPath( origin, best[ i ], path, ARRAY_LEN( path ), 0, team );
     if( !n )
       continue;
 
@@ -1914,6 +1963,31 @@ static void BotGiveUpBuild( botState_t *bs, int delay )
   bs->nextBuildTime = level.time + delay;
 }
 
+// would a structure here leave too narrow a gap to an existing one? A row of
+// them can wall off a base even when no single one blocks anything
+static qboolean BotTooClose( gentity_t *self, const vec3_t mins, const vec3_t maxs )
+{
+  // room for a human to walk between, or a tyrant in the alien base
+  float gap = ( self->client->pers.teamSelection == TEAM_ALIENS ) ? 70.0f : 40.0f;
+  int   i;
+
+  for( i = 0; i < botNumBuildables; i++ )
+  {
+    gentity_t *ent = botBuildables[ i ];
+
+    // players walk over the low ones
+    if( ent->r.absmax[ 2 ] - ent->r.absmin[ 2 ] <= 19.0f )
+      continue;
+
+    if( mins[ 0 ] - gap < ent->r.absmax[ 0 ] && maxs[ 0 ] + gap > ent->r.absmin[ 0 ] &&
+        mins[ 1 ] - gap < ent->r.absmax[ 1 ] && maxs[ 1 ] + gap > ent->r.absmin[ 1 ] &&
+        mins[ 2 ] < ent->r.absmax[ 2 ] && maxs[ 2 ] > ent->r.absmin[ 2 ] )
+      return qtrue;
+  }
+
+  return qfalse;
+}
+
 // try to place the planned structure in the direction we're facing
 static qboolean BotTryPlace( gentity_t *self, botState_t *bs, usercmd_t *cmd )
 {
@@ -1938,6 +2012,24 @@ static qboolean BotTryPlace( gentity_t *self, botState_t *bs, usercmd_t *cmd )
 
   err = G_CanBuild( self, bs->buildType, (int)BG_Class( ps->stats[ STAT_CLASS ] )->buildDist,
                     origin, normal, angles, &groundEntNum );
+
+  // somewhere it would wall off a corridor or doorway is as bad as no room
+  if( err == IBE_NONE || err == IBE_TNODEWARN || err == IBE_RPTNOREAC ||
+      err == IBE_RPTPOWERHERE || err == IBE_SPWNWARN )
+  {
+    vec3_t mins, maxs;
+
+    BG_BuildableBoundingBox( bs->buildType, mins, maxs );
+    VectorAdd( origin, mins, mins );
+    VectorAdd( origin, maxs, maxs );
+
+    // keep to open floor, away from bridges and ledges, and don't wall off a
+    // corridor (players walk over low structures like telenodes)
+    if( !G_BotNavOpenGround( mins, maxs ) ||
+        ( maxs[ 2 ] - mins[ 2 ] > 19.0f &&
+          ( G_BotNavWouldBlock( mins, maxs ) || BotTooClose( self, mins, maxs ) ) ) )
+      err = IBE_NOROOM;
+  }
 
   switch( err )
   {
