@@ -265,6 +265,9 @@ static void GLSL_GetShaderHeader( GLenum shaderType, const GLchar *extra, char *
 		Q_strcat(dest, size, "#version 120\n");
         Q_strcat(dest, size, "#define shadow2D(a,b) shadow2D(a,b).r \n");
 	}
+#else
+	// WebGL's GLSL ES has no default float precision in fragment shaders
+	Q_strcat(dest, size, "precision mediump float;\n");
 #endif
 	// HACK: add some macros to avoid extra uniforms and save speed and code maintenance
 	//Q_strcat(dest, size,

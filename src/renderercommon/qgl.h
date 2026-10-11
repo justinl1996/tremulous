@@ -114,6 +114,13 @@ extern void (APIENTRYP qglUnlockArraysEXT) (void);
 #define qglEdgeFlagPointer glEdgeFlagPointer
 #define qglEdgeFlagv glEdgeFlagv
 #define qglEnable glEnable
+#ifndef __EMSCRIPTEN__
+// WebGL has no fixed function pipeline, see QGL_LEGACY_PROCS
+#define qglColor4f glColor4f
+#define qglColor4fv glColor4fv
+#define qglDisableClientState glDisableClientState
+#define qglEnableClientState glEnableClientState
+#endif
 #define qglEnd glEnd
 #define qglEndList glEndList
 #define qglEvalCoord1d glEvalCoord1d
@@ -401,16 +408,13 @@ extern void (APIENTRYP qglUnlockArraysEXT) (void);
 #define QGL_2_0_PROCS \
 	GLE(void, AttachShader, GLuint program, GLuint shader) \
 	GLE(void, BindAttribLocation, GLuint program, GLuint index, const GLchar *name) \
-	GLE(void, Color4f, GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) \
 	GLE(void, CompileShader, GLuint shader) \
 	GLE(GLuint, CreateProgram, void) \
 	GLE(GLuint, CreateShader, GLenum type) \
-	GLE(void, DisableClientState, GLenum cap) \
 	GLE(void, DeleteProgram, GLuint program) \
 	GLE(void, DeleteShader, GLuint shader) \
 	GLE(void, DetachShader, GLuint program, GLuint shader) \
 	GLE(void, DisableVertexAttribArray, GLuint index) \
-	GLE(void, EnableClientState, GLenum cap) \
 	GLE(void, EnableVertexAttribArray, GLuint index) \
 	GLE(void, GetActiveUniform, GLuint program, GLuint index, GLsizei bufSize, GLsizei *length, GLint *size, GLenum *type, GLchar *name) \
 	GLE(void, GetProgramiv, GLuint program, GLenum pname, GLint *params) \
@@ -431,6 +435,18 @@ extern void (APIENTRYP qglUnlockArraysEXT) (void);
 	GLE(void, UniformMatrix4fv, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) \
 	GLE(void, ValidateProgram, GLuint program) \
 	GLE(void, VertexAttribPointer, GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer) \
+
+// Fixed function calls that WebGL doesn't provide, so the web build looks them
+// up at runtime instead of linking against them. Desktop builds call them directly.
+#ifdef __EMSCRIPTEN__
+#define QGL_LEGACY_PROCS \
+	GLE(void, Color4f, GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) \
+	GLE(void, DisableClientState, GLenum cap) \
+	GLE(void, EnableClientState, GLenum cap) \
+
+#else
+#define QGL_LEGACY_PROCS
+#endif
 
 // GL_NVX_gpu_memory_info
 #ifndef GL_NVX_gpu_memory_info
@@ -560,6 +576,7 @@ extern void (APIENTRYP qglUnlockArraysEXT) (void);
 QGL_1_3_PROCS;
 QGL_1_5_PROCS;
 QGL_2_0_PROCS;
+QGL_LEGACY_PROCS;
 QGL_3_0_PROCS;
 QGL_ARB_framebuffer_object_PROCS;
 QGL_ARB_vertex_array_object_PROCS;

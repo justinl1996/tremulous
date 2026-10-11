@@ -1,4 +1,3 @@
-precision mediump float;
 attribute vec4 attr_Position;
 attribute vec4 attr_TexCoord0;
 

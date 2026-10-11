@@ -1,4 +1,3 @@
-precision mediump float;
 uniform vec4  u_LightOrigin;
 uniform float u_LightRadius;
 

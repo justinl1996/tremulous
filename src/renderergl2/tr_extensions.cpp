@@ -35,6 +35,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 QGL_1_3_PROCS;
 QGL_1_5_PROCS;
 QGL_2_0_PROCS;
+QGL_LEGACY_PROCS;
 QGL_3_0_PROCS;
 QGL_ARB_framebuffer_object_PROCS;
 QGL_ARB_vertex_array_object_PROCS;
@@ -80,6 +81,7 @@ void GLimp_InitExtraExtensions()
     // OpenGL 2.0, was GL_ARB_shading_language_100, GL_ARB_vertex_program, GL_ARB_shader_objects, and
     // GL_ARB_vertex_shader
     QGL_2_0_PROCS;
+    QGL_LEGACY_PROCS;
 
     // OpenGL 3.0 - no matching extension
     // QGL_*_PROCS becomes several functions, do not remove {}

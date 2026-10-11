@@ -2033,7 +2033,8 @@ ifneq ($(USE_RENDERER_DLOPEN), 0)
     $(B)/renderergl1/q_shared.o \
     $(B)/renderergl1/puff.o \
     $(B)/renderergl1/q_math.o \
-    $(B)/renderergl1/tr_subs.o
+    $(B)/renderergl1/tr_subs.o \
+    $(B)/renderergl1/json.o
 endif
 
 Q3R2STRINGOBJ = \

@@ -1,4 +1,3 @@
-precision mediump float;
 uniform sampler2D u_TextureMap;
 
 uniform vec4      u_Color;

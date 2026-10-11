@@ -1,4 +1,3 @@
-precision mediump float;
 uniform sampler2D u_ScreenImageMap;
 uniform sampler2D u_ScreenDepthMap;
 

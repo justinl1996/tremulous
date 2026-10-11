@@ -1989,7 +1989,8 @@ static void RawImage_UploadTexture(GLuint texture, byte *data, int x, int y,
 			if (rgba8 && rgtc) {
 				RawImage_UploadToRgtc2Texture(texture, miplevel, x, y, width, height, data);
 			} else {
-				qglTextureSubImage2DEXT(texture, target, miplevel, x, y, width, height, internalFormat, dataType, data);
+				// the pixel layout, not the storage format (they're the same on the web)
+				qglTextureSubImage2DEXT(texture, target, miplevel, x, y, width, height, dataFormat, dataType, data);
 			}
 		}
 

@@ -47,8 +47,11 @@ static	edgeDef_t	edgeDefs[SHADER_MAX_VERTEXES][MAX_EDGE_DEFS];
 static	int			numEdgeDefs[SHADER_MAX_VERTEXES];
 static	int			facing[SHADER_MAX_INDEXES/3];
 static	vec3_t		shadowXyz[SHADER_MAX_VERTEXES];
+#ifdef EMSCRIPTEN
+// WebGL has no glBegin/glEnd, so shadow edges are batched into one draw
 static unsigned short indexes[6*MAX_EDGE_DEFS*SHADER_MAX_VERTEXES];
 static  int idx = 0;
+#endif
 
 void R_AddEdgeDef( int i1, int i2, int facing ) {
 	int		c;
@@ -101,7 +104,9 @@ void R_RenderShadowEdges( void ) {
 	int		c_edges, c_rejected;
 	int		hit[2];
 
+#ifdef EMSCRIPTEN
 	idx = 0;
+#endif
 	// an edge is NOT a silhouette edge if its face doesn't face the light,
 	// or if it has a reverse paired edge that also faces the light.
 	// A well behaved polyhedron would have exactly two faces for each edge,
@@ -227,7 +232,11 @@ void RB_ShadowTessEnd( void ) {
 
 	GL_BindToTMU( tr.whiteImage, TB_COLORMAP );
 	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+#ifdef EMSCRIPTEN
 	qglColor4f( 0.2f, 0.2f, 0.2f, 1.0f );
+#else
+	qglColor3f( 0.2f, 0.2f, 0.2f );
+#endif
 
 	// don't write to the color buffer
 	qglGetBooleanv(GL_COLOR_WRITEMASK, rgba);

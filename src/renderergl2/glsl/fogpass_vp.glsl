@@ -1,4 +1,3 @@
-precision mediump float;
 attribute vec3  attr_Position;
 attribute vec3  attr_Normal;
 
