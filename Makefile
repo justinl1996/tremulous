@@ -1362,10 +1362,10 @@ endif
 $(B).zip: $(TARGETS)
 	${echo_cmd} "Packaging files into $(B).zip"
 ifeq ($(PLATFORM),darwin)
-	@("./make-macosx-app.sh" release $(ARCH); if [ "$$?" -eq 0 ] && [ -d "$(B)/Tremulous.app" ]; then rm -f $@; cd $(B) && zip --symlinks -qr9 ../../$@ GPL COPYING CC `find "Tremulous.app" -print | sed -e "s!$(B)/!!g"`; else rm -f $@; cd $(B) && zip -qr9 ../../$@ $(NAKED_TARGETS) gpp/*.pk3; fi)
+	@("./make-macosx-app.sh" release $(ARCH); if [ "$$?" -eq 0 ] && [ -d "$(B)/Tremulous.app" ]; then rm -f $@; cd $(B) && zip --symlinks -qr9 $(CURDIR)/$@ GPL COPYING CC `find "Tremulous.app" -print | sed -e "s!$(B)/!!g"`; else rm -f $@; cd $(B) && zip -qr9 $(CURDIR)/$@ $(NAKED_TARGETS) gpp/*.pk3; fi)
 else
 	@rm -f $@
-	@(cd $(B) && zip -qr9 ../../$@ $(NAKED_TARGETS) gpp/*.pk3)
+	@(cd $(B) && zip -qr9 $(CURDIR)/$@ $(NAKED_TARGETS) gpp/*.pk3)
 	@echo "Created $@"
 endif
 

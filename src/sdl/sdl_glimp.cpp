@@ -370,6 +370,13 @@ static int GLimp_SetMode( bool failSafe, bool fullscreen, bool noborder, bool co
 		colorBits = 24;
 
 	alphaBits = r_alphabits->value;
+#ifdef EMSCRIPTEN
+	// The browser composites the canvas using its alpha channel, so blends
+	// that write destination alpha (e.g. GL_ZERO GL_ONE_MINUS_SRC_COLOR
+	// decals) would punch see-through holes in the page. Ask for an opaque
+	// canvas instead.
+	alphaBits = 0;
+#endif
 
 	if (!r_depthbits->value)
 		depthBits = 24;
