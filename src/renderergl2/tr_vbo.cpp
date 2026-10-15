@@ -606,8 +606,12 @@ void RB_UpdateTessVao(unsigned int attribBits)
 
 		R_BindVao(tess.vao);
 
+#ifndef EMSCRIPTEN
 		// orphan old vertex buffer so we don't stall on it
+		// (WebGL has to allocate and zero fill the whole buffer on every
+		// glBufferData, which costs far more than the stall it avoids)
 		qglBufferData(GL_ARRAY_BUFFER, tess.vao->vertexesSize, NULL, GL_DYNAMIC_DRAW);
+#endif
 
 		// if nothing to set, set everything
 		if(!(attribBits & ATTR_BITS))
@@ -647,8 +651,10 @@ void RB_UpdateTessVao(unsigned int attribBits)
 			}
 		}
 
+#ifndef EMSCRIPTEN
 		// orphan old index buffer so we don't stall on it
 		qglBufferData(GL_ELEMENT_ARRAY_BUFFER, tess.vao->indexesSize, NULL, GL_DYNAMIC_DRAW);
+#endif
 
 		qglBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, tess.numIndexes * sizeof(tess.indexes[0]), tess.indexes);
 	}

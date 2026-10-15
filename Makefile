@@ -787,8 +787,7 @@ ifeq ($(PLATFORM),js)
   BINEXT=.js
 # debug optimize flags: --closure 0 --minify 0 -g
 
-  #OPTIMIZEVM += -O3
-  OPTIMIZEVM += -O1 #FIXME: Issue https://github.com/justinl1996/tremulous/issues/8
+  OPTIMIZEVM += -O3
   #OPTIMIZEVM += -O0 -g
   OPTIMIZE = $(OPTIMIZEVM)
 

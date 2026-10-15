@@ -1227,6 +1227,12 @@ void SV_Frame( int msec ) {
 		return;
 	}
 
+	// the game isn't loaded yet while an asynchronous FS_Restart is
+	// still running for SV_SpawnServer
+	if ( !sv.gvm ) {
+		return;
+	}
+
 	// allow pause if only the local client is connected
 	if ( SV_CheckPaused() ) {
 		return;

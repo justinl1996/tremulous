@@ -917,6 +917,15 @@ const void	*RB_DrawSurfs( const void *data ) {
 
 	isShadowView = !!(backEnd.viewParms.flags & VPF_DEPTHSHADOW);
 
+	bool depthPrepass = r_depthPrepass->integer || isShadowView;
+#ifdef EMSCRIPTEN
+	// The prepass only feeds sun shadows, SSAO and shadow blur. Without them
+	// it just draws the whole world twice, and WebGL draw calls are expensive.
+	if (!isShadowView && !tr.hdrDepthFbo && !r_ssao->integer &&
+		!(r_sunlightMode->integer && (backEnd.viewParms.flags & VPF_USESUNLIGHT)))
+		depthPrepass = false;
+#endif
+
 	// clear the z buffer, set the modelview, etc
 	RB_BeginDrawingView ();
 
@@ -925,7 +934,7 @@ const void	*RB_DrawSurfs( const void *data ) {
 		qglEnable(GL_DEPTH_CLAMP);
 	}
 
-	if (glRefConfig.framebufferObject && !(backEnd.refdef.rdflags & RDF_NOWORLDMODEL) && (r_depthPrepass->integer || isShadowView))
+	if (glRefConfig.framebufferObject && !(backEnd.refdef.rdflags & RDF_NOWORLDMODEL) && depthPrepass)
 	{
 		FBO_t *oldFbo = glState.currentFBO;
 		vec4_t viewInfo;
