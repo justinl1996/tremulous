@@ -1118,29 +1118,52 @@ void      Svcmd_BotStatus_f( void );
 // g_bot_nav.c
 //
 #define NAVLINK_JUMP 1  // the link needs a jump to cross
-#define NAVLINK_BLOCKED_ALIENS 32  // an alien structure is in the way
-#define NAVLINK_BLOCKED_HUMANS 64  // a human structure is in the way
-#define NAVLINK_BLOCKED ( NAVLINK_BLOCKED_ALIENS | NAVLINK_BLOCKED_HUMANS )
+#define NAVLINK_CROUCH 2  // humans have to crouch to get through
 #define NAVLINK_SIZE_SHIFT 2  // largest size class that fits through the link
 #define NAVLINK_SIZE_MASK ( 7 << NAVLINK_SIZE_SHIFT )
-#define NAV_NUM_SIZES 6    // humans and dretches, basilisks, grangers, marauders, dragoons, tyrants
+#define NAVLINK_CLIMB 32  // up a wall, only for aliens that can walk on walls
+#define NAVLINK_HOP 64  // our own structures are in the way, but low enough to jump on
+#define NAVLINK_PORTAL 128  // a teleporter or jump pad carries us across
+#define NAV_NUM_SIZES 7    // humans and dretches, basilisks, grangers, adv. basilisks, marauders and dragoons,
+                           // adv. dragoons and battlesuits, tyrants
+
+// who is asking for a route, and how they like to travel
+typedef struct
+{
+  int       size;       // G_BotNavSizeClass
+  team_t    team;       // our own structures are in the way, the enemy's cost time to destroy
+  float     jump;       // how high we can jump up, 0 if not at all
+  float     hop;        // how high we can jump up onto a structure, 0 if not at all
+  qboolean  climb;      // can walk up walls
+  float     noise;      // 0 takes the shortest route, higher wanders further from it
+  int       seed;       // picks which way the noise leans, keep it for the same route
+  float     caution;    // how much to stay clear of enemy defences and where the team has died
+  qboolean  squeeze;    // boxed in by our own structures, try to get past them anyway
+} navQuery_t;
 
 void      G_BotNavInit( void );
 void      G_BotNavFrame( int budgetMsec );
 void      G_BotNavDump( void );
 void      G_BotNavTrace( void );
+void      G_BotNavPathTest( void );
 qboolean  G_BotNavInHazard( const vec3_t origin );
-int       G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxPath, int size, team_t team );
+int       G_BotNavFindPath( const vec3_t start, const vec3_t goal, int *path, int maxPath, const navQuery_t *query );
 int       G_BotNavSizeClass( const vec3_t mins, const vec3_t maxs );
 qboolean  G_BotNavWouldBlock( const vec3_t absmin, const vec3_t absmax );
 qboolean  G_BotNavOpenGround( const vec3_t absmin, const vec3_t absmax );
 int       G_BotNavNearestNode( const vec3_t origin );
 int       G_BotNavNumNodes( void );
 void      G_BotNavNodeOrigin( int node, vec3_t out );
-int       G_BotNavLinkFlags( int from, int to );
+int       G_BotNavLinkFlags( int from, int to, const navQuery_t *query );
 int       G_BotNavVersion( void );
 void      G_BotNavLinkFailed( int from, int to );
 qboolean  G_BotNavRandomNodeNear( const vec3_t origin, float minDist, float maxDist, vec3_t out );
+qboolean  G_BotNavNodeAround( const vec3_t point, float radius, vec3_t out );
+qboolean  G_BotNavExplore( team_t team, const vec3_t origin, float minDist, float maxDist, vec3_t out );
+void      G_BotNavAddDanger( team_t team, const vec3_t origin, float amount );
+int       G_BotNavRegion( const vec3_t origin );
+float     G_BotNavCeiling( const vec3_t origin, float maxHeight );
+qboolean  G_BotNavConnected( const vec3_t a, const vec3_t b, qboolean climb );
 
 //some maxs
 #define MAX_FILEPATH      144

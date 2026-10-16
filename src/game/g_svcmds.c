@@ -584,6 +584,7 @@ struct svcmd
   { "m", qtrue, Svcmd_MessageWrapper },
   { "mapRotation", qfalse, Svcmd_MapRotation_f },
   { "navdump", qfalse, G_BotNavDump },
+  { "navpath", qfalse, G_BotNavPathTest },
   { "navtrace", qfalse, G_BotNavTrace },
   { "pr", qfalse, Svcmd_Pr_f },
   { "printqueue", qfalse, Svcmd_PrintQueue_f },

@@ -34,9 +34,10 @@ Team, class, buy and evolve requests are issued as normal client commands
 Console commands:
   addbot [name] [aliens|humans] [skill 1-5]
   kickbots [aliens|humans]
-  botstatus                   what every bot is doing
+  botstatus                   what every bot is doing, and abilities used so far
   navdump                     write the navigation graph to nav/<map>.txt
-  navtrace x y z x y z        trace a player box and report what it hits
+  navtrace x y z x y z [class] trace a player box and report what it hits
+  navpath x y z x y z [class] find a route between two points for a class
 
 Cvars:
   bot_minplayers  keep at least this many players on each team, using bots
@@ -56,6 +57,7 @@ Cvars:
 #define BOT_ALIEN_SIGHT       2000.0f
 #define BOT_BUILDABLE_SIGHT   1200.0f
 #define BOT_NODE_REACHED      28.0f
+#define NAV_STEP_HEIGHT       18.0f   // STEPSIZE in bg_pmove.c
 #define BOT_MIN_SKILL         1
 #define BOT_MAX_SKILL         5
 
@@ -66,8 +68,14 @@ typedef enum
   BG_HUNT,        // chase where an enemy was last seen
   BG_ARMOURY,     // humans: buy weapons, armour and ammo
   BG_HEAL,        // retreat somewhere to recover health
-  BG_REGROUP      // aliens: join up with a teammate before attacking
+  BG_REGROUP,     // aliens: join up with a teammate before attacking
+  BG_ROAM         // look around parts of the map the team hasn't been to lately
 } botGoal_t;
+
+// how BotPathDirection wants us to move
+#define BOT_MOVE_JUMP     1
+#define BOT_MOVE_CROUCH   2
+#define BOT_MOVE_CLIMB    4
 
 typedef struct
 {
@@ -89,6 +97,18 @@ typedef struct
   int       nextPathTime;
   int       nextShortcutTime;
   int       pathVersion;      // obstacles change the graph, repath when they do
+  qboolean  pathShort;        // the path stops well short of where we're going
+  qboolean  pathRetried;      // and we've looked again from the end of it
+  qboolean  offGraph;         // nowhere near the graph, heading for offGraphPoint
+  vec3_t    offGraphPoint;
+  int       goalFailTime;     // when a goal last turned out to be out of reach
+  int       idleUntil;        // goals keep failing, wander about until then
+  int       routeSeed;        // which way this bot leans when there's a choice of routes
+  vec3_t    lastFramePos;     // to notice being teleported
+
+  // to come at the goal from another side, go via here first
+  vec3_t    viaPoint;
+  qboolean  viaActive;
 
   // enemy
   int       enemy;
@@ -104,11 +124,40 @@ typedef struct
 
   // movement
   vec3_t    lastPos;
+  vec3_t    lastMoveDir;      // where we last tried to go, for bot_debug
+  signed char lastMove[ 3 ];  // and the moves we made
+  int       groundFail;       // why we last wouldn't step forward
   int       nextStuckTime;
   int       stuckCount;
   int       unstuckUntil;
   float     strafeDir;
   int       nextStrafeTime;
+
+  // steering round something in the way
+  vec3_t    avoidDir;
+  int       avoidUntil;
+
+  int       wallUntil;        // aliens: walk on walls until then
+  int       noWallUntil;      // and not before then, after dropping off
+  int       noCeilingUntil;   // crawling along ceilings didn't work out, walk for a while
+  int       crouchUntil;      // humans: stay crouched until then
+  qboolean  sprinting;        // humans: sprint until stamina runs low, then rest
+  qboolean  wasOnWall;
+  qboolean  wasOnGround;
+  vec3_t    wallSpot;         // the wall we're heading for to get up to the ceiling
+  int       nextWallSearch;
+  int       nextDodgeTime;
+  int       nextHopTime;      // humans: jumping about to put off aliens up close
+  int       hoverUntil;       // humans: keep up in the air on the jetpack until then
+
+  // stuck in the same place again and again: wander off, and in the end
+  // give up and respawn
+  vec3_t    trapOrigin;
+  int       trapStart;
+  int       trapCount;
+  vec3_t    wanderDir;
+  int       wanderUntil;
+  int       nextJetCommandTime;
 
   // alternate attacks that need the button held
   int       chargeStart;
@@ -139,6 +188,8 @@ typedef struct
   // has already checked those are safe
   int         pathDropTime;
   int         pathJumpTime;
+  int         pathHopTime;    // the jump is onto our own structures
+  int         tunnelTime;     // when we were last in a tunnel
 
   // humans fire in bursts rather than holding the trigger down
   int         burstUntil;
@@ -150,6 +201,12 @@ typedef struct
   vec3_t      lastGround;
   int         lastGroundTime;
   int         spawnTime;
+
+  // what the bot has been up to, for botstatus
+  int         statStuck;
+  int         statSprint, statCrouch, statWall, statCeiling, statJet, statTunnel;   // msec
+  int         statJumps, statHops, statClimbs, statDodges;
+  byte        statRegions[ 128 ];   // areas visited, a bit each
 } botState_t;
 
 static botState_t botStates[ MAX_CLIENTS ];
@@ -163,6 +220,8 @@ static int        botNumBuildables;
 static int        botNextMinPlayersCheck;
 static int        botNextBuilderCheck;
 static int        botLastBuildWork[ NUM_TEAMS ];
+static qboolean   botWasAlive[ MAX_CLIENTS ];
+static int        botNextStatsTime;
 
 static const char *botHumanNames[ ] =
 {
@@ -270,6 +329,8 @@ static gentity_t *BotNearestBuildable( gentity_t *self, team_t team,
   return best;
 }
 
+static qboolean BotIsBuilderWeapon( weapon_t weapon );
+
 // small aliens can't survive base defences, they're better off hunting players
 static qboolean BotIsWeakAlien( gentity_t *ent )
 {
@@ -281,11 +342,92 @@ static qboolean BotIsWeakAlien( gentity_t *ent )
            c == PCL_ALIEN_BUILDER0_UPG );
 }
 
-static qboolean BotIsBuilderWeapon( weapon_t weapon );
-
 static void BotCommand( gentity_t *ent, const char *cmd )
 {
   trap_BotClientCommand( ent - g_entities, cmd );
+}
+
+static qboolean BotCanClimb( gentity_t *self )
+{
+  return BG_ClassHasAbility( self->client->ps.stats[ STAT_CLASS ], SCA_WALLCLIMBER );
+}
+
+// a jetpack only works while the reactor stands
+static qboolean BotCanFly( gentity_t *self )
+{
+  return BG_InventoryContainsUpgrade( UP_JETPACK, self->client->ps.stats ) && G_Reactor( );
+}
+
+// on a wall or ceiling, not just ready to grab one
+static qboolean BotOnWall( gentity_t *self )
+{
+  playerState_t *ps = &self->client->ps;
+  vec3_t        normal;
+
+  if( !( ps->stats[ STAT_STATE ] & SS_WALLCLIMBING ) || ps->groundEntityNum == ENTITYNUM_NONE )
+    return qfalse;
+
+  BG_GetClientNormal( ps, normal );
+  return normal[ 2 ] < 0.7f;
+}
+
+// how this bot looks for routes
+static void BotNavQuery( gentity_t *self, botState_t *bs, navQuery_t *query )
+{
+  gclient_t *client = self->client;
+  class_t   cl = client->ps.stats[ STAT_CLASS ];
+  float     jump = BG_Class( cl )->jumpMagnitude;
+
+  memset( query, 0, sizeof( *query ) );
+  query->size = G_BotNavSizeClass( self->r.mins, self->r.maxs );
+  query->team = client->pers.teamSelection;
+  // a jetpack gets up walls as well as claws do
+  query->climb = BotCanClimb( self ) || BotCanFly( self );
+  query->seed = bs->routeSeed;
+
+  // how high a jump takes us, with a little to spare for stepping up at the
+  // top of it. Humans need the stamina
+  query->jump = jump * jump / ( 2.0f * MAX( g_gravity.value, 1.0f ) ) + 6.0f;
+  if( query->team == TEAM_HUMANS &&
+      client->ps.stats[ STAT_STAMINA ] < STAMINA_SLOW_LEVEL + STAMINA_JUMP_TAKE + 100 )
+    query->jump = 0.0f;
+  query->hop = query->jump;
+
+  // errands are best done quickly, fighters spread out and keep clear of
+  // the enemy's defences and anywhere the team keeps dying
+  if( BotIsBuilderWeapon( client->ps.weapon ) || bs->goal == BG_HEAL || bs->goal == BG_ARMOURY )
+  {
+    query->noise = 0.15f;
+    query->caution = 0.5f;
+  }
+  else
+  {
+    query->noise = 0.5f + bs->skill * 0.1f;
+    query->caution = BotIsWeakAlien( self ) ? 2.0f : 1.0f;
+  }
+}
+
+// pmove turns a wall walker's view to match the surface it's on, so turn
+// the view we want back the other way. Only the direction we face can be
+// matched, the roll is up to the surface
+static void BotSetCmdAngles( gentity_t *self, usercmd_t *cmd, const vec3_t view )
+{
+  playerState_t *ps = &self->client->ps;
+  vec3_t        angles, axis[ 3 ], local[ 3 ];
+
+  VectorSet( angles, view[ PITCH ], view[ YAW ], 0.0f );
+
+  if( ps->stats[ STAT_STATE ] & SS_WALLCLIMBING )
+  {
+    AnglesToAxis( angles, axis );
+    if( BG_RotateAxis( ps->grapplePoint, axis, local, qtrue,
+                       ps->eFlags & EF_WALLCLIMBCEILING ) )
+      vectoangles( local[ 0 ], angles );
+  }
+
+  cmd->angles[ PITCH ] = ANGLE2SHORT( angles[ PITCH ] ) - ps->delta_angles[ PITCH ];
+  cmd->angles[ YAW ] = ANGLE2SHORT( angles[ YAW ] ) - ps->delta_angles[ YAW ];
+  cmd->angles[ ROLL ] = 0;
 }
 
 /*
@@ -425,18 +567,26 @@ static weapon_t BotBestAffordableWeapon( gentity_t *self )
   return WP_NONE;
 }
 
+// half the humans fly about with a jetpack rather than save up for a
+// battlesuit, which takes its place on the back
+static qboolean BotJetpacker( gentity_t *self )
+{
+  return ( self - g_entities ) & 1;
+}
+
 static upgrade_t BotWantedUpgrade( gentity_t *self )
 {
   gclient_t *client = self->client;
   int       *stats = client->ps.stats;
-  static const upgrade_t wanted[ ] = { UP_LIGHTARMOUR, UP_HELMET };
+  static const upgrade_t wanted[ ] = { UP_LIGHTARMOUR, UP_HELMET, UP_JETPACK };
   int       i;
 
   // a battlesuit takes the place of the other armour
   if( BG_InventoryContainsUpgrade( UP_BATTLESUIT, stats ) )
     return UP_NONE;
 
-  if( BG_UpgradeIsAllowed( UP_BATTLESUIT ) &&
+  if( !BotJetpacker( self ) && !BG_InventoryContainsUpgrade( UP_JETPACK, stats ) &&
+      BG_UpgradeIsAllowed( UP_BATTLESUIT ) &&
       BG_UpgradeAllowedInStage( UP_BATTLESUIT, g_humanStage.integer ) &&
       client->pers.credit >= BG_Upgrade( UP_BATTLESUIT )->price )
     return UP_BATTLESUIT;
@@ -446,7 +596,8 @@ static upgrade_t BotWantedUpgrade( gentity_t *self )
     upgrade_t u = wanted[ i ];
 
     if( BG_InventoryContainsUpgrade( u, stats ) || !BG_UpgradeIsAllowed( u ) ||
-        !BG_UpgradeAllowedInStage( u, g_humanStage.integer ) )
+        !BG_UpgradeAllowedInStage( u, g_humanStage.integer ) ||
+        ( u == UP_JETPACK && !BotJetpacker( self ) ) )
       continue;
 
     if( client->pers.credit >= BG_Upgrade( u )->price )
@@ -531,6 +682,44 @@ static void BotShop( gentity_t *self, botState_t *bs )
     BotCommand( self, "buy ammo" );
 }
 
+static gentity_t *BotTeamCore( team_t team );
+static gentity_t *BotRandomEnemyBuildable( gentity_t *self );
+
+// could we get to the enemy as this class? Some maps only let the big aliens
+// out of their base through gaps they don't fit, or past barricades they
+// can't jump onto
+static qboolean BotClassCanReach( gentity_t *self, botState_t *bs, class_t cl )
+{
+  gentity_t   *target = BotTeamCore( TEAM_HUMANS );
+  vec3_t      mins, maxs, end;
+  navQuery_t  query;
+  int         path[ BOT_MAX_PATH ], n;
+  float       jump = BG_Class( cl )->jumpMagnitude;
+
+  if( !target )
+    target = BotRandomEnemyBuildable( self );
+  if( !target || !G_BotNavNumNodes( ) )
+    return qtrue;
+
+  BG_ClassBoundingBox( cl, mins, maxs, NULL, NULL, NULL );
+  BotNavQuery( self, bs, &query );
+  query.size = G_BotNavSizeClass( mins, maxs );
+  query.climb = BG_ClassHasAbility( cl, SCA_WALLCLIMBER );
+  query.jump = query.hop = jump * jump / ( 2.0f * MAX( g_gravity.value, 1.0f ) ) + 6.0f;
+  query.noise = 0.0f;
+
+  // no bigger than we are now, we'll fit wherever we can go already
+  if( query.size <= G_BotNavSizeClass( self->r.mins, self->r.maxs ) )
+    return qtrue;
+
+  n = G_BotNavFindPath( self->r.currentOrigin, target->r.currentOrigin, path, ARRAY_LEN( path ), &query );
+  if( !n )
+    return qfalse;
+
+  G_BotNavNodeOrigin( path[ n - 1 ], end );
+  return Distance( end, target->r.currentOrigin ) < 300.0f;
+}
+
 static void BotEvolve( gentity_t *self, botState_t *bs )
 {
   gclient_t *client = self->client;
@@ -558,6 +747,9 @@ static void BotEvolve( gentity_t *self, botState_t *bs )
 
     if( BG_ClassCanEvolveFromTo( current, c, client->pers.credit,
                                  g_alienStage.integer, 0 ) < 0 )
+      continue;
+
+    if( !BotClassCanReach( self, bs, c ) )
       continue;
 
     choice = i;
@@ -588,7 +780,8 @@ static gentity_t *BotRandomEnemyBuildable( gentity_t *self )
     buildable_t type = ent->s.modelindex;
     int         p;
 
-    if( ent->buildableTeam == team || ent->health <= 0 )
+    if( ent->buildableTeam == team || ent->health <= 0 ||
+        !G_BotNavConnected( self->r.currentOrigin, ent->r.currentOrigin, BotCanClimb( self ) ) )
       continue;
 
     // spawns and the main structure win games, so prefer them
@@ -617,7 +810,75 @@ static qboolean BotGoalBlocked( botState_t *bs, gentity_t *target )
          level.time < bs->blockedUntil;
 }
 
+// sometimes come at a far off goal from the side rather than straight on
+static void BotPlanFlank( gentity_t *self, botState_t *bs )
+{
+  vec3_t  mid, side, via;
+  float   d;
+
+  bs->viaActive = qfalse;
+
+  d = Distance( self->r.currentOrigin, bs->goalOrigin );
+  if( d < 1000.0f || BotRandom( ) > 0.2f + bs->skill * 0.05f )
+    return;
+
+  VectorAdd( self->r.currentOrigin, bs->goalOrigin, mid );
+  VectorScale( mid, 0.5f, mid );
+  VectorSet( side, self->r.currentOrigin[ 1 ] - bs->goalOrigin[ 1 ],
+                   bs->goalOrigin[ 0 ] - self->r.currentOrigin[ 0 ], 0.0f );
+  VectorNormalize( side );
+  VectorMA( mid, ( ( rand( ) & 1 ) ? 1.0f : -1.0f ) * d * ( 0.25f + BotRandom( ) * 0.25f ), side, mid );
+
+  if( G_BotNavNodeAround( mid, 400.0f, via ) )
+  {
+    VectorCopy( via, bs->viaPoint );
+    bs->viaActive = qtrue;
+  }
+}
+
+// head somewhere the team hasn't been for a while
+static qboolean BotChooseRoam( gentity_t *self, botState_t *bs )
+{
+  vec3_t spot;
+
+  if( !G_BotNavExplore( self->client->pers.teamSelection, self->r.currentOrigin,
+                        500.0f, 3000.0f, spot ) )
+    return qfalse;
+
+  bs->goal = BG_ROAM;
+  bs->goalEntity = -1;
+  VectorCopy( spot, bs->goalOrigin );
+  bs->nextGoalTime = level.time + 25000 + rand( ) % 15000;
+  bs->viaActive = qfalse;
+  return qtrue;
+}
+
+static void BotChooseGoalFor( gentity_t *self, botState_t *bs );
+
 static void BotChooseGoal( gentity_t *self, botState_t *bs )
+{
+  botGoal_t oldGoal = bs->goal;
+  int       oldEntity = bs->goalEntity;
+  vec3_t    oldOrigin;
+
+  VectorCopy( bs->goalOrigin, oldOrigin );
+  BotChooseGoalFor( self, bs );
+
+  // somewhere new, so pick a new way there
+  if( bs->goal != oldGoal || bs->goalEntity != oldEntity ||
+      ( bs->goalEntity < 0 && DistanceSquared( bs->goalOrigin, oldOrigin ) > Square( 300.0f ) ) )
+  {
+    bs->routeSeed = rand( );
+    bs->nextPathTime = 0;
+
+    if( bs->goal == BG_ATTACK )
+      BotPlanFlank( self, bs );
+    else
+      bs->viaActive = qfalse;
+  }
+}
+
+static void BotChooseGoalFor( gentity_t *self, botState_t *bs )
 {
   gclient_t *client = self->client;
   team_t    team = client->pers.teamSelection;
@@ -681,6 +942,11 @@ static void BotChooseGoal( gentity_t *self, botState_t *bs )
     return;
   }
 
+  // keep exploring until we get there
+  if( bs->goal == BG_ROAM && level.time < bs->nextGoalTime &&
+      Distance( self->r.currentOrigin, bs->goalOrigin ) > 150.0f )
+    return;
+
   // keep attacking the same structure while it stands
   if( bs->goal == BG_ATTACK && bs->goalEntity >= 0 &&
       level.time < bs->nextGoalTime )
@@ -730,6 +996,11 @@ static void BotChooseGoal( gentity_t *self, botState_t *bs )
       bs->regroupUntil = 0;
   }
 
+  // now and then look around the map rather than heading straight for the
+  // enemy, the small aliens more than the rest
+  if( BotRandom( ) < ( BotIsWeakAlien( self ) ? 0.35f : 0.15f ) && BotChooseRoam( self, bs ) )
+    return;
+
   // weak aliens roam after players, everybody else goes for the base,
   // skipping anything we've just failed to reach
   if( !BotIsWeakAlien( self ) )
@@ -754,7 +1025,8 @@ static void BotChooseGoal( gentity_t *self, botState_t *bs )
     {
       gentity_t *other = botPlayers[ i ];
 
-      if( other->client->pers.teamSelection == team || BotGoalBlocked( bs, other ) )
+      if( other->client->pers.teamSelection == team || BotGoalBlocked( bs, other ) ||
+          !G_BotNavConnected( self->r.currentOrigin, other->r.currentOrigin, BotCanClimb( self ) ) )
         continue;
 
       d = DistanceSquared( other->r.currentOrigin, self->r.currentOrigin );
@@ -825,89 +1097,6 @@ static qboolean BotCanWalkTo( gentity_t *self, const vec3_t target )
   return qfalse;
 }
 
-// returns the direction to walk in, and whether to jump
-static qboolean BotPathDirection( gentity_t *self, botState_t *bs,
-                                  const vec3_t goal, vec3_t dir, qboolean *jump )
-{
-  vec3_t  origin, node, delta;
-  float   horizontal;
-
-  VectorCopy( self->r.currentOrigin, origin );
-  *jump = qfalse;
-
-  if( level.time >= bs->nextPathTime || bs->pathVersion != G_BotNavVersion( ) ||
-      DistanceSquared( goal, bs->pathGoal ) > Square( 128.0f ) )
-  {
-    bs->pathVersion = G_BotNavVersion( );
-    bs->pathLength = G_BotNavFindPath( origin, goal, bs->path, BOT_MAX_PATH,
-                                       G_BotNavSizeClass( self->r.mins, self->r.maxs ),
-                                       self->client->pers.teamSelection );
-    bs->pathIndex = 0;
-    VectorCopy( goal, bs->pathGoal );
-    bs->nextPathTime = level.time + 2000 + rand( ) % 1000;
-
-    // the nearest node may be behind us
-    if( bs->pathLength > 1 )
-    {
-      G_BotNavNodeOrigin( bs->path[ 1 ], node );
-      if( BotCanWalkTo( self, node ) )
-        bs->pathIndex = 1;
-    }
-  }
-
-  // skip nodes we've reached
-  while( bs->pathIndex < bs->pathLength )
-  {
-    G_BotNavNodeOrigin( bs->path[ bs->pathIndex ], node );
-    VectorSubtract( node, origin, delta );
-    horizontal = sqrt( delta[ 0 ] * delta[ 0 ] + delta[ 1 ] * delta[ 1 ] );
-
-    if( horizontal > BOT_NODE_REACHED || fabs( delta[ 2 ] ) > 56.0f )
-      break;
-
-    bs->pathIndex++;
-  }
-
-  // cut corners when the next node is in plain reach
-  if( bs->pathIndex + 1 < bs->pathLength && level.time >= bs->nextShortcutTime )
-  {
-    bs->nextShortcutTime = level.time + 300;
-    G_BotNavNodeOrigin( bs->path[ bs->pathIndex + 1 ], node );
-
-    if( fabs( node[ 2 ] - origin[ 2 ] ) < 18.0f &&
-        !( G_BotNavLinkFlags( bs->path[ bs->pathIndex ],
-                              bs->path[ bs->pathIndex + 1 ] ) & NAVLINK_JUMP ) &&
-        BotCanWalkTo( self, node ) )
-      bs->pathIndex++;
-  }
-
-  if( bs->pathIndex >= bs->pathLength )
-  {
-    VectorSubtract( goal, origin, dir );
-    return bs->pathLength > 0 || BotCanWalkTo( self, goal );
-  }
-
-  G_BotNavNodeOrigin( bs->path[ bs->pathIndex ], node );
-  VectorSubtract( node, origin, dir );
-
-  if( dir[ 2 ] < -18.0f )
-    bs->pathDropTime = level.time;
-
-  // jump links get a jump, and so does climbing more than a step up to the
-  // next node in case we've cut a corner and aren't on the marked link
-  if( dir[ 0 ] * dir[ 0 ] + dir[ 1 ] * dir[ 1 ] < Square( 72.0f ) &&
-      ( dir[ 2 ] > 18.0f ||
-        ( bs->pathIndex > 0 &&
-          ( G_BotNavLinkFlags( bs->path[ bs->pathIndex - 1 ],
-                               bs->path[ bs->pathIndex ] ) & NAVLINK_JUMP ) ) ) )
-  {
-    *jump = qtrue;
-    bs->pathJumpTime = level.time;
-  }
-
-  return qtrue;
-}
-
 // jump over low obstacles in the way
 static qboolean BotShouldJumpObstacle( gentity_t *self, const vec3_t dir )
 {
@@ -935,8 +1124,378 @@ static qboolean BotShouldJumpObstacle( gentity_t *self, const vec3_t dir )
   return tr.fraction >= 1.0f;
 }
 
+// returns the direction to go in, and in moveFlags how (BOT_MOVE_*). Returns
+// qfalse when we've got as close as the graph goes and can't see a way on
+static qboolean BotPathDirection( gentity_t *self, botState_t *bs,
+                                  const vec3_t goalIn, vec3_t dir, int *moveFlags )
+{
+  vec3_t      origin, node, delta, goal;
+  float       horizontal;
+  navQuery_t  query;
+  int         flags, i;
+
+  VectorCopy( self->r.currentOrigin, origin );
+  VectorCopy( goalIn, goal );
+  *moveFlags = 0;
+
+  // going round the side first
+  if( bs->viaActive && VectorCompare( goalIn, bs->goalOrigin ) )
+  {
+    if( Distance( origin, bs->viaPoint ) < 250.0f )
+    {
+      bs->viaActive = qfalse;
+      bs->nextPathTime = 0;
+    }
+    else
+      VectorCopy( bs->viaPoint, goal );
+  }
+
+  BotNavQuery( self, bs, &query );
+
+  if( DistanceSquared( goal, bs->pathGoal ) > Square( 128.0f ) )
+  {
+    bs->pathRetried = qfalse;
+    bs->nextPathTime = 0;
+  }
+
+  if( level.time >= bs->nextPathTime || bs->pathVersion != G_BotNavVersion( ) )
+  {
+    bs->pathVersion = G_BotNavVersion( );
+    bs->pathLength = G_BotNavFindPath( origin, goal, bs->path, BOT_MAX_PATH, &query );
+    bs->pathIndex = 0;
+    bs->pathShort = qfalse;
+    VectorCopy( goal, bs->pathGoal );
+    bs->nextPathTime = level.time + 2000 + rand( ) % 1000;
+
+    if( bs->pathLength > 0 )
+    {
+      G_BotNavNodeOrigin( bs->path[ bs->pathLength - 1 ], node );
+      bs->pathShort = Distance( node, goal ) > 200.0f;
+    }
+    if( !bs->pathShort )
+      bs->pathRetried = qfalse;
+
+    // nowhere on the graph near us, head for somewhere that is
+    bs->offGraph = !bs->pathLength && !BotCanWalkTo( self, goal ) &&
+                   G_BotNavNodeAround( origin, 400.0f, bs->offGraphPoint );
+
+    // the nearest node may be behind us, start from the furthest of the
+    // first few we can walk straight to
+    for( i = 1; i < bs->pathLength && i <= 3; i++ )
+    {
+      if( G_BotNavLinkFlags( bs->path[ i - 1 ], bs->path[ i ], &query ) &
+          ( NAVLINK_CLIMB | NAVLINK_HOP | NAVLINK_PORTAL | NAVLINK_JUMP | NAVLINK_CROUCH ) )
+        break;
+    }
+    for( i--; i > 0; i-- )
+    {
+      G_BotNavNodeOrigin( bs->path[ i ], node );
+      if( fabs( node[ 2 ] - origin[ 2 ] ) < 18.0f && BotCanWalkTo( self, node ) )
+      {
+        bs->pathIndex = i;
+        break;
+      }
+    }
+  }
+
+  // skip nodes we've reached
+  while( bs->pathIndex < bs->pathLength )
+  {
+    G_BotNavNodeOrigin( bs->path[ bs->pathIndex ], node );
+    VectorSubtract( node, origin, delta );
+    horizontal = sqrt( delta[ 0 ] * delta[ 0 ] + delta[ 1 ] * delta[ 1 ] );
+
+    // up on the ceiling, being over it will do
+    if( horizontal > BOT_NODE_REACHED ||
+        ( fabs( delta[ 2 ] ) > 56.0f && !( BotOnWall( self ) && delta[ 2 ] < 0.0f ) ) )
+      break;
+
+    bs->pathIndex++;
+  }
+
+  // cut corners when the next node is in plain reach
+  if( bs->pathIndex + 1 < bs->pathLength && level.time >= bs->nextShortcutTime )
+  {
+    bs->nextShortcutTime = level.time + 300;
+    G_BotNavNodeOrigin( bs->path[ bs->pathIndex + 1 ], node );
+
+    if( fabs( node[ 2 ] - origin[ 2 ] ) < 18.0f &&
+        !( G_BotNavLinkFlags( bs->path[ bs->pathIndex ], bs->path[ bs->pathIndex + 1 ], &query ) &
+           ( NAVLINK_JUMP | NAVLINK_CLIMB | NAVLINK_HOP | NAVLINK_CROUCH | NAVLINK_PORTAL ) ) &&
+        BotCanWalkTo( self, node ) )
+      bs->pathIndex++;
+  }
+
+  if( bs->offGraph )
+  {
+    VectorSubtract( bs->offGraphPoint, origin, dir );
+    if( VectorLength( dir ) < BOT_NODE_REACHED )
+      bs->nextPathTime = 0;
+    return qtrue;
+  }
+
+  if( bs->pathIndex >= bs->pathLength )
+  {
+    VectorSubtract( goal, origin, dir );
+
+    // the route ran out, if we can't see a way to the goal from here it's
+    // not worth pushing against a wall for
+    if( bs->pathShort && !BotCanWalkTo( self, goal ) )
+    {
+      // a detour that doesn't lead anywhere, go straight for the goal
+      if( bs->viaActive )
+      {
+        bs->viaActive = qfalse;
+        bs->nextPathTime = 0;
+        return qtrue;
+      }
+
+      // the search can give up early on a big map, so look again from here
+      if( bs->pathLength > 1 && !bs->pathRetried )
+      {
+        bs->pathRetried = qtrue;
+        bs->nextPathTime = 0;
+        return qtrue;
+      }
+      return qfalse;
+    }
+
+    return bs->pathLength > 0 || BotCanWalkTo( self, goal );
+  }
+
+  G_BotNavNodeOrigin( bs->path[ bs->pathIndex ], node );
+  VectorSubtract( node, origin, dir );
+
+  // dropping down to the next node: if there's a wall in the way of going
+  // straight there, we've cut the corner, so go back to where the link
+  // leaves the ledge from
+  if( dir[ 2 ] < -40.0f && bs->pathIndex > 0 &&
+      !( G_BotNavLinkFlags( bs->path[ bs->pathIndex - 1 ], bs->path[ bs->pathIndex ], NULL ) &
+         NAVLINK_JUMP ) )
+  {
+    static const vec3_t humanMins = { -15.0f, -15.0f, -24.0f };
+    static const vec3_t humanMaxs = { 15.0f, 15.0f, 16.0f };
+    trace_t tr;
+    vec3_t  prev, flat;
+
+    // the link was found with a crouching human, bigger players get pushed
+    // off walls into the gap anyway
+    G_BotNavNodeOrigin( bs->path[ bs->pathIndex - 1 ], prev );
+    VectorSet( flat, node[ 0 ], node[ 1 ], origin[ 2 ] );
+    trap_Trace( &tr, origin, humanMins, humanMaxs, flat, self->s.number, MASK_PLAYERSOLID );
+
+    if( tr.fraction < 1.0f && tr.entityNum == ENTITYNUM_WORLD &&
+        Square( prev[ 0 ] - origin[ 0 ] ) + Square( prev[ 1 ] - origin[ 1 ] ) > Square( 16.0f ) &&
+        fabs( prev[ 2 ] - origin[ 2 ] ) < 40.0f )
+    {
+      VectorSubtract( prev, origin, dir );
+      return qtrue;
+    }
+  }
+
+  if( dir[ 2 ] < -18.0f )
+    bs->pathDropTime = level.time;
+
+  // how to get along the link we're on, and the next one if it's close
+  flags = 0;
+  if( bs->pathIndex > 0 )
+    flags = G_BotNavLinkFlags( bs->path[ bs->pathIndex - 1 ], bs->path[ bs->pathIndex ], &query );
+  if( bs->pathIndex + 1 < bs->pathLength &&
+      dir[ 0 ] * dir[ 0 ] + dir[ 1 ] * dir[ 1 ] < Square( 40.0f ) )
+    flags |= G_BotNavLinkFlags( bs->path[ bs->pathIndex ], bs->path[ bs->pathIndex + 1 ], &query ) &
+             ( NAVLINK_CROUCH | NAVLINK_CLIMB );
+
+  if( ( flags & NAVLINK_CROUCH ) && self->client->pers.teamSelection == TEAM_HUMANS )
+    *moveFlags |= BOT_MOVE_CROUCH;
+
+  // a vent or crawlspace, or a gap only the small fit through
+  if( bs->pathIndex > 0 &&
+      ( ( flags & NAVLINK_CROUCH ) || ( ( flags & NAVLINK_SIZE_MASK ) >> NAVLINK_SIZE_SHIFT ) <= 2 ) )
+    bs->tunnelTime = level.time;
+
+  if( ( flags & NAVLINK_CLIMB ) && query.climb )
+  {
+    *moveFlags |= BOT_MOVE_CLIMB;
+    return qtrue;
+  }
+
+  // jump links get a jump, and so does climbing more than a step up to the
+  // next node in case we've cut a corner and aren't on the marked link.
+  // Jumping onto our own structures takes a run up, so jump a little earlier
+  if( !( *moveFlags & BOT_MOVE_CROUCH ) &&
+      ( ( dir[ 0 ] * dir[ 0 ] + dir[ 1 ] * dir[ 1 ] < Square( 72.0f ) &&
+          ( dir[ 2 ] > 18.0f || ( flags & NAVLINK_JUMP ) ) ) ||
+        ( ( flags & NAVLINK_HOP ) && BotShouldJumpObstacle( self, dir ) ) ) )
+  {
+    *moveFlags |= BOT_MOVE_JUMP;
+    bs->pathJumpTime = level.time;
+    if( flags & NAVLINK_HOP )
+      bs->pathHopTime = level.time;
+  }
+
+  return qtrue;
+}
+
+// what's in the way going this way, ENTITYNUM_NONE if nothing
+static int BotBlockerAhead( gentity_t *self, const vec3_t dir, float dist, trace_t *tr )
+{
+  vec3_t start, end, flat;
+
+  VectorSet( flat, dir[ 0 ], dir[ 1 ], 0.0f );
+  if( VectorNormalize( flat ) < 0.01f )
+    return ENTITYNUM_NONE;
+
+  // a step up, so the floor and low curbs don't count
+  VectorCopy( self->r.currentOrigin, start );
+  start[ 2 ] += 4.0f;
+  VectorMA( start, dist, flat, end );
+  trap_Trace( tr, start, self->r.mins, self->r.maxs, end, self->s.number, MASK_PLAYERSOLID );
+
+  if( tr->startsolid || tr->fraction >= 1.0f )
+    return ENTITYNUM_NONE;
+
+  return tr->entityNum;
+}
+
+static const char *BotBlockerName( int entityNum )
+{
+  gentity_t *ent;
+
+  if( entityNum == ENTITYNUM_NONE )
+    return "nothing";
+  if( entityNum == ENTITYNUM_WORLD )
+    return "world";
+
+  ent = &g_entities[ entityNum ];
+  if( ent->client )
+    return "player";
+  if( ent->s.eType == ET_BUILDABLE )
+    return BG_Buildable( ent->s.modelindex )->name;
+  return ent->classname ? ent->classname : "?";
+}
+
+// for bot_debug: where bots get stuck and what on, to find map problems
+static void BotReportStuck( gentity_t *self, botState_t *bs, int blocker, const trace_t *tr )
+{
+  gentity_t *near = NULL;
+  float     d, nearDist = 0.0f, endDist = -1.0f;
+  vec3_t    end, node;
+  int       i, link = 0;
+
+  for( i = 0; i < botNumBuildables; i++ )
+  {
+    d = Distance( botBuildables[ i ]->r.currentOrigin, self->r.currentOrigin );
+    if( !near || d < nearDist )
+    {
+      near = botBuildables[ i ];
+      nearDist = d;
+    }
+  }
+
+  if( bs->pathLength > 0 )
+  {
+    G_BotNavNodeOrigin( bs->path[ bs->pathLength - 1 ], end );
+    endDist = Distance( end, bs->pathGoal );
+  }
+
+  VectorClear( node );
+  if( bs->pathIndex < bs->pathLength )
+  {
+    G_BotNavNodeOrigin( bs->path[ bs->pathIndex ], node );
+    if( bs->pathIndex > 0 )
+      link = G_BotNavLinkFlags( bs->path[ bs->pathIndex - 1 ], bs->path[ bs->pathIndex ], NULL );
+  }
+
+  G_Printf( "botstuck: %s %s at (%.0f %.0f %.0f) goal %d path %d/%d near %s %.0f "
+            "hit %s normal %.1f %.1f %.1f to (%.0f %.0f %.0f) end %.0f away%s "
+            "move %d %d %d node (%.0f %.0f %.0f) link %d vel %.0f ground %d\n",
+            BG_TeamName( self->client->pers.teamSelection ),
+            BG_Class( self->client->ps.stats[ STAT_CLASS ] )->name,
+            self->r.currentOrigin[ 0 ], self->r.currentOrigin[ 1 ], self->r.currentOrigin[ 2 ],
+            bs->goal, bs->pathIndex, bs->pathLength,
+            near ? BG_Buildable( near->s.modelindex )->name : "none", nearDist,
+            BotBlockerName( blocker ),
+            tr->plane.normal[ 0 ], tr->plane.normal[ 1 ], tr->plane.normal[ 2 ],
+            bs->pathGoal[ 0 ], bs->pathGoal[ 1 ], bs->pathGoal[ 2 ], endDist,
+            BotOnWall( self ) ? " (on wall)" : "",
+            bs->lastMove[ 0 ], bs->lastMove[ 1 ], bs->lastMove[ 2 ],
+            node[ 0 ], node[ 1 ], node[ 2 ], link, VectorLength( self->client->ps.velocity ),
+            bs->groundFail );
+}
+
+// is there room to go this way crouched, but not standing?
+static qboolean BotCrouchFits( gentity_t *self, const vec3_t dir )
+{
+  trace_t tr;
+  vec3_t  mins, maxs, cmaxs, start, end, flat;
+
+  BG_ClassBoundingBox( self->client->ps.stats[ STAT_CLASS ], mins, maxs, cmaxs, NULL, NULL );
+  if( cmaxs[ 2 ] >= maxs[ 2 ] )
+    return qfalse;
+
+  VectorSet( flat, dir[ 0 ], dir[ 1 ], 0.0f );
+  if( VectorNormalize( flat ) < 0.01f )
+    return qfalse;
+
+  VectorCopy( self->r.currentOrigin, start );
+  VectorMA( start, 32.0f, flat, end );
+
+  trap_Trace( &tr, start, mins, maxs, end, self->s.number, MASK_PLAYERSOLID );
+  if( tr.fraction >= 1.0f )
+    return qfalse;
+
+  maxs[ 2 ] = cmaxs[ 2 ];
+  trap_Trace( &tr, start, mins, maxs, end, self->s.number, MASK_PLAYERSOLID );
+  return !tr.startsolid && tr.fraction >= 1.0f;
+}
+
+// decide how to get going again from what's in the way
+static void BotUnstick( gentity_t *self, botState_t *bs, int blocker )
+{
+  gentity_t *ent = ( blocker != ENTITYNUM_NONE && blocker != ENTITYNUM_WORLD ) ?
+                   &g_entities[ blocker ] : NULL;
+  team_t    team = self->client->pers.teamSelection;
+
+  bs->unstuckUntil = level.time + 600 + rand( ) % 600;
+  bs->strafeDir = ( rand( ) & 1 ) ? 1.0f : -1.0f;
+
+  // an enemy structure in the way gets destroyed
+  if( ent && ent->s.eType == ET_BUILDABLE && ent->buildableTeam != team && ent->health > 0 &&
+      !BotIsBuilderWeapon( self->client->ps.weapon ) )
+  {
+    bs->enemy = ent->s.number;
+    bs->enemyVisible = qtrue;
+    bs->enemyLastSeen = level.time;
+    bs->enemySightTime = level.time - 1000;
+    BotEntityCenter( ent, bs->enemyLastPos );
+    return;
+  }
+
+  // climbers go over whatever it is, or down off the wall if that's what's
+  // stuck
+  if( BotCanClimb( self ) )
+  {
+    if( BotOnWall( self ) && bs->stuckCount > 1 )
+    {
+      bs->wallUntil = 0;
+      bs->noWallUntil = level.time + 2000;
+      bs->noCeilingUntil = level.time + 10000;
+    }
+    else if( level.time >= bs->noWallUntil )
+      bs->wallUntil = level.time + 2500;
+    return;
+  }
+
+  // humans duck under anything low in the way
+  if( team == TEAM_HUMANS && !ent && BotCrouchFits( self, bs->lastMoveDir ) )
+    bs->crouchUntil = level.time + 1500;
+}
+
 static void BotCheckStuck( gentity_t *self, botState_t *bs, qboolean moving )
 {
+  trace_t tr;
+  int     blocker;
+
   if( level.time < bs->nextStuckTime )
     return;
 
@@ -950,32 +1509,49 @@ static void BotCheckStuck( gentity_t *self, botState_t *bs, qboolean moving )
   if( moving && Distance( self->r.currentOrigin, bs->lastPos ) < 32.0f )
   {
     bs->stuckCount++;
+    bs->statStuck++;
+
+    if( Distance( self->r.currentOrigin, bs->trapOrigin ) > 150.0f )
+    {
+      VectorCopy( self->r.currentOrigin, bs->trapOrigin );
+      bs->trapStart = level.time;
+      bs->trapCount = 0;
+    }
+    bs->trapCount++;
+
+    memset( &tr, 0, sizeof( tr ) );
+    blocker = BotBlockerAhead( self, bs->lastMoveDir, 24.0f, &tr );
 
     if( bot_debug.integer )
+      BotReportStuck( self, bs, blocker, &tr );
+
+    BotUnstick( self, bs, blocker );
+
+    // nothing's working here: head off somewhere at random for a bit,
+    // forgetting where we were going, and as a last resort respawn
+    if( bs->trapCount >= 6 && level.time >= bs->wanderUntil )
     {
-      gentity_t *near = NULL;
-      float     d, nearDist = 0.0f;
-      int       i;
+      float yaw = BotRandom( ) * 2.0f * M_PI;
 
-      for( i = 0; i < botNumBuildables; i++ )
-      {
-        d = Distance( botBuildables[ i ]->r.currentOrigin, self->r.currentOrigin );
-        if( !near || d < nearDist )
-        {
-          near = botBuildables[ i ];
-          nearDist = d;
-        }
-      }
-
-      G_Printf( "botstuck: %s %s at (%.0f %.0f %.0f) goal %d path %d/%d near %s %.0f\n",
-                BG_TeamName( self->client->pers.teamSelection ),
-                BG_Class( self->client->ps.stats[ STAT_CLASS ] )->name,
-                self->r.currentOrigin[ 0 ], self->r.currentOrigin[ 1 ], self->r.currentOrigin[ 2 ],
-                bs->goal, bs->pathIndex, bs->pathLength,
-                near ? BG_Buildable( near->s.modelindex )->name : "none", nearDist );
+      VectorSet( bs->wanderDir, cos( yaw ), sin( yaw ), 0.0f );
+      bs->wanderUntil = level.time + 1500 + rand( ) % 1500;
+      bs->goal = BG_NONE;
+      bs->goalEntity = -1;
+      bs->viaActive = qfalse;
+      bs->nextPathTime = 0;
+      if( BotCanClimb( self ) && level.time >= bs->noWallUntil )
+        bs->wallUntil = bs->wanderUntil;
     }
-    bs->unstuckUntil = level.time + 600 + rand( ) % 600;
-    bs->strafeDir = ( rand( ) & 1 ) ? 1.0f : -1.0f;
+
+    if( bs->trapCount >= 20 && level.time - bs->trapStart > 40000 )
+    {
+      if( bot_debug.integer )
+        G_Printf( "bottrapped: %s at (%.0f %.0f %.0f), respawning\n", self->client->pers.netname,
+                  self->r.currentOrigin[ 0 ], self->r.currentOrigin[ 1 ], self->r.currentOrigin[ 2 ] );
+      bs->trapCount = 0;
+      BotCommand( self, "kill" );
+      return;
+    }
 
     if( bs->stuckCount >= 3 )
     {
@@ -986,6 +1562,7 @@ static void BotCheckStuck( gentity_t *self, botState_t *bs, qboolean moving )
         bs->pathIndex++;
       bs->nextPathTime = 0;
       bs->stuckCount = 0;
+      bs->viaActive = qfalse;
 
       // and on the goal itself if no route works
       if( ++bs->routeFailures >= 3 && bs->goalEntity >= 0 )
@@ -994,6 +1571,11 @@ static void BotCheckStuck( gentity_t *self, botState_t *bs, qboolean moving )
         bs->blockedUntil = level.time + 30000;
         bs->goal = BG_NONE;
         bs->goalEntity = -1;
+        bs->routeFailures = 0;
+      }
+      else if( bs->routeFailures >= 3 && bs->goal == BG_ROAM )
+      {
+        bs->goal = BG_NONE;
         bs->routeFailures = 0;
       }
     }
@@ -1043,14 +1625,31 @@ static qboolean BotGroundAhead( gentity_t *self, const vec3_t forward, const vec
     if( tr.startsolid || tr.allsolid )
       return qtrue;
 
-    if( tr.fraction >= 1.0f || G_BotNavInHazard( tr.endpos ) )
+    if( G_BotNavInHazard( tr.endpos ) )
+    {
+      botStates[ self - g_entities ].groundFail = 2;
       return qfalse;
+    }
+
+    // a drop the route takes us down has been checked already, just short
+    // of the edge can be deeper than where we'll land
+    if( botStates[ self - g_entities ].pathDropTime == level.time )
+      continue;
+
+    if( tr.fraction >= 1.0f )
+    {
+      botStates[ self - g_entities ].groundFail = 1;
+      return qfalse;
+    }
 
     // too steep to stand on means sliding down whatever is below, though
-    // the lip of a drop the route takes us down is often sloped
+    // a slope going up from here is no danger
     if( tr.plane.normal[ 2 ] < 0.7f &&
-        botStates[ self - g_entities ].pathDropTime != level.time )
+        tr.endpos[ 2 ] < self->r.currentOrigin[ 2 ] + self->r.mins[ 2 ] - NAV_STEP_HEIGHT )
+    {
+      botStates[ self - g_entities ].groundFail = 3;
       return qfalse;
+    }
   }
 
   return qtrue;
@@ -1086,6 +1685,7 @@ static void BotSetMovement( gentity_t *self, usercmd_t *cmd, const vec3_t viewAn
 
   VectorSet( flat, dir[ 0 ], dir[ 1 ], 0.0f );
   VectorNormalize( flat );
+  VectorCopy( flat, botStates[ self - g_entities ].lastMoveDir );
 
   fm = DotProduct( flat, forward );
   rm = DotProduct( flat, right ) + strafe;
@@ -1135,6 +1735,368 @@ static float BotAngleTo( const vec3_t view, const vec3_t dir )
 
   AngleVectors( view, forward, NULL, NULL );
   return RAD2DEG( acos( MAX( -1.0f, MIN( 1.0f, DotProduct( forward, dir ) ) ) ) );
+}
+
+/*
+===============
+Moving
+===============
+*/
+static float BotEnemyDistance( team_t team, const vec3_t point );
+
+static qboolean BotWantsWall( gentity_t *self, botState_t *bs, int moveFlags )
+{
+  return BotCanClimb( self ) && level.time >= bs->noWallUntil &&
+         ( ( moveFlags & BOT_MOVE_CLIMB ) || level.time < bs->wallUntil );
+}
+
+// face the way we're going: level when walking, straight at it on walls
+static void BotFaceMove( gentity_t *self, botState_t *bs, const vec3_t moveDir, int moveFlags,
+                         vec3_t desired )
+{
+  vectoangles( moveDir, desired );
+  if( !BotWantsWall( self, bs, moveFlags ) )
+    desired[ PITCH ] = 0.0f;
+}
+
+// rotate a direction about the vertical
+static void BotRotateYaw( const vec3_t in, float degrees, vec3_t out )
+{
+  float s = sin( DEG2RAD( degrees ) ), c = cos( DEG2RAD( degrees ) );
+
+  VectorSet( out, in[ 0 ] * c - in[ 1 ] * s, in[ 0 ] * s + in[ 1 ] * c, 0.0f );
+}
+
+// steer round players and our own structures rather than walk into them
+static void BotAvoid( gentity_t *self, botState_t *bs, vec3_t moveDir, qboolean jumping )
+{
+  static const float  turns[ ] = { 45.0f, 90.0f, 135.0f };
+  trace_t             tr;
+  gentity_t           *ent;
+  vec3_t              flat, side;
+  int                 blocker, i, j;
+
+  if( level.time < bs->avoidUntil )
+  {
+    VectorCopy( bs->avoidDir, moveDir );
+    return;
+  }
+
+  if( jumping )
+    return;
+
+  blocker = BotBlockerAhead( self, moveDir, 40.0f, &tr );
+  if( blocker == ENTITYNUM_NONE || blocker == ENTITYNUM_WORLD )
+    return;
+
+  ent = &g_entities[ blocker ];
+
+  // enemy structures are in the way to be destroyed
+  if( ent->s.eType == ET_BUILDABLE && ent->buildableTeam != self->client->pers.teamSelection )
+  {
+    if( !BotIsBuilderWeapon( self->client->ps.weapon ) && ent->health > 0 &&
+        ( bs->enemy < 0 || !bs->enemyVisible ) )
+      BotUnstick( self, bs, blocker );
+    return;
+  }
+
+  VectorSet( flat, moveDir[ 0 ], moveDir[ 1 ], 0.0f );
+  VectorNormalize( flat );
+
+  // the first way round that's clear, trying our favoured side first
+  for( i = 0; i < ARRAY_LEN( turns ); i++ )
+  {
+    for( j = 0; j < 2; j++ )
+    {
+      BotRotateYaw( flat, turns[ i ] * bs->strafeDir * ( j ? -1.0f : 1.0f ), side );
+      if( BotBlockerAhead( self, side, 48.0f, &tr ) != ENTITYNUM_NONE )
+        continue;
+
+      VectorCopy( side, bs->avoidDir );
+      VectorCopy( side, moveDir );
+      bs->avoidUntil = level.time + 300 + i * 150;
+      return;
+    }
+  }
+}
+
+// the closest wall that's worth climbing, qfalse if there's none near
+static qboolean BotFindWall( gentity_t *self, const vec3_t towards, vec3_t out )
+{
+  trace_t tr;
+  vec3_t  dir, end, flat;
+  float   best = 0.0f, score;
+  int     i;
+  qboolean found = qfalse;
+
+  VectorSet( flat, towards[ 0 ], towards[ 1 ], 0.0f );
+  VectorNormalize( flat );
+
+  for( i = 0; i < 8; i++ )
+  {
+    VectorSet( dir, cos( DEG2RAD( i * 45.0f ) ), sin( DEG2RAD( i * 45.0f ) ), 0.0f );
+    VectorMA( self->r.currentOrigin, 256.0f, dir, end );
+    trap_Trace( &tr, self->r.currentOrigin, self->r.mins, self->r.maxs, end, self->s.number,
+                MASK_PLAYERSOLID );
+
+    if( tr.startsolid || tr.fraction >= 1.0f || tr.entityNum != ENTITYNUM_WORLD ||
+        fabs( tr.plane.normal[ 2 ] ) > 0.3f || ( tr.surfaceFlags & ( SURF_SKY | SURF_SLICK ) ) )
+      continue;
+
+    // close walls, and ones the way we're going
+    score = tr.fraction * 256.0f - DotProduct( dir, flat ) * 100.0f;
+    if( !found || score < best )
+    {
+      best = score;
+      VectorCopy( tr.endpos, out );
+      found = qtrue;
+    }
+  }
+
+  return found;
+}
+
+/*
+===============
+BotCeilingCrawl
+
+Dretches and basilisks sneak up on humans along the ceiling, where they
+aren't looking. Instead of the next point on the route, head for the
+ceiling above it, by way of a wall when there's one to climb
+===============
+*/
+static void BotCeilingCrawl( gentity_t *self, botState_t *bs, vec3_t moveDir, int *moveFlags )
+{
+  vec3_t  target, delta;
+  float   ceiling;
+
+  if( !BotCanClimb( self ) || !BotIsWeakAlien( self ) ||
+      BotIsBuilderWeapon( self->client->ps.weapon ) ||
+      level.time < bs->noCeilingUntil || level.time < bs->noWallUntil ||
+      ( *moveFlags & ( BOT_MOVE_CLIMB | BOT_MOVE_JUMP ) ) )
+    return;
+
+  // only worth it near the humans
+  if( BotEnemyDistance( TEAM_ALIENS, self->r.currentOrigin ) > 1000.0f )
+    return;
+
+  // somewhere to hang from, here and where we're going
+  VectorAdd( self->r.currentOrigin, moveDir, target );
+  ceiling = G_BotNavCeiling( target, 280.0f );
+  if( ceiling < 80.0f || !G_BotNavCeiling( self->r.currentOrigin, 280.0f ) )
+    return;
+
+  target[ 2 ] += ceiling - 24.0f;
+  bs->wallUntil = level.time + 500;
+
+  // on the floor, find a wall to go up first
+  if( !BotOnWall( self ) )
+  {
+    if( level.time >= bs->nextWallSearch )
+    {
+      bs->nextWallSearch = level.time + 1000;
+      if( !BotFindWall( self, moveDir, bs->wallSpot ) )
+      {
+        bs->wallUntil = 0;
+        bs->noCeilingUntil = level.time + 3000;
+        return;
+      }
+    }
+
+    VectorSubtract( bs->wallSpot, self->r.currentOrigin, moveDir );
+    moveDir[ 2 ] = 0.0f;
+    return;
+  }
+
+  VectorSubtract( target, self->r.currentOrigin, delta );
+  VectorCopy( delta, moveDir );
+}
+
+static void BotUpdateStats( gentity_t *self, botState_t *bs, usercmd_t *cmd, int msec )
+{
+  playerState_t *ps = &self->client->ps;
+  qboolean      onWall = BotOnWall( self );
+  int           region = G_BotNavRegion( ps->origin );
+
+  if( ps->stats[ STAT_STATE ] & SS_SPEEDBOOST && ( cmd->buttons & BUTTON_SPRINT ) )
+    bs->statSprint += msec;
+  if( ps->pm_flags & PMF_DUCKED )
+    bs->statCrouch += msec;
+  if( ps->pm_type == PM_JETPACK )
+    bs->statJet += msec;
+  if( level.time - bs->tunnelTime < 200 )
+    bs->statTunnel += msec;
+  if( onWall )
+    bs->statWall += msec;
+  if( onWall && ( ps->eFlags & EF_WALLCLIMBCEILING ) )
+    bs->statCeiling += msec;
+  if( onWall && !bs->wasOnWall )
+    bs->statClimbs++;
+  bs->wasOnWall = onWall;
+
+  // we asked for a jump last time and left the ground
+  if( bs->lastMove[ 2 ] > 0 && bs->wasOnGround && ps->groundEntityNum == ENTITYNUM_NONE )
+  {
+    bs->statJumps++;
+    if( level.time - bs->pathHopTime < 200 )
+      bs->statHops++;
+  }
+  bs->wasOnGround = ps->groundEntityNum != ENTITYNUM_NONE;
+
+  bs->statRegions[ region >> 3 ] |= 1 << ( region & 7 );
+}
+
+/*
+===============
+BotJetpack
+
+Humans with a jetpack fly up walls the route climbs, and hover out of
+reach of aliens that have to get close to hurt them. Returns whether it's
+flying, with cmd->upmove set to rise, hold or sink
+===============
+*/
+static qboolean BotJetpack( gentity_t *self, botState_t *bs, usercmd_t *cmd,
+                            const vec3_t moveDir, int moveFlags )
+{
+  playerState_t *ps = &self->client->ps;
+  qboolean      active = BG_UpgradeIsActive( UP_JETPACK, ps->stats );
+  qboolean      climb = ( moveFlags & BOT_MOVE_CLIMB ) != 0;
+  qboolean      want = BotCanFly( self ) && ( climb || level.time < bs->hoverUntil );
+  trace_t       tr;
+  vec3_t        end;
+
+  if( want != active && level.time >= bs->nextJetCommandTime )
+  {
+    bs->nextJetCommandTime = level.time + 300;
+    BotCommand( self, want ? "itemact jetpack" : "itemdeact jetpack" );
+  }
+
+  if( ps->pm_type != PM_JETPACK )
+    return qfalse;
+
+  if( climb )
+  {
+    // up to the ledge, then over it
+    cmd->upmove = moveDir[ 2 ] > -8.0f ? 127 : 0;
+    return qtrue;
+  }
+
+  // hover a little way off the ground, under the ceiling
+  VectorCopy( self->r.currentOrigin, end );
+  end[ 2 ] -= 128.0f;
+  trap_Trace( &tr, self->r.currentOrigin, self->r.mins, self->r.maxs, end, self->s.number, MASK_PLAYERSOLID );
+  cmd->upmove = tr.fraction < 0.75f ? 127 : 0;
+  return qtrue;
+}
+
+/*
+===============
+BotMove
+
+Turn where we want to go into the usercmd: walls for climbers, steering
+round things in the way, crouching, jumping and sprinting
+===============
+*/
+static void BotMove( gentity_t *self, botState_t *bs, usercmd_t *cmd, const vec3_t view,
+                     const vec3_t moveDirIn, qboolean moving, int moveFlags, float strafe,
+                     qboolean sprint, int msec )
+{
+  gclient_t *client = self->client;
+  vec3_t    moveDir;
+  qboolean  wall, crouch, jump;
+  int       stamina = client->ps.stats[ STAT_STAMINA ];
+
+  VectorCopy( moveDirIn, moveDir );
+
+  if( level.time < bs->wanderUntil )
+  {
+    VectorCopy( bs->wanderDir, moveDir );
+    moving = qtrue;
+  }
+
+  wall = BotWantsWall( self, bs, moveFlags );
+
+  // walking on walls goes nowhere if what we want is straight up and
+  // there's no wall in front, so find one
+  if( wall && moving && !BotOnWall( self ) &&
+      moveDir[ 0 ] * moveDir[ 0 ] + moveDir[ 1 ] * moveDir[ 1 ] < Square( moveDir[ 2 ] ) )
+  {
+    if( level.time >= bs->nextWallSearch )
+    {
+      bs->nextWallSearch = level.time + 1000;
+      if( !BotFindWall( self, moveDir, bs->wallSpot ) )
+        VectorCopy( self->r.currentOrigin, bs->wallSpot );
+    }
+
+    VectorSubtract( bs->wallSpot, self->r.currentOrigin, moveDir );
+    moveDir[ 2 ] = 0.0f;
+  }
+  crouch = client->pers.teamSelection == TEAM_HUMANS &&
+           ( ( moveFlags & BOT_MOVE_CROUCH ) || level.time < bs->crouchUntil );
+  jump = ( moveFlags & BOT_MOVE_JUMP ) != 0;
+
+  BotCheckStuck( self, bs, moving );
+  bs->groundFail = 0;
+
+  if( level.time < bs->unstuckUntil && !wall )
+  {
+    strafe = bs->strafeDir;
+    if( bs->stuckCount > 1 && !crouch )
+      jump = qtrue;
+  }
+
+  if( wall )
+  {
+    // holding crouch sticks us to whatever we walk into, and we go along
+    // it whichever way we face
+    cmd->upmove = -127;
+    if( moving )
+    {
+      cmd->forwardmove = 127;
+      VectorCopy( moveDir, bs->lastMoveDir );
+    }
+    jump = qfalse;
+  }
+  else if( moving )
+  {
+    BotAvoid( self, bs, moveDir, jump );
+    BotSetMovement( self, cmd, view, moveDir, strafe );
+    if( moveDir[ 0 ] * moveDir[ 0 ] + moveDir[ 1 ] * moveDir[ 1 ] < 1.0f )
+      bs->groundFail = 4;
+
+    if( !jump && !crouch && BotShouldJumpObstacle( self, moveDir ) )
+      jump = qtrue;
+  }
+  else if( strafe != 0.0f )
+  {
+    vec3_t none = { 0.0f, 0.0f, 0.0f };
+
+    BotSetMovement( self, cmd, view, none, strafe );
+  }
+
+  if( client->pers.teamSelection == TEAM_HUMANS &&
+      BG_InventoryContainsUpgrade( UP_JETPACK, client->ps.stats ) &&
+      BotJetpack( self, bs, cmd, moveDir, moveFlags ) )
+    crouch = qfalse;
+  else if( crouch && !wall )
+    cmd->upmove = -127;
+  else if( jump && client->ps.groundEntityNum != ENTITYNUM_NONE && BotSafeToJump( self, cmd, view ) )
+    cmd->upmove = 127;
+
+  // humans sprint while there's stamina to spare, then rest until it's back
+  if( client->pers.teamSelection == TEAM_HUMANS )
+  {
+    if( bs->sprinting && stamina < STAMINA_BREATHING_LEVEL )
+      bs->sprinting = qfalse;
+    else if( !bs->sprinting && stamina > STAMINA_MAX * 4 / 10 )
+      bs->sprinting = qtrue;
+
+    if( sprint && bs->sprinting && moving && cmd->forwardmove > 0 && !crouch )
+      cmd->buttons |= BUTTON_SPRINT;
+  }
+
+  BotSetCmdAngles( self, cmd, view );
+  BotUpdateStats( self, bs, cmd, msec );
 }
 
 /*
@@ -1468,10 +2430,16 @@ static float BotEnemyDistance( team_t team, const vec3_t point )
 static qboolean BotPickSite( team_t team, const vec3_t origin, float minDist, float maxDist,
                              float minEnemyDist, vec3_t out )
 {
-  vec3_t  candidate, best[ 4 ], node;
-  float   score, bestScore[ 4 ];
-  int     numBest = 0, i, j, n;
-  int     path[ 128 ];
+  vec3_t      candidate, best[ 4 ], node;
+  float       score, bestScore[ 4 ];
+  int         numBest = 0, i, j, n;
+  int         path[ 128 ];
+  navQuery_t  query;
+
+  // somewhere a human could walk to
+  memset( &query, 0, sizeof( query ) );
+  query.team = team;
+  query.jump = 36.0f;
 
   // sample rather than scoring every node, this runs in the qvm
   for( i = 0; i < 300; i++ )
@@ -1507,7 +2475,7 @@ static qboolean BotPickSite( team_t team, const vec3_t origin, float minDist, fl
   // check we can get there
   for( i = 0; i < numBest; i++ )
   {
-    n = G_BotNavFindPath( origin, best[ i ], path, ARRAY_LEN( path ), 0, team );
+    n = G_BotNavFindPath( origin, best[ i ], path, ARRAY_LEN( path ), &query );
     if( !n )
       continue;
 
@@ -1899,10 +2867,13 @@ static qboolean BotPlanBuild( gentity_t *self, botState_t *bs )
 {
   team_t        team = self->client->pers.teamSelection;
   botTeamBase_t *base = &botBases[ team ];
-  vec3_t        anchor;
+  vec3_t        anchor, end;
   float         minDist, maxDist;
   buildable_t   type;
   qboolean      outpost;
+  navQuery_t    query;
+  int           path[ BOT_MAX_PATH ];
+  int           i, n;
 
   type = BotChooseBuildableAt( team, self->client->ps.weapon, &outpost, NULL );
   if( type == BA_NONE )
@@ -1943,10 +2914,24 @@ static qboolean BotPlanBuild( gentity_t *self, botState_t *bs )
     maxDist = 450.0f;
   }
 
-  if( !G_BotNavRandomNodeNear( anchor, minDist, maxDist, bs->buildSpot ) )
+  // somewhere we can get to
+  for( i = 0; i < 4; i++ )
   {
-    // no graph yet, build where we stand
-    VectorCopy( self->r.currentOrigin, bs->buildSpot );
+    if( !G_BotNavRandomNodeNear( anchor, minDist, maxDist, bs->buildSpot ) )
+    {
+      // no graph yet, build where we stand
+      VectorCopy( self->r.currentOrigin, bs->buildSpot );
+      break;
+    }
+
+    BotNavQuery( self, bs, &query );
+    n = G_BotNavFindPath( self->r.currentOrigin, bs->buildSpot, path, ARRAY_LEN( path ), &query );
+    if( n > 0 )
+    {
+      G_BotNavNodeOrigin( path[ n - 1 ], end );
+      if( Distance( end, bs->buildSpot ) < 100.0f )
+        break;
+    }
   }
 
   bs->buildType = type;
@@ -2106,7 +3091,8 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
   gclient_t *client = self->client;
   team_t    team = client->pers.teamSelection;
   vec3_t    view, desired, moveDir, dir;
-  qboolean  moving = qfalse, jump = qfalse;
+  qboolean  moving = qfalse;
+  int       moveFlags = 0;
   gentity_t *enemy = NULL, *core, *repair;
 
   VectorCopy( client->ps.viewangles, view );
@@ -2142,10 +3128,9 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
 
       if( Distance( armoury->r.currentOrigin, self->r.currentOrigin ) > 64.0f )
       {
-        BotPathDirection( self, bs, armoury->r.currentOrigin, moveDir, &jump );
+        BotPathDirection( self, bs, armoury->r.currentOrigin, moveDir, &moveFlags );
         moving = qtrue;
-        vectoangles( moveDir, desired );
-        desired[ PITCH ] = 0.0f;
+        BotFaceMove( self, bs, moveDir, moveFlags, desired );
       }
     }
 
@@ -2158,16 +3143,12 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
   {
     // builders can't fight, fall back to the base
     if( core && Distance( core->r.currentOrigin, self->r.currentOrigin ) > 150.0f )
-      BotPathDirection( self, bs, core->r.currentOrigin, moveDir, &jump );
+      BotPathDirection( self, bs, core->r.currentOrigin, moveDir, &moveFlags );
     else
       VectorSubtract( self->r.currentOrigin, enemy->r.currentOrigin, moveDir );
 
     moving = qtrue;
-    vectoangles( moveDir, desired );
-    desired[ PITCH ] = 0.0f;
-    if( team == TEAM_HUMANS &&
-        client->ps.stats[ STAT_STAMINA ] > STAMINA_BREATHING_LEVEL + 200 )
-      cmd->buttons |= BUTTON_SPRINT;
+    BotFaceMove( self, bs, moveDir, moveFlags, desired );
   }
   else
   {
@@ -2226,10 +3207,9 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
 
         if( Distance( eye, center ) > 80.0f )
         {
-          BotPathDirection( self, bs, surplus->r.currentOrigin, moveDir, &jump );
+          BotPathDirection( self, bs, surplus->r.currentOrigin, moveDir, &moveFlags );
           moving = qtrue;
-          vectoangles( moveDir, desired );
-          desired[ PITCH ] = 0.0f;
+          BotFaceMove( self, bs, moveDir, moveFlags, desired );
         }
         else
         {
@@ -2259,10 +3239,16 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
       else if( Distance( self->r.currentOrigin, bs->buildSpot ) > 40.0f &&
                bs->buildTries == 0 && bs->stuckCount < 2 )
       {
-        BotPathDirection( self, bs, bs->buildSpot, moveDir, &jump );
+        // somewhere we can't get to, try another spot
+        if( !BotPathDirection( self, bs, bs->buildSpot, moveDir, &moveFlags ) )
+        {
+          if( ++bs->buildSpots >= 4 )
+            BotGiveUpBuild( bs, 5000 );
+          else
+            BotPlanBuild( self, bs );
+        }
         moving = qtrue;
-        vectoangles( moveDir, desired );
-        desired[ PITCH ] = 0.0f;
+        BotFaceMove( self, bs, moveDir, moveFlags, desired );
       }
       else
       {
@@ -2286,10 +3272,9 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
 
       if( VectorLength( dir ) > 80.0f )
       {
-        BotPathDirection( self, bs, repair->r.currentOrigin, moveDir, &jump );
+        BotPathDirection( self, bs, repair->r.currentOrigin, moveDir, &moveFlags );
         moving = qtrue;
-        vectoangles( moveDir, desired );
-        desired[ PITCH ] = 0.0f;
+        BotFaceMove( self, bs, moveDir, moveFlags, desired );
       }
       else
       {
@@ -2304,34 +3289,14 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
     else if( core && Distance( core->r.currentOrigin, self->r.currentOrigin ) > 400.0f )
     {
       // nothing to do, stay home
-      BotPathDirection( self, bs, core->r.currentOrigin, moveDir, &jump );
+      BotPathDirection( self, bs, core->r.currentOrigin, moveDir, &moveFlags );
       moving = qtrue;
-      vectoangles( moveDir, desired );
-      desired[ PITCH ] = 0.0f;
+      BotFaceMove( self, bs, moveDir, moveFlags, desired );
     }
   }
 
   BotTurn( bs, view, desired, msec );
-  BotCheckStuck( self, bs, moving );
-
-  if( level.time < bs->unstuckUntil )
-    jump = bs->stuckCount > 1;
-
-  if( moving )
-  {
-    BotSetMovement( self, cmd, view, moveDir,
-                    level.time < bs->unstuckUntil ? bs->strafeDir : 0.0f );
-
-    if( !jump && BotShouldJumpObstacle( self, moveDir ) )
-      jump = qtrue;
-  }
-
-  if( jump && client->ps.groundEntityNum != ENTITYNUM_NONE && BotSafeToJump( self, cmd, view ) )
-    cmd->upmove = 127;
-
-  cmd->angles[ PITCH ] = ANGLE2SHORT( view[ PITCH ] ) - client->ps.delta_angles[ PITCH ];
-  cmd->angles[ YAW ] = ANGLE2SHORT( view[ YAW ] ) - client->ps.delta_angles[ YAW ];
-  cmd->angles[ ROLL ] = ANGLE2SHORT( view[ ROLL ] ) - client->ps.delta_angles[ ROLL ];
+  BotMove( self, bs, cmd, view, moveDir, moving, moveFlags, 0.0f, qtrue, msec );
 }
 
 /*
@@ -2339,6 +3304,141 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
 BotThinkAlive
 ===============
 */
+
+// climbers fight from walls too: up to enemies they can't walk to, and
+// dropping onto them from above
+static void BotClimbAttack( gentity_t *self, botState_t *bs, gentity_t *enemy, const vec3_t dir )
+{
+  float horizontal = sqrt( dir[ 0 ] * dir[ 0 ] + dir[ 1 ] * dir[ 1 ] );
+
+  if( BotOnWall( self ) )
+  {
+    if( dir[ 2 ] < -32.0f && horizontal < 96.0f )
+    {
+      bs->wallUntil = 0;
+      bs->noWallUntil = level.time + 1500;
+    }
+    else
+      bs->wallUntil = level.time + 300;
+  }
+  else if( dir[ 2 ] > 64.0f && level.time >= bs->noWallUntil &&
+           !BotCanWalkTo( self, enemy->r.currentOrigin ) )
+    bs->wallUntil = level.time + 1000;
+}
+
+// humans dodge aside as an alien closes in, and hop about when one is at
+// their feet
+static void BotHumanEvade( gentity_t *self, botState_t *bs, usercmd_t *cmd, gentity_t *enemy,
+                           float dist, const vec3_t view )
+{
+  playerState_t *ps = &self->client->ps;
+  vec3_t        toEnemy, angles, forward, right;
+  float         approach, side;
+
+  if( !enemy->client || enemy->client->pers.teamSelection != TEAM_ALIENS )
+    return;
+
+  // with a jetpack, get up out of reach of claws and teeth
+  if( BotCanFly( self ) && dist < 400.0f && BotAttackRange( enemy->client->ps.weapon ) < 200.0f )
+  {
+    bs->hoverUntil = level.time + 2000;
+    return;
+  }
+
+  if( ps->groundEntityNum == ENTITYNUM_NONE || ( ps->pm_flags & PMF_DUCKED ) )
+    return;
+
+  VectorSubtract( enemy->r.currentOrigin, self->r.currentOrigin, toEnemy );
+  VectorNormalize( toEnemy );
+  approach = -DotProduct( enemy->client->ps.velocity, toEnemy );
+
+  if( level.time >= bs->nextDodgeTime && dist < 350.0f &&
+      ps->stats[ STAT_STAMINA ] > STAMINA_BREATHING_LEVEL )
+  {
+    bs->nextDodgeTime = level.time + 400;
+
+    if( ( approach > 250.0f || ( enemy->client->ps.weapon == WP_ALEVEL3 ||
+                                 enemy->client->ps.weapon == WP_ALEVEL3_UPG ) &&
+          enemy->client->ps.groundEntityNum == ENTITYNUM_NONE ) &&
+        BotRandom( ) < 0.2f + bs->skill * 0.1f )
+    {
+      // not off a ledge
+      side = ( rand( ) & 1 ) ? 1.0f : -1.0f;
+      VectorSet( angles, 0.0f, view[ YAW ], 0.0f );
+      AngleVectors( angles, forward, right, NULL );
+      if( !BotGroundAhead( self, forward, right, 0.0f, side, 100.0f ) )
+        side = -side;
+
+      if( BotGroundAhead( self, forward, right, 0.0f, side, 100.0f ) )
+      {
+        cmd->forwardmove = 0;
+        cmd->rightmove = side * 127;
+        cmd->upmove = 0;
+        cmd->buttons |= BUTTON_DODGE;
+        cmd->buttons &= ~BUTTON_SPRINT;
+        bs->nextDodgeTime = level.time + 2500 - bs->skill * 200 + rand( ) % 1000;
+        bs->statDodges++;
+        return;
+      }
+    }
+  }
+
+  if( dist < 120.0f && level.time >= bs->nextHopTime &&
+      ps->stats[ STAT_STAMINA ] > STAMINA_MAX * 3 / 10 )
+  {
+    bs->nextHopTime = level.time + 800 + rand( ) % 1200;
+    if( BotRandom( ) < 0.35f )
+      cmd->upmove = 127;
+  }
+}
+
+// we've got as close as the graph goes to our goal. If we can't see it from
+// here, find something else to do for a while
+static void BotGoalUnreachable( gentity_t *self, botState_t *bs )
+{
+  gentity_t *target = bs->goalEntity >= 0 ? &g_entities[ bs->goalEntity ] : NULL;
+
+  // close enough to shoot at, maybe
+  if( target && target->inuse && target->s.eType == ET_BUILDABLE &&
+      Distance( target->r.currentOrigin, self->r.currentOrigin ) < BOT_BUILDABLE_SIGHT &&
+      BotCanSee( self, target ) )
+    return;
+
+  if( bot_debug.integer )
+    G_Printf( "botunreachable: %s %s at (%.0f %.0f %.0f) goal %d to (%.0f %.0f %.0f)\n",
+              BG_TeamName( self->client->pers.teamSelection ),
+              BG_Class( self->client->ps.stats[ STAT_CLASS ] )->name,
+              self->r.currentOrigin[ 0 ], self->r.currentOrigin[ 1 ], self->r.currentOrigin[ 2 ],
+              bs->goal, bs->goalOrigin[ 0 ], bs->goalOrigin[ 1 ], bs->goalOrigin[ 2 ] );
+
+  if( target )
+  {
+    bs->blockedEntity = bs->goalEntity;
+    bs->blockedUntil = level.time + 30000;
+  }
+
+  if( bs->goal == BG_HUNT )
+    bs->enemy = -1;
+
+  bs->goal = BG_NONE;
+  bs->goalEntity = -1;
+  bs->viaActive = qfalse;
+  bs->routeFailures = 0;
+
+  // rather than straight away picking something else that may be no
+  // better, look around for a while, or if that's failing too just wander
+  if( level.time - bs->goalFailTime < 2000 )
+  {
+    bs->idleUntil = level.time + 1500 + rand( ) % 1000;
+    bs->unstuckUntil = bs->idleUntil;
+    bs->strafeDir = ( rand( ) & 1 ) ? 1.0f : -1.0f;
+  }
+  else
+    BotChooseRoam( self, bs );
+
+  bs->goalFailTime = level.time;
+}
+
 static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int msec )
 {
   gclient_t *client = self->client;
@@ -2346,7 +3446,8 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
   gentity_t *enemy = NULL;
   vec3_t    view, desired, dir, aimPoint, eye, toEnemy;
   vec3_t    moveDir;
-  qboolean  moving = qfalse, jump = qfalse;
+  qboolean  moving = qfalse, sprint = qtrue;
+  int       moveFlags = 0;
   float     dist = 0.0f, strafe = 0.0f;
 
   if( BotIsBuilderWeapon( client->ps.weapon ) )
@@ -2367,9 +3468,10 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
   if( bs->enemy >= 0 && bs->enemyVisible )
     enemy = &g_entities[ bs->enemy ];
 
-  if( level.time >= bs->nextGoalTime || bs->goal == BG_NONE ||
-      bs->goal == BG_HUNT || bs->goal == BG_HEAL || bs->goal == BG_ARMOURY ||
-      bs->goal == BG_REGROUP )
+  if( level.time >= bs->idleUntil &&
+      ( level.time >= bs->nextGoalTime || bs->goal == BG_NONE ||
+        bs->goal == BG_HUNT || bs->goal == BG_HEAL || bs->goal == BG_ARMOURY ||
+        bs->goal == BG_REGROUP || bs->goal == BG_ROAM ) )
     BotChooseGoal( self, bs );
 
   // economy
@@ -2444,28 +3546,36 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
       if( BotCanWalkTo( self, enemy->r.currentOrigin ) )
         VectorCopy( dir, moveDir );
       else
-        BotPathDirection( self, bs, enemy->r.currentOrigin, moveDir, &jump );
+        BotPathDirection( self, bs, enemy->r.currentOrigin, moveDir, &moveFlags );
 
       moving = qtrue;
 
-      if( dir[ 2 ] > 48.0f && dist < 200.0f )
-        jump = qtrue;
+      if( BotCanClimb( self ) )
+        BotClimbAttack( self, bs, enemy, dir );
 
-      // weave and hop on the way in so we're harder to hit
-      if( dist > 200.0f && enemy->client )
+      if( BotWantsWall( self, bs, moveFlags ) )
+        VectorCopy( dir, moveDir );
+      else
       {
-        if( level.time >= bs->nextStrafeTime )
-        {
-          bs->nextStrafeTime = level.time + 300 + rand( ) % 700;
-          bs->strafeDir = ( rand( ) & 1 ) ? 0.7f : -0.7f;
-        }
-        strafe = bs->strafeDir;
+        if( dir[ 2 ] > 48.0f && dist < 200.0f )
+          moveFlags |= BOT_MOVE_JUMP;
 
-        if( dist < 800.0f && ( client->ps.weapon == WP_ALEVEL0 ||
-                               client->ps.weapon == WP_ALEVEL1 ||
-                               client->ps.weapon == WP_ALEVEL1_UPG ) &&
-            BotRandom( ) < 0.05f )
-          jump = qtrue;
+        // weave and hop on the way in so we're harder to hit
+        if( dist > 200.0f && enemy->client )
+        {
+          if( level.time >= bs->nextStrafeTime )
+          {
+            bs->nextStrafeTime = level.time + 300 + rand( ) % 700;
+            bs->strafeDir = ( rand( ) & 1 ) ? 0.7f : -0.7f;
+          }
+          strafe = bs->strafeDir;
+
+          if( dist < 800.0f && ( client->ps.weapon == WP_ALEVEL0 ||
+                                 client->ps.weapon == WP_ALEVEL1 ||
+                                 client->ps.weapon == WP_ALEVEL1_UPG ) &&
+              BotRandom( ) < 0.05f )
+            moveFlags |= BOT_MOVE_JUMP;
+        }
       }
     }
     else
@@ -2475,13 +3585,16 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
       if( enemy->s.eType == ET_BUILDABLE )
         preferred = MAX( preferred, 250.0f );
 
+      // close the distance quickly, keeping some stamina back for dodging
+      sprint = qfalse;
       if( dist > preferred * 1.5f )
       {
         if( BotCanWalkTo( self, enemy->r.currentOrigin ) )
           VectorCopy( dir, moveDir );
         else
-          BotPathDirection( self, bs, enemy->r.currentOrigin, moveDir, &jump );
+          BotPathDirection( self, bs, enemy->r.currentOrigin, moveDir, &moveFlags );
         moving = qtrue;
+        sprint = client->ps.stats[ STAT_STAMINA ] > STAMINA_MAX / 2;
       }
       else if( dist < preferred * 0.6f && enemy->client )
       {
@@ -2529,11 +3642,20 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
       }
       else if( bs->goal == BG_ATTACK )
         closeEnough = 160.0f;
+      else if( bs->goal == BG_ROAM )
+        closeEnough = 150.0f;
 
       if( goalDist > closeEnough )
       {
-        BotPathDirection( self, bs, bs->goalOrigin, moveDir, &jump );
-        moving = qtrue;
+        if( BotPathDirection( self, bs, bs->goalOrigin, moveDir, &moveFlags ) )
+        {
+          moving = qtrue;
+
+          if( bs->goal == BG_ATTACK || bs->goal == BG_HUNT || bs->goal == BG_ROAM )
+            BotCeilingCrawl( self, bs, moveDir, &moveFlags );
+        }
+        else
+          BotGoalUnreachable( self, bs );
       }
       else if( bs->goal == BG_HUNT )
       {
@@ -2541,52 +3663,22 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
         bs->enemy = -1;
         bs->goal = BG_NONE;
       }
+      else if( bs->goal == BG_ROAM )
+        bs->goal = BG_NONE;
     }
 
     // look where we're going
     if( moving && VectorLength( moveDir ) > 0.1f )
     {
-      vectoangles( moveDir, desired );
-      desired[ PITCH ] = 0.0f;
+      BotFaceMove( self, bs, moveDir, moveFlags, desired );
       BotTurn( bs, view, desired, msec );
     }
-
-    // humans sprint when not fighting, but stop before running out of
-    // stamina since that slows them right down
-    if( team == TEAM_HUMANS && moving &&
-        client->ps.stats[ STAT_STAMINA ] > STAMINA_BREATHING_LEVEL + 200 )
-      cmd->buttons |= BUTTON_SPRINT;
   }
 
-  BotCheckStuck( self, bs, moving );
+  BotMove( self, bs, cmd, view, moveDir, moving, moveFlags, strafe, sprint, msec );
 
-  if( level.time < bs->unstuckUntil )
-  {
-    strafe = bs->strafeDir;
-    if( bs->stuckCount > 1 )
-      jump = qtrue;
-  }
-
-  if( moving )
-  {
-    BotSetMovement( self, cmd, view, moveDir, strafe );
-
-    if( !jump && BotShouldJumpObstacle( self, moveDir ) )
-      jump = qtrue;
-  }
-  else if( strafe != 0.0f )
-  {
-    vec3_t none = { 0.0f, 0.0f, 0.0f };
-
-    BotSetMovement( self, cmd, view, none, strafe );
-  }
-
-  if( jump && client->ps.groundEntityNum != ENTITYNUM_NONE && BotSafeToJump( self, cmd, view ) )
-    cmd->upmove = 127;
-
-  cmd->angles[ PITCH ] = ANGLE2SHORT( view[ PITCH ] ) - client->ps.delta_angles[ PITCH ];
-  cmd->angles[ YAW ] = ANGLE2SHORT( view[ YAW ] ) - client->ps.delta_angles[ YAW ];
-  cmd->angles[ ROLL ] = ANGLE2SHORT( view[ ROLL ] ) - client->ps.delta_angles[ ROLL ];
+  if( enemy && team == TEAM_HUMANS )
+    BotHumanEvade( self, bs, cmd, enemy, dist, view );
 }
 
 /*
@@ -2679,7 +3771,77 @@ static void BotThink( gentity_t *self, botState_t *bs, usercmd_t *cmd, int msec 
   if( client->ps.stats[ STAT_HEALTH ] <= 0 )
     return;
 
+  // teleported or thrown somewhere, the old route is no use
+  if( DistanceSquared( client->ps.origin, bs->lastFramePos ) > Square( 200.0f ) )
+  {
+    bs->nextPathTime = 0;
+    bs->pathLength = 0;
+  }
+  VectorCopy( client->ps.origin, bs->lastFramePos );
+
   BotThinkAlive( self, bs, cmd, msec );
+
+  bs->lastMove[ 0 ] = cmd->forwardmove;
+  bs->lastMove[ 1 ] = cmd->rightmove;
+  bs->lastMove[ 2 ] = cmd->upmove;
+}
+
+// what bots have been up to: time spent sprinting, crouched and on walls,
+// how often they jumped, climbed, dodged and got stuck, and how much of
+// the map they've seen
+static void BotPrintStats( const char *prefix, botState_t *bs, int count )
+{
+  int i, regions = 0;
+
+  for( i = 0; i < ARRAY_LEN( bs->statRegions ); i++ )
+  {
+    byte b = bs->statRegions[ i ];
+
+    for( ; b; b &= b - 1 )
+      regions++;
+  }
+
+  G_Printf( "%ssprint %ds crouch %ds wall %ds ceiling %ds jetpack %ds tunnels %ds, %d jumps %d hops "
+            "%d climbs %d dodges, stuck %d, %d areas%s\n", prefix,
+            bs->statSprint / 1000, bs->statCrouch / 1000, bs->statWall / 1000,
+            bs->statCeiling / 1000, bs->statJet / 1000, bs->statTunnel / 1000, bs->statJumps,
+            bs->statHops, bs->statClimbs,
+            bs->statDodges, bs->statStuck, regions, count > 1 ? " visited between them" : "" );
+}
+
+// the same for a whole team
+static void BotPrintTeamStats( team_t team )
+{
+  botState_t  total;
+  int         i, j, count = 0;
+
+  memset( &total, 0, sizeof( total ) );
+  for( i = 0; i < level.maxclients; i++ )
+  {
+    botState_t *bs = &botStates[ i ];
+
+    if( !level.clients[ i ].pers.isBot || level.clients[ i ].pers.connected == CON_DISCONNECTED ||
+        bs->team != team )
+      continue;
+
+    count++;
+    total.statSprint += bs->statSprint;
+    total.statCrouch += bs->statCrouch;
+    total.statWall += bs->statWall;
+    total.statCeiling += bs->statCeiling;
+    total.statJet += bs->statJet;
+    total.statTunnel += bs->statTunnel;
+    total.statJumps += bs->statJumps;
+    total.statHops += bs->statHops;
+    total.statClimbs += bs->statClimbs;
+    total.statDodges += bs->statDodges;
+    total.statStuck += bs->statStuck;
+    for( j = 0; j < ARRAY_LEN( total.statRegions ); j++ )
+      total.statRegions[ j ] |= bs->statRegions[ j ];
+  }
+
+  if( count )
+    BotPrintStats( va( "botstats: %s %d bots, ", BG_TeamName( team ), count ), &total, count );
 }
 
 /*
@@ -2823,6 +3985,7 @@ void G_BotConnect( int clientNum )
   bs->goalEntity = -1;
   bs->reclaimEntity = -1;
   bs->strafeDir = 1.0f;
+  bs->routeSeed = rand( );
   // give the client a moment to finish joining before acting
   bs->nextCommandTime = level.time + 500 + rand( ) % 1000;
 
@@ -2994,6 +4157,8 @@ void G_BotInit( void )
   botNextBuilderCheck = 0;
   memset( botBases, 0, sizeof( botBases ) );
   memset( botLastBuildWork, 0, sizeof( botLastBuildWork ) );
+  memset( botWasAlive, 0, sizeof( botWasAlive ) );
+  botNextStatsTime = 0;
   G_BotNavInit( );
 }
 
@@ -3039,6 +4204,27 @@ void G_BotRunFrame( int msec )
     }
     else if( ent->s.eType == ET_BUILDABLE && ent->health > 0 )
       botBuildables[ botNumBuildables++ ] = ent;
+  }
+
+  // where anybody dies, their team learns to keep away from for a while
+  for( i = 0; i < level.maxclients; i++ )
+  {
+    gclient_t *client = &level.clients[ i ];
+    qboolean  alive = BotIsAlive( &g_entities[ i ] );
+
+    if( botWasAlive[ i ] && !alive && client->pers.connected == CON_CONNECTED )
+      G_BotNavAddDanger( client->pers.teamSelection, client->ps.origin, 300.0f );
+    botWasAlive[ i ] = alive;
+  }
+
+  if( bot_debug.integer && level.time >= botNextStatsTime )
+  {
+    if( botNextStatsTime )
+    {
+      BotPrintTeamStats( TEAM_ALIENS );
+      BotPrintTeamStats( TEAM_HUMANS );
+    }
+    botNextStatsTime = level.time + 60000;
   }
 
   for( i = 0; i < level.maxclients; i++ )
@@ -3124,10 +4310,12 @@ void Svcmd_AddBot_f( void )
 
 void Svcmd_BotStatus_f( void )
 {
-  static const char *goalNames[ ] = { "none", "attack", "hunt", "armoury", "heal", "regroup" };
+  static const char *goalNames[ ] = { "none", "attack", "hunt", "armoury", "heal", "regroup", "roam" };
   int i;
 
   G_Printf( "navigation graph: %d nodes\n", G_BotNavNumNodes( ) );
+  BotPrintTeamStats( TEAM_ALIENS );
+  BotPrintTeamStats( TEAM_HUMANS );
 
   {
     team_t      team;
@@ -3182,6 +4370,7 @@ void Svcmd_BotStatus_f( void )
               BG_Weapon( client->ps.weapon )->name,
               bs->buildType != BA_NONE ? ", building " : "",
               bs->buildType != BA_NONE ? BG_Buildable( bs->buildType )->name : "" );
+    BotPrintStats( "   ", bs, 1 );
 
     if( bs->pathIndex < bs->pathLength )
     {
@@ -3193,7 +4382,7 @@ void Svcmd_BotStatus_f( void )
       {
         G_BotNavNodeOrigin( bs->path[ j ], node );
         G_Printf( " %d(%.0f %.0f %.0f)%s", bs->path[ j ], node[ 0 ], node[ 1 ], node[ 2 ],
-                  j > 0 && ( G_BotNavLinkFlags( bs->path[ j - 1 ], bs->path[ j ] ) & NAVLINK_JUMP ) ?
+                  j > 0 && ( G_BotNavLinkFlags( bs->path[ j - 1 ], bs->path[ j ], NULL ) & NAVLINK_JUMP ) ?
                   "J" : "" );
       }
       G_Printf( "\n" );
