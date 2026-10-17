@@ -108,10 +108,10 @@ var LibrarySysCommon = {
 			}
 		],*/
 		paks: [
-			{ src: 'data-web-1.3.1.pk3', dest: 'gpp/data-web-1.3.1.pk3', checksum: 1249824326 },
-			{ src: 'vms-gpp-v1.3.0.pk3', dest: 'gpp/vms-gpp-v1.3.0.pk3', checksum: 3739632750 },
+			{ src: 'data-web-1.3.1.pk3', dest: 'gpp/data-web-1.3.1.pk3', checksum: 3282924353 },
+			{ src: 'vms-gpp-v1.3.0.pk3', dest: 'gpp/vms-gpp-v1.3.0.pk3', checksum: 3085729762 },
 			{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
-			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3951678288 },
+			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
 			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
 			{ src: 'map-atcs-1.1.0.pk3', dest: 'gpp/map-atcs-1.1.0.pk3', checksum: 1649092924 },
 			{ src: 'map-karith-1.1.0.pk3', dest: 'gpp/map-karith-1.1.0.pk3', checksum: 3322431863 },
