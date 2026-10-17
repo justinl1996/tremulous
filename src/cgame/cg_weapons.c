@@ -1720,6 +1720,68 @@ void CG_Weapon_f( void )
   cg.weaponSelect = num;
 }
 
+/*
+===============
+CG_WeaponSlot_f
+
+Human number key slots: 1 primary weapon, 2 blaster, 3 grenade, 4 medkit
+===============
+*/
+void CG_WeaponSlot_f( void )
+{
+  playerState_t *ps;
+  int           i;
+
+  if( !cg.snap )
+    return;
+
+  ps = &cg.snap->ps;
+
+  if( ( ps->pm_flags & PMF_FOLLOW ) || ps->stats[ STAT_TEAM ] != TEAM_HUMANS ||
+      ps->stats[ STAT_HEALTH ] <= 0 )
+    return;
+
+  switch( atoi( CG_Argv( 1 ) ) )
+  {
+    case 1:
+      for( i = WP_NONE + 1; i < WP_NUM_WEAPONS; i++ )
+      {
+        if( i != WP_BLASTER && CG_WeaponSelectable( i ) )
+          break;
+      }
+      if( i == WP_NUM_WEAPONS )
+        return;
+      break;
+
+    case 2:
+      i = WP_BLASTER;
+      if( !CG_WeaponSelectable( i ) )
+        return;
+      break;
+
+    case 3:
+      i = UP_MEDKIT + 32;
+      break;
+
+    case 4:
+      i = UP_GRENADE + 32;
+      break;
+
+    default:
+      return;
+  }
+
+  if( i < 32 )
+  {
+    cg.weaponSelect = i;
+    cg.weaponSelectTime = cg.time;
+    if( ps->weapon != i )
+      trap_SendClientCommand( va( "itemact %s\n", BG_Weapon( i )->name ) );
+  }
+  else if( CG_UpgradeSelectable( i - 32 ) )
+    trap_SendClientCommand( va( "itemact %s\n", BG_Upgrade( i - 32 )->name ) );
+}
+
 
 /*
 ===================================================================================================

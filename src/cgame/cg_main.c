@@ -1922,6 +1922,27 @@ void CG_AssetCache( void )
 
 /*
 =================
+CG_BindWeaponSlots
+
+Bind the number keys to the human weapon slots, leaving keys the player
+has already bound alone
+=================
+*/
+static void CG_BindWeaponSlots( void )
+{
+  char  buf[ MAX_STRING_CHARS ];
+  int   i;
+
+  for( i = 1; i <= 4; i++ )
+  {
+    trap_Key_GetBindingBuf( '0' + i, buf, sizeof( buf ) );
+    if( !buf[ 0 ] )
+      trap_Key_SetBinding( '0' + i, va( "weapslot %d", i ) );
+  }
+}
+
+/*
+=================
 CG_Init
 
 Called after every level change or subsystem restart
@@ -1963,6 +1984,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum )
   CG_RegisterCvars( );
 
   CG_InitConsoleCommands( );
+  CG_BindWeaponSlots( );
 
   String_Init( );
 

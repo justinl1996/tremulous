@@ -228,6 +228,7 @@ static consoleCommand_t commands[ ] =
   { "weapnext", CG_NextWeapon_f },
   { "weapon", CG_Weapon_f },
   { "weapprev", CG_PrevWeapon_f },
+  { "weapslot", CG_WeaponSlot_f },
   { "zcp", CG_CenterPrint_f },
   { "zkill", CG_KillMessage_f }
 };
