@@ -88,9 +88,9 @@ extern int demo_protocols[];
 #endif
 
 #ifdef WEB_SERVER
-// game servers for the web port sit behind websockify, which takes the usual
-// ports for the browsers' websocket connections, and talk to the web master
-// server's UDP port
+// game servers for the web port talk to the web master server's UDP port, and
+// either sit behind websockify, which takes the usual ports for the browsers'
+// websocket connections, or take those connections themselves (net_websocket)
 #define	PORT_MASTER			40700
 #define	PORT_SERVER			40720
 #define	ALT1PORT_MASTER			40700

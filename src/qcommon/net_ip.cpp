@@ -23,6 +23,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 */
 
 #include "net.h"
+#include "net_ws.h"
 
 #include "cmd.h"
 #include "cvar.h"
@@ -709,6 +710,10 @@ void Sys_SendPacket(int length, const void *data, netadr_t to)
         Com_Error(ERR_FATAL, "Sys_SendPacket: bad address type");
         return;
     }
+
+#ifdef USE_WEBSOCKET
+    if (NET_WS_SendPacket(length, data, &to)) return;
+#endif
 
     if ((ip_sockets[to.alternateProtocol] == INVALID_SOCKET && to.type == NA_IP) ||
         (ip_sockets[to.alternateProtocol] == INVALID_SOCKET && to.type == NA_BROADCAST) ||
@@ -1607,6 +1612,10 @@ static bool NET_GetCvars(void)
 
     net_dropsim = Cvar_Get("net_dropsim", "", CVAR_TEMP);
 
+#ifdef USE_WEBSOCKET
+    modified += NET_WS_GetCvars();
+#endif
+
     return modified ? true : false;
 }
 
@@ -1666,6 +1675,10 @@ void NET_Config(bool enableNetworking)
 
     if (stop)
     {
+#ifdef USE_WEBSOCKET
+        NET_WS_Close();
+#endif
+
         for (a = 0; a < 3; ++a)
         {
             if (ip_sockets[a] != INVALID_SOCKET)
@@ -1704,6 +1717,9 @@ void NET_Config(bool enableNetworking)
         {
             NET_OpenIP();
             NET_SetMulticast6();
+#ifdef USE_WEBSOCKET
+            NET_WS_Open(net_ip->string, net_ip6->string, net_enabled->integer, net_ports[0]->integer);
+#endif
         }
     }
 }
@@ -1762,6 +1778,21 @@ Called from NET_Sleep which uses select() to determine which sockets have seen a
 ====================
 */
 
+static void NET_DispatchPacket(netadr_t *from, msg_t *netmsg)
+{
+    if (net_dropsim->value > 0.0f && net_dropsim->value <= 100.0f)
+    {
+        // com_dropsim->value percent of incoming packets get dropped.
+        if (rand() < (int)(((double)RAND_MAX) / 100.0 * (double)net_dropsim->value))
+            return;  // drop this packet
+    }
+
+    if (com_sv_running->integer)
+        Com_RunAndTimeServerPacket(from, netmsg);
+    else
+        CL_PacketEvent(*from, netmsg);
+}
+
 void NET_Event(fd_set *fdr)
 {
     uint8_t bufData[MAX_MSGLEN + 1];
@@ -1775,22 +1806,24 @@ void NET_Event(fd_set *fdr)
         MSG_Init(&netmsg, bufData, sizeof(bufData));
 
         if (NET_GetPacket(&from, &netmsg, fdr))
-        {
-            if (net_dropsim->value > 0.0f && net_dropsim->value <= 100.0f)
-            {
-                // com_dropsim->value percent of incoming packets get dropped.
-                if (rand() < (int)(((double)RAND_MAX) / 100.0 * (double)net_dropsim->value))
-                    continue;  // drop this packet
-            }
-
-            if (com_sv_running->integer)
-                Com_RunAndTimeServerPacket(&from, &netmsg);
-            else
-                CL_PacketEvent(from, &netmsg);
-        }
+            NET_DispatchPacket(&from, &netmsg);
         else
             break;
     }
+
+#ifdef USE_WEBSOCKET
+    NET_WS_Frame(fdr);
+
+    while (1)
+    {
+        MSG_Init(&netmsg, bufData, sizeof(bufData));
+
+        if (NET_WS_GetPacket(&from, &netmsg))
+            NET_DispatchPacket(&from, &netmsg);
+        else
+            break;
+    }
+#endif
 }
 
 /*
@@ -1827,6 +1860,10 @@ void NET_Sleep(int msec)
             if (highestfd == INVALID_SOCKET || ip6_sockets[a] > highestfd) highestfd = ip6_sockets[a];
         }
     }
+
+#ifdef USE_WEBSOCKET
+    highestfd = NET_WS_FillFdSet(&fdr, highestfd);
+#endif
 
 #ifdef _WIN32
     if (highestfd == INVALID_SOCKET)

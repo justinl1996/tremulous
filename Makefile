@@ -182,6 +182,11 @@ ifndef USE_OPENAL_DLOPEN
 USE_OPENAL_DLOPEN=1
 endif
 
+# lets native dedicated servers serve the web client over wss:// (net_websocket)
+ifndef USE_WEBSOCKET_TLS
+USE_WEBSOCKET_TLS=1
+endif
+
 ifndef USE_RESTCLIENT
 USE_RESTCLIENT=1
 USE_CURL=1
@@ -303,6 +308,8 @@ LUADIR=$(EXTERNAL_DIR)/lua-5.3.3/src
 RESTDIR=$(EXTERNAL_DIR)/restclient
 NETTLEDIR=$(EXTERNAL_DIR)/nettle-3.3
 SEMVERDIR=$(EXTERNAL_DIR)/semver
+WEBSOCKETPPDIR=$(EXTERNAL_DIR)/websocketpp-0.8.2
+ASIODIR=$(EXTERNAL_DIR)/asio-1.30.2
 LUA_RAPIDJSONDIR=$(MOUNT_DIR)/script/rapidjson
 Q3ASMDIR=$(MOUNT_DIR)/tools/asm
 LBURGDIR=$(MOUNT_DIR)/tools/lcc/lburg
@@ -1065,8 +1072,8 @@ ifeq ($(BUILD_STANDALONE),1)
   BASE_CFLAGS += -DSTANDALONE
 endif
 
-# native dedicated servers for the web port (behind websockify, using the
-# web master server): make WEB_SERVER=1 BUILD_CLIENT=0
+# native dedicated servers for the web port (using the web master server, and
+# net_websocket 1 or websockify for the browsers): make WEB_SERVER=1 BUILD_CLIENT=0
 ifeq ($(WEB_SERVER),1)
   BASE_CFLAGS += -DWEB_SERVER
 endif
@@ -2513,6 +2520,21 @@ endif
 
 Q3DOBJ += $(LUAOBJ) $(SCRIPTOBJ) $(NETTLEOBJ)
 
+# native dedicated servers take the web client's websocket connections
+# themselves when net_websocket is set, so they don't need websockify
+ifneq ($(PLATFORM),js)
+ifneq ($(PLATFORM),mingw32)
+  Q3DOBJ += $(B)/ded/net_ws.o
+  DED_LIBS += $(THREAD_LIBS)
+
+  $(B)/ded/net_ws.o: DED_CC_FLAGS += -I$(WEBSOCKETPPDIR) -I$(ASIODIR)/include
+  ifeq ($(USE_WEBSOCKET_TLS),1)
+    $(B)/ded/net_ws.o: DED_CC_FLAGS += -DUSE_WEBSOCKET_TLS
+    DED_LIBS += -lssl -lcrypto
+  endif
+endif
+endif
+
 ifeq ($(USE_INTERNAL_ZLIB),1)
 Q3DOBJ += \
   $(B)/ded/adler32.o \
@@ -2558,7 +2580,7 @@ endif
 
 $(B)/$(SERVERBIN)$(FULLBINEXT): $(Q3DOBJ) $(LIBSYSCOMMON) $(LIBSYSNODE) $(LIBVMJS)
 	$(echo_cmd) "LD $@"
-	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVER_CFLAGS) $(SERVER_LIBS) -o $@ $(Q3DOBJ) -v $(LIBS)
+	$(Q)$(CXX) $(CFLAGS) $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVER_CFLAGS) $(SERVER_LIBS) -o $@ $(Q3DOBJ) -v $(LIBS) $(DED_LIBS)
 
 #############################################################################
 ## TREMULOUS CGAME
