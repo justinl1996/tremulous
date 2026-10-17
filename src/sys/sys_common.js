@@ -193,6 +193,17 @@ var LibrarySysCommon = {
 			SYSC.Print('generated crc32 for ' + path + ' in ' + ((Date.now() - start) / 1000).toFixed(2) + ' seconds');
 			return CRC32.Finish(crc);
 		},
+		CRC32Buffer: function (buffer) {
+			var bytes = new Uint8Array(buffer);
+			return CRC32.Finish(CRC32.Update(CRC32.Start(), bytes, 0, bytes.length));
+		},
+		LogChecksum: function (name, crc, expected) {
+			var msg = 'checksum ' + name + ': crc32 ' + crc;
+			if (expected !== undefined) {
+				msg += (crc === expected ? ' (ok)' : ' (MISMATCH, expected ' + expected + ')');
+			}
+			SYSC.Print(msg);
+		},
 		GetCDN: function () {
 			return Module.UTF8ToString(_Com_GetCDN());
 		},
@@ -348,6 +359,7 @@ var LibrarySysCommon = {
 				}
 				if (!SYSC.ValidatePak(pak)) {
 					asset.dest = pak.dest;
+					asset.expected = pak.checksum;
 					paks.push(asset);
 				}
 			}
@@ -357,10 +369,11 @@ var LibrarySysCommon = {
 			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
 			var localPath = PATH.join(fs_basepath, pak.dest);
 			var crc = SYSC.CRC32File(localPath);
-			if (crc !== pak.checksum) {
+			if (crc === null) {
 				return false;
 			}
-			return true;
+			SYSC.LogChecksum(pak.dest, crc, pak.checksum);
+			return crc === pak.checksum;
 		},
 		DirtyQVM: function(callback) {
 			var qvms = [];
@@ -551,6 +564,7 @@ var LibrarySysCommon = {
 			}, function (loaded, total) {
 				SYS.LoadingProgress(loaded / total);
 			}, function (asset, data, next) {
+				SYSC.LogChecksum(asset.name + ' (downloaded)', SYSC.CRC32Buffer(data), asset.expected);
 				SYSC.SaveFile(asset.dest, data, false, next);
 			}, function (err) {
 				SYS.LoadingDescription(null);
@@ -743,6 +757,7 @@ var LibrarySysCommon = {
 					{{{ makeDynCall('vi', 'onassetend') }}}(err);
 					return;
 				}
+				SYSC.LogChecksum(localNameStr + ' (downloaded from ' + remoteNameStr + ')', SYSC.CRC32Buffer(data));
 				SYSC.SaveFile(localNameStr, data, true, 0);
 				{{{ makeDynCall('vi', 'onassetend') }}}(0);
 				return;

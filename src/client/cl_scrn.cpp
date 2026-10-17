@@ -471,6 +471,29 @@ void SCR_Init(void)
 
 //=======================================================
 
+#ifdef EMSCRIPTEN
+#ifndef GIT_HASH
+#define GIT_HASH "unknown"
+#endif
+
+/*
+==================
+SCR_DrawCommitHash
+
+Shows which build the web client is running on the start screen
+==================
+*/
+static void SCR_DrawCommitHash(void)
+{
+    vec4_t color = {1.0f, 1.0f, 1.0f, 0.5f};
+    const char *text = GIT_HASH;
+    int x = cls.glconfig.vidWidth - (int)strlen(text) * SMALLCHAR_WIDTH - 8;
+    int y = cls.glconfig.vidHeight - SMALLCHAR_HEIGHT - 8;
+
+    SCR_DrawSmallStringExt(x, y, text, color, true, true);
+}
+#endif
+
 /*
 ==================
 SCR_DrawScreenField
@@ -543,6 +566,11 @@ void SCR_DrawScreenField(stereoFrame_t stereoFrame)
     {
         VM_Call(cls.ui, UI_REFRESH - (cls.uiInterface == 2 ? 2 : 0), cls.realtime);
     }
+
+#ifdef EMSCRIPTEN
+    if (clc.state == CA_DISCONNECTED)
+        SCR_DrawCommitHash();
+#endif
 
     // console draws next
     Con_DrawConsole();

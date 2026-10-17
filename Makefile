@@ -2928,6 +2928,7 @@ $(B)/ded/%.o: $(NDIR)/%.cpp
 # Extra dependencies to ensure the git version is incorporated
 ifeq ($(USE_GIT),1)
   $(B)/client/cl_console.o : .git/index
+  $(B)/client/cl_scrn.o : .git/index
   $(B)/client/common.o : .git/index
   $(B)/ded/common.o : .git/index
 endif
