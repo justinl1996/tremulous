@@ -315,6 +315,10 @@ static int      numUnlinkedMovers;
 // doors that something else opens (stage doors and the like) remember whether
 // they were open, so the graph can be extended when they open
 static byte     moverWasOpen[ MAX_GENTITIES ];
+static byte     moverLastState[ MAX_GENTITIES ];
+
+// nodes whose floor has gone, a trapdoor that dropped away
+static byte     nodeDead[ NAV_MAX_NODES ];
 static int      nextMoverCheckTime;
 
 // nodes to expand again because a door near them opened
@@ -783,6 +787,9 @@ static void NavExpandNode( int n )
   vec3_t  to, ground;
   int     x, y;
 
+  if( nodeDead[ n ] )
+    return;
+
   for( i = 0; i < 8; i++ )
   {
     // the node array may not move, but read through the index anyway
@@ -922,6 +929,8 @@ void G_BotNavInit( void )
   portalNodes = 0;
   nextPortalTime = 0;
   memset( moverWasOpen, 0, sizeof( moverWasOpen ) );
+  memset( moverLastState, 0, sizeof( moverLastState ) );
+  memset( nodeDead, 0, sizeof( nodeDead ) );
 
   for( i = 0; i < NAV_HASH_SIZE; i++ )
     hashHeads[ i ] = -1;
@@ -957,7 +966,10 @@ static void NavStart( void )
   for( i = MAX_CLIENTS, ent = g_entities + MAX_CLIENTS; i < level.num_entities; i++, ent++ )
   {
     if( ent->inuse && ent->s.eType == ET_MOVER )
+    {
       moverWasOpen[ i ] = NavMoverPassable( ent );
+      moverLastState[ i ] = ent->moverState;
+    }
   }
 
   NavUnlinkMovers( );
@@ -1056,6 +1068,48 @@ static void NavObserve( gentity_t *ent )
 }
 
 // when a door that something else opens has opened, look for routes through it
+// a door has moved: anything that stood on it, check there's still a floor.
+// Some maps drop floors away from under players at a stage
+static void NavCheckFloors( gentity_t *ent )
+{
+  vec3_t  mins, maxs, start, ground;
+  int     n, i;
+
+  // where it was and where it is, the door's origin is pos1 when closed
+  for( i = 0; i < 3; i++ )
+  {
+    mins[ i ] = MIN( ent->r.absmin[ i ], ent->r.mins[ i ] + ent->pos1[ i ] ) - 32.0f;
+    maxs[ i ] = MAX( ent->r.absmax[ i ], ent->r.maxs[ i ] + ent->pos1[ i ] ) + 32.0f;
+  }
+  maxs[ 2 ] += -navMins[ 2 ] + NAV_STEP;
+
+  for( n = 0; n < numNodes; n++ )
+  {
+    float *o = nodes[ n ].origin;
+
+    if( o[ 0 ] < mins[ 0 ] || o[ 0 ] > maxs[ 0 ] || o[ 1 ] < mins[ 1 ] || o[ 1 ] > maxs[ 1 ] ||
+        o[ 2 ] < mins[ 2 ] || o[ 2 ] > maxs[ 2 ] )
+      continue;
+
+    VectorCopy( o, start );
+    start[ 2 ] += NAV_STEP;
+    nodeDead[ n ] = !NavGroundAt( start, ground ) || ground[ 2 ] < o[ 2 ] - NAV_LEVEL_DIST;
+  }
+
+  if( bot_debug.integer )
+  {
+    int dead = 0;
+
+    for( n = 0; n < numNodes; n++ )
+      dead += nodeDead[ n ];
+    G_Printf( "navfloors: %s %s moved to state %d, %d nodes without a floor\n", ent->classname,
+              ent->targetname, ent->moverState, dead );
+  }
+
+  // routes through them need finding again
+  navVersion++;
+}
+
 static void NavCheckDoors( void )
 {
   gentity_t *ent;
@@ -1066,6 +1120,11 @@ static void NavCheckDoors( void )
   {
     if( !ent->inuse || ent->s.eType != ET_MOVER )
       continue;
+
+    // only doors something else opens are part of the graph
+    if( ent->moverState != moverLastState[ i ] && ent->targetname && ent->targetname[ 0 ] )
+      NavCheckFloors( ent );
+    moverLastState[ i ] = ent->moverState;
 
     open = NavMoverPassable( ent );
     if( open && !moverWasOpen[ i ] )
@@ -1971,7 +2030,7 @@ qboolean G_BotNavRandomNodeNear( const vec3_t origin, float minDist, float maxDi
 
   for( n = 0; n < numNodes; n++ )
   {
-    if( fabs( nodes[ n ].origin[ 2 ] - origin[ 2 ] ) > 96.0f )
+    if( nodeDead[ n ] || fabs( nodes[ n ].origin[ 2 ] - origin[ 2 ] ) > 96.0f )
       continue;
 
     d = Distance( nodes[ n ].origin, origin );
@@ -1993,7 +2052,7 @@ qboolean G_BotNavNodeAround( const vec3_t point, float radius, vec3_t out )
 
   for( n = 0; n < numNodes; n++ )
   {
-    if( nodeBlocked[ n ] || DistanceSquared( nodes[ n ].origin, point ) > Square( radius ) )
+    if( nodeBlocked[ n ] || nodeDead[ n ] || DistanceSquared( nodes[ n ].origin, point ) > Square( radius ) )
       continue;
 
     if( rand( ) % ++count == 0 )
@@ -2026,7 +2085,7 @@ qboolean G_BotNavExplore( team_t team, const vec3_t origin, float minDist, float
   for( i = 0; i < 64; i++ )
   {
     n = rand( ) % numNodes;
-    if( nodeBlocked[ n ] || nodeComponent[ 0 ][ n ] != nodeComponent[ 0 ][ here ] )
+    if( nodeBlocked[ n ] || nodeDead[ n ] || nodeComponent[ 0 ][ n ] != nodeComponent[ 0 ][ here ] )
       continue;
 
     d = Distance( nodes[ n ].origin, origin );
@@ -2151,7 +2210,7 @@ static qboolean NavFits( const vec3_t from, const vec3_t to, int size )
 
 // the closest few nodes to a point, visible ones first and nearest first.
 // If none are in sight, the single closest node a little further out
-static int NavNearestNodes( const vec3_t origin, int *out, int maxOut, int size )
+static int NavNearestNodes( const vec3_t origin, int *out, int maxOut, int size, float maxRise )
 {
   int     cx = NavCell( origin[ 0 ] );
   int     cy = NavCell( origin[ 1 ] );
@@ -2177,11 +2236,13 @@ static int NavNearestNodes( const vec3_t origin, int *out, int maxOut, int size 
           if( nodes[ n ].cellX != x || nodes[ n ].cellY != y )
             continue;
 
-          // inside a structure, so no use as a start or end point
-          if( nodeBlocked[ n ] )
+          // inside a structure, or the floor's gone, so no use as a start or end point
+          if( nodeBlocked[ n ] || nodeDead[ n ] )
             continue;
 
-          if( fabs( nodes[ n ].origin[ 2 ] - origin[ 2 ] ) > 128.0f )
+          // nor anywhere above us we can't get up to
+          if( fabs( nodes[ n ].origin[ 2 ] - origin[ 2 ] ) > 128.0f ||
+              nodes[ n ].origin[ 2 ] - origin[ 2 ] > maxRise )
             continue;
 
           // a node up on a ledge above us is further away than it looks
@@ -2252,7 +2313,7 @@ int G_BotNavNearestNode( const vec3_t origin )
 {
   int node;
 
-  return NavNearestNodes( origin, &node, 1, -1 ) ? node : -1;
+  return NavNearestNodes( origin, &node, 1, -1, 128.0f ) ? node : -1;
 }
 
 /*
@@ -2347,7 +2408,11 @@ static int NavFindPathSized( const vec3_t start, const vec3_t goal, int *path, i
 
   // start from a few nodes around us, the nearest one may be boxed in by
   // our own structures when there's an easy way out in another direction
-  numStarts = NavNearestNodes( start, starts, ARRAY_LEN( starts ), size );
+  // somewhere we can step or jump up to, or fly or climb to
+  numStarts = NavNearestNodes( start, starts, ARRAY_LEN( starts ), size,
+                               query->climb ? 128.0f : MAX( query->jump, 0.0f ) + NAV_STEP );
+  if( !numStarts )
+    numStarts = NavNearestNodes( start, starts, ARRAY_LEN( starts ), size, 128.0f );
   startNode = numStarts ? starts[ 0 ] : -1;
   goalNode = G_BotNavNearestNode( goal );
   if( startNode < 0 || goalNode < 0 )
@@ -2403,7 +2468,7 @@ static int NavFindPathSized( const vec3_t start, const vec3_t goal, int *path, i
       m = nodes[ n ].links[ i ];
       flags = nodes[ n ].linkFlags[ i ];
 
-      if( closedStamp[ m ] == searchStamp ||
+      if( closedStamp[ m ] == searchStamp || nodeDead[ m ] ||
           ( ( flags & NAVLINK_SIZE_MASK ) >> NAVLINK_SIZE_SHIFT ) < size ||
           ( ( flags & NAVLINK_JUMP ) && nodes[ n ].linkJump[ i ] > query->jump ) ||
           ( ( flags & NAVLINK_CLIMB ) && !query->climb ) ||
