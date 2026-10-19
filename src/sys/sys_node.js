@@ -133,7 +133,7 @@ var LibrarySys = {
 		// mount up the local filesystem in emscripten
 		var dir;
 		try {
-			dir = FS.mkdir(fs_basepath, 0777);
+			dir = FS.mkdir(fs_basepath, 0o777);
 		} catch (e) {
 			if (!(e instanceof FS.ErrnoError) || e.errno !== ERRNO_CODES.EEXIST) {
 				SYSC.Error('fatal', e.message);

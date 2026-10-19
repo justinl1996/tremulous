@@ -109,7 +109,7 @@ var LibrarySysCommon = {
 		],*/
 		paks: [
 			{ src: 'data-web-1.3.1.pk3', dest: 'gpp/data-web-1.3.1.pk3', checksum: 3282924353 },
-			{ src: 'vms-gpp-v1.3.0.pk3', dest: 'gpp/vms-gpp-v1.3.0.pk3', checksum: 3085729762 },
+			{ src: 'vms-gpp-v1.3.0.pk3', dest: 'gpp/vms-gpp-v1.3.0.pk3', checksum: 3879912733 },
 			{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
 			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
 			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
@@ -125,14 +125,6 @@ var LibrarySysCommon = {
 			{ src: 'map-atcshd-gpp.pk3', dest: 'gpp/map-atcshd-gpp.pk3', checksum: 2833692283 },
 			{ src: 'map-spacelab_b2.pk3', dest: 'gpp/map-spacelab_b2.pk3', checksum: 3262686861 },
 			{ src: 'map-base-a51_b2.pk3', dest: 'gpp/map-base-a51_b2.pk3', checksum: 213743857 },
-		],
-		qvms: [
-			{ src: 'vm/cgame.qvm', dest: 'gpp/vm/cgame.qvm' }, 
-			{ src: 'vm/game.qvm', dest: 'gpp/vm/game.qvm' }, //Auriga: This needs to be DEDICATED / CLIENT specific at compilation
-			{ src: 'vm/ui.qvm', dest: 'gpp/vm/ui.qvm' }
-		],
-		so: [
-			{ src: 'vm/game.so', dest: 'gpp/vm/game.so' }
 		],
 		manifest: null,
 		Print: function (str) {
@@ -330,7 +322,7 @@ var LibrarySysCommon = {
 				var localPath = PATH.join(fs_basepath, name);
 			}
 			try {
-				FS.mkdir(PATH.dirname(localPath), 0777);
+				FS.mkdir(PATH.dirname(localPath), 0o777);
 			} catch (e) {
 				if (e.errno !== ERRNO_CODES.EEXIST) {
 					return callback(e);
@@ -374,27 +366,6 @@ var LibrarySysCommon = {
 			}
 			SYSC.LogChecksum(pak.dest, crc, pak.checksum);
 			return crc === pak.checksum;
-		},
-		DirtyQVM: function(callback) {
-			var qvms = [];
-			var assets = SYSC.GetManifest();
-			for (var i = 0; i < SYSC.qvms.length; i++) {
-				var qvm = SYSC.qvms[i];
-
-				var asset;
-				for (var j = 0; j < assets.length; j++) {
-					if (assets[j].name === qvm.src) {
-						asset = assets[j];
-						break;
-					}
-				}
-				if (!asset) {
-					return callback(new Error('DirtyQVM: Failed to find "' + qvm.src + '" in manifest'));
-				}
-				asset.dest = qvm.dest;
-				qvms.push(asset);
-			}
-			return qvms;
 		},
 		/*ValidateInstaller: function (installer) {
 			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
@@ -553,7 +524,6 @@ var LibrarySysCommon = {
 		},
 		SyncFiles: function (callback) {
 			var downloads = SYSC.DirtyPaks(callback);
-			//downloads = downloads.concat(SYSC.DirtyQVM(callback));
 
 			//Remove any files in base that don't belong
 			SYSC.ClearBaseDir();
@@ -678,7 +648,7 @@ var LibrarySysCommon = {
 
 		var ptr;
 
-		for (var i = 0; (ptr = {{{ makeGetValue('list', 'i*4', 'i32') }}}); i++) {
+		for (var i = 0; (ptr = HEAP32[(list >> 2) + i]); i++) {
 			_Z_Free(ptr);
 		}
 
@@ -701,7 +671,7 @@ var LibrarySysCommon = {
 	Sys_Mkdir: function (directory) {
 		directory = Module.UTF8ToString(directory);
 		try {
-			FS.mkdir(directory, 0777);
+			FS.mkdir(directory, 0o777);
 		} catch (e) {
 			if (!(e instanceof FS.ErrnoError)) {
 				SYSC.Error('drop', e.message);
