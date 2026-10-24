@@ -42,6 +42,8 @@ Console commands:
 Cvars:
   bot_minplayers  keep at least this many players on each team, using bots
   bot_skill       default skill for new bots (1-5)
+  bot_humanAimHandicap  skill levels taken off a human bot's aim and reaction
+                  when its target is a real player, not another bot
   bot_builders    bots on each team that build and repair the base
   bot_debug       print where and how bots die or get stuck, to find map problems
   bot_navBudget   msec per frame spent building the navigation graph
@@ -2519,6 +2521,19 @@ static float BotPreferredRange( weapon_t weapon )
   }
 }
 
+// skill used for aiming and reacting. Human bots aim worse at real players
+// than at other bots, so bot against bot stays as balanced as it was
+static float BotAimSkill( gentity_t *self, botState_t *bs, gentity_t *enemy )
+{
+  float skill = bs->skill;
+
+  if( self->client->pers.teamSelection == TEAM_HUMANS &&
+      enemy && enemy->client && !( enemy->r.svFlags & SVF_BOT ) )
+    skill -= bot_humanAimHandicap.value;
+
+  return MAX( skill, 0.0f );
+}
+
 static void BotAttack( gentity_t *self, botState_t *bs, usercmd_t *cmd,
                        gentity_t *enemy, float dist, float aimOff )
 {
@@ -2527,7 +2542,7 @@ static void BotAttack( gentity_t *self, botState_t *bs, usercmd_t *cmd,
   float         tolerance;
   qboolean      aimed;
 
-  int           reaction = 700 - bs->skill * 100;
+  int           reaction = 700 - BotAimSkill( self, bs, enemy ) * 100;
 
   // humans take a little longer to react to fast, small aliens than aliens
   // do to them
@@ -4074,6 +4089,8 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
 
   if( enemy )
   {
+    float aimSkill = BotAimSkill( self, bs, enemy );
+
     BotEyes( self, eye );
     BotEntityCenter( enemy, aimPoint );
 
@@ -4086,7 +4103,7 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
     // wobble the aim, less for better bots
     if( level.time >= bs->nextAimErrorTime )
     {
-      float spread = ( BOT_MAX_SKILL + 1 - bs->skill ) * 1.5f;
+      float spread = ( BOT_MAX_SKILL + 1 - aimSkill ) * 1.5f;
 
       // fast movers are hard to keep a gun on
       if( team == TEAM_HUMANS && enemy->client )
@@ -4099,7 +4116,7 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
     // react to movement late, so fast targets are hard to track. Aliens
     // only need to be close, humans have to be on target
     if( enemy->client )
-      VectorMA( aimPoint, -( BOT_MAX_SKILL + 1 - bs->skill ) *
+      VectorMA( aimPoint, -( BOT_MAX_SKILL + 1 - aimSkill ) *
                           ( team == TEAM_HUMANS ? 0.029f : 0.06f ),
                 enemy->client->ps.velocity, aimPoint );
 

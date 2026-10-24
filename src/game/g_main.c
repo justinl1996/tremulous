@@ -62,6 +62,7 @@ vmCvar_t  g_inactivity;
 
 vmCvar_t  bot_minplayers;
 vmCvar_t  bot_skill;
+vmCvar_t  bot_humanAimHandicap;
 vmCvar_t  bot_navBudget;
 vmCvar_t  bot_builders;
 vmCvar_t  bot_debug;
@@ -208,6 +209,7 @@ static cvarTable_t   gameCvarTable[ ] =
 
   { &bot_minplayers, "bot_minplayers", "0", CVAR_SERVERINFO, 0, qfalse },
   { &bot_skill, "bot_skill", "3", CVAR_ARCHIVE, 0, qfalse },
+  { &bot_humanAimHandicap, "bot_humanAimHandicap", "2", CVAR_ARCHIVE, 0, qfalse },
   { &bot_navBudget, "bot_navBudget", "5", CVAR_ARCHIVE, 0, qfalse },
   { &bot_builders, "bot_builders", "1", CVAR_ARCHIVE, 0, qfalse },
   { &bot_debug, "bot_debug", "0", 0, 0, qfalse },

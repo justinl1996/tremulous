@@ -1196,6 +1196,7 @@ extern  vmCvar_t  g_inactivity;
 
 extern  vmCvar_t  bot_minplayers;
 extern  vmCvar_t  bot_skill;
+extern  vmCvar_t  bot_humanAimHandicap;
 extern  vmCvar_t  bot_navBudget;
 extern  vmCvar_t  bot_builders;
 extern  vmCvar_t  bot_debug;
