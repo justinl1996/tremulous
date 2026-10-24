@@ -236,6 +236,16 @@ class ServerImpl : public Server
         }
 
         endpoint.set_reuse_addr(true);
+
+        // Snapshots are small and frequent. Without TCP_NODELAY, Nagle's algorithm holds
+        // each one back until the previous is acknowledged, so clients with a long round
+        // trip get them in bursts. Set once the connection is accepted, before the handshake
+        // (the socket init handler runs earlier, while the socket is not yet open).
+        endpoint.set_tcp_pre_init_handler([this](Hdl hdl) {
+            asio::error_code aec;
+            endpoint.get_con_from_hdl(hdl)->get_raw_socket().set_option(asio::ip::tcp::no_delay(true), aec);
+        });
+
         endpoint.set_max_message_size(MAX_MSGLEN);
         endpoint.set_close_handshake_timeout(1000);
 
