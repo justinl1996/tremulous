@@ -108,6 +108,8 @@ endif
 export CROSS_COMPILING
 
 # Always name the version to be alphabetically *after* gpp1
+# The one place the version number is written. CMake reads it from here, and
+# q_shared.h builds every version text the game shows from it.
 ifndef VERSION
 VERSION=v1.3.0
 endif
@@ -349,14 +351,15 @@ ifneq ($(BUILD_CLIENT),0)
   endif
 endif
 
-# Add git version info
+# Add git version info: the tag, commits since it and the hash (v1.3.0-12-g1a2b3c4),
+# or just the hash while there is no tag; not passed without git (q_shared.h then says unknown)
 USE_GIT=
+GIT_HASH=
 ifeq ($(wildcard .git),.git)
-  GIT_REV=$(shell git describe --tag | sed -e 's/-/_/g')
-  GIT_HASH=$(shell git rev-parse --short HEAD 2> /dev/null || echo unknown)
+  GIT_INDEX:=$(shell git rev-parse --git-path index 2> /dev/null)
 
-  ifneq ($(GIT_REV),)
-    #VERSION:=$(GIT_REV)
+  ifneq ($(GIT_INDEX),)
+    GIT_HASH:=$(shell git describe --tags --always --dirty 2> /dev/null)
     USE_GIT=1
   endif
 endif
@@ -812,7 +815,8 @@ ifeq ($(PLATFORM),js)
   USE_LOCAL_HEADERS=0
   USE_RESTCLIENT=0
 
-  LIBSYSCOMMON=$(SYSDIR)/sys_common.js
+  # sys_common.js names the vms pk3 @VERSION@; the copy in the build dir has VERSION in it
+  LIBSYSCOMMON=$(B)/sys_common-$(VERSION).js
   LIBSYSBROWSER=$(SYSDIR)/sys_browser.js
   LIBSYSNODE=$(SYSDIR)/sys_node.js
   #LIBVMCOMPILED=$(CMDIR)/vm_js.js     --js-library $(LIBVMCOMPILED) \
@@ -1091,7 +1095,9 @@ else
 endif
 
 BASE_CFLAGS += -DPRODUCT_VERSION=\\\"$(VERSION)\\\"
+ifneq ($(GIT_HASH),)
 BASE_CFLAGS += -DGIT_HASH=\\\"$(GIT_HASH)\\\"
+endif
 
 ifeq ($(V),1)
 echo_cmd=@:
@@ -2947,12 +2953,25 @@ $(B)/ded/%.o: $(NDIR)/%.c
 $(B)/ded/%.o: $(NDIR)/%.cpp
 	$(DO_DED_CXX)
 
+# The web client names the vms pk3 after VERSION (see LIBSYSCOMMON above)
+ifeq ($(PLATFORM),js)
+$(B)/sys_common-$(VERSION).js: $(SYSDIR)/sys_common.js
+	$(echo_cmd) "SED $<"
+	$(Q)mkdir -p $(B)
+	$(Q)sed -e 's/@VERSION@/$(VERSION)/g' $< > $@
+endif
+
 # Extra dependencies to ensure the git version is incorporated
 ifeq ($(USE_GIT),1)
-  $(B)/client/cl_console.o : .git/index
-  $(B)/client/cl_scrn.o : .git/index
-  $(B)/client/common.o : .git/index
-  $(B)/ded/common.o : .git/index
+  $(B)/client/cl_scrn.o : $(GIT_INDEX)
+  $(B)/client/cl_console.o : $(GIT_INDEX)
+  $(B)/client/cl_curl.o : $(GIT_INDEX)
+  $(B)/client/common.o : $(GIT_INDEX)
+  $(B)/client/cl_cgame.o : $(GIT_INDEX)
+  $(B)/renderercommon/sdl_glimp.o : $(GIT_INDEX)
+  $(B)/client/sys_main.o : $(GIT_INDEX)
+  $(B)/ded/common.o : $(GIT_INDEX)
+  $(B)/ded/sys_main.o : $(GIT_INDEX)
 endif
 
 
