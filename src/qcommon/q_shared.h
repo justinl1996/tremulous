@@ -34,13 +34,22 @@ extern "C" {
 
 #define PRODUCT_NAME              "tremulous"
 
-#ifndef PRODUCT_VERSION
-# define PRODUCT_VERSION          "1.3.0 alpha"
+// The version number comes from VERSION in the Makefile (CMake reads it from there),
+// and the build from git describe; there is no other copy of either. The engine
+// shows two texts, both made here: VERSION_STRING ("v1.3.0 (hash)", the version cvar,
+// menus, the in-game line, the log) and Q3_VERSION ("Tremulous v1.3.0 (hash)", the
+// window title, the console right edge, --version, the curl user agent). The game
+// modules show no version, so they are built without PRODUCT_VERSION; common.cpp
+// refuses to build an engine without it.
+#ifndef GIT_HASH
+# define GIT_HASH                 "unknown" // no git describe available at build time
 #endif
-
-#define CLIENT_WINDOW_TITLE       "Tremulous " PRODUCT_VERSION
+#ifdef PRODUCT_VERSION
+# define VERSION_STRING           PRODUCT_VERSION " (" GIT_HASH ")"
+# define Q3_VERSION               "Tremulous " VERSION_STRING
+# define CLIENT_WINDOW_TITLE      Q3_VERSION
+#endif
 #define CLIENT_WINDOW_MIN_TITLE   "Tremulous"
-#define Q3_VERSION                 PRODUCT_NAME " " PRODUCT_VERSION
 
 #define GAMENAME_FOR_MASTER       "Tremulous"
 #define HOMEPATH_NAME_UNIX        ".tremulous"

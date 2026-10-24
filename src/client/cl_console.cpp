@@ -64,7 +64,6 @@ cvar_t      *con_colorRed;
 cvar_t      *con_colorGreen;
 cvar_t      *con_colorBlue;
 cvar_t      *con_colorAlpha;
-cvar_t      *con_versionStr;
 
 #define	DEFAULT_CONSOLE_WIDTH	78
 
@@ -446,7 +445,6 @@ void Con_Init (void) {
 	con_colorBlue   = Cvar_Get ("scr_colorBlue", "0", CVAR_ARCHIVE);
 	con_colorGreen  = Cvar_Get ("scr_colorGreen", "0", CVAR_ARCHIVE);
 	con_colorAlpha  = Cvar_Get ("scr_colorAlpha", ".8", CVAR_ARCHIVE);
-    con_versionStr  = Cvar_Get ("scr_versionString", Q3_VERSION, CVAR_ARCHIVE);
 
 	Field_Clear( &g_consoleField );
 	g_consoleField.widthInChars = g_console_field_width;

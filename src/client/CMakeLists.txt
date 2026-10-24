@@ -21,7 +21,6 @@ add_definitions(
     -DUSE_INTERNAL_JPEG
     -DUSE_RENDERER_DLOPEN
     -DNDEBUG
-    -DPRODUCT_VERSION="1.3.0 alpha"
     ${SDL2_DEFINES}
     )
 

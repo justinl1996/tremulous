@@ -472,9 +472,6 @@ void SCR_Init(void)
 //=======================================================
 
 #ifdef EMSCRIPTEN
-#ifndef GIT_HASH
-#define GIT_HASH "unknown"
-#endif
 
 /*
 ==================
@@ -486,13 +483,32 @@ Shows which build the web client is running on the start screen
 static void SCR_DrawCommitHash(void)
 {
     vec4_t color = {1.0f, 1.0f, 1.0f, 0.5f};
-    const char *text = GIT_HASH;
+    const char *text = VERSION_STRING;
     int x = cls.glconfig.vidWidth - (int)strlen(text) * SMALLCHAR_WIDTH - 8;
     int y = cls.glconfig.vidHeight - SMALLCHAR_HEIGHT - 8;
 
     SCR_DrawSmallStringExt(x, y, text, color, true, true);
 }
 #endif
+
+/*
+==================
+SCR_DrawVersion
+
+Shows the running version at the bottom centre while in a game, just above the
+default HUD's item selector row (y 425 of 480), so that screenshots always say
+which build they came from
+==================
+*/
+static void SCR_DrawVersion(void)
+{
+    vec4_t color = {1.0f, 1.0f, 1.0f, 0.6f};
+    const char *text = Cvar_VariableString("version");
+    int x = (cls.glconfig.vidWidth - (int)strlen(text) * SMALLCHAR_WIDTH) / 2;
+    int y = cls.glconfig.vidHeight * 425 / 480 - SMALLCHAR_HEIGHT - 2;
+
+    SCR_DrawSmallStringExt(x, y, text, color, true, true);
+}
 
 /*
 ==================
@@ -580,6 +596,10 @@ void SCR_DrawScreenField(stereoFrame_t stereoFrame)
     {
         SCR_DrawDebugGraph();
     }
+
+    // the version goes over everything else while in a game
+    if (clc.state == CA_ACTIVE)
+        SCR_DrawVersion();
 }
 
 /*

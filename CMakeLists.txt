@@ -37,6 +37,23 @@ option(USE_MUMBLE "" OFF)
 option(USE_CODEC_OPUS "" ON)
 option(USE_RESTCLIENT "" ON)
 
+# The version: VERSION in the Makefile is the only place it is written. The build is
+# git describe, as in the Makefile, and is left out when there is no git.
+file(STRINGS ${CMAKE_SOURCE_DIR}/Makefile PRODUCT_VERSION_LINE REGEX "^VERSION=")
+string(REGEX REPLACE "^VERSION=" "" PRODUCT_VERSION "${PRODUCT_VERSION_LINE}")
+if(NOT PRODUCT_VERSION)
+  message(FATAL_ERROR "no VERSION= line found in ${CMAKE_SOURCE_DIR}/Makefile")
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/Makefile)
+add_definitions(-DPRODUCT_VERSION="${PRODUCT_VERSION}")
+execute_process(COMMAND git describe --tags --always --dirty
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_HASH OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE GIT_RESULT ERROR_QUIET)
+if(GIT_RESULT EQUAL 0 AND GIT_HASH)
+  add_definitions(-DGIT_HASH="${GIT_HASH}")
+endif()
+
 include(${CMAKE_SOURCE_DIR}/cmake/build_dir)
 include(${CMAKE_SOURCE_DIR}/cmake/debug_cflags)
 

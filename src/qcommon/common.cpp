@@ -57,8 +57,8 @@ int demo_protocols[] = { PROTOCOL_VERSION, 70, 69, 0 };
 #define DEF_COMHUNKMEGS_S XSTRING(DEF_COMHUNKMEGS)
 #define DEF_COMZONEMEGS_S XSTRING(DEF_COMZONEMEGS)
 
-#ifndef GIT_HASH
-#define GIT_HASH "unknown"
+#ifndef PRODUCT_VERSION
+#error PRODUCT_VERSION is not set: build with make or cmake, which take it from VERSION in the Makefile
 #endif
 
 int com_argc;
@@ -2793,7 +2793,7 @@ static void Com_Init_after_FS_InitFilesystem( cb_context_t *context, int status 
     Cvar_Get("com_errorMessage", "", CVAR_ROM | CVAR_NORESTART);
     Cvar_Get("com_demoErrorMessage", "", CVAR_ROM | CVAR_NORESTART);
 
-    com_version = Cvar_Get ("version", PRODUCT_NAME, CVAR_ROM | CVAR_SERVERINFO );
+    com_version = Cvar_Get ("version", VERSION_STRING, CVAR_ROM | CVAR_SERVERINFO );
     Cvar_Get ("protocol", va("%i", PROTOCOL_VERSION), CVAR_SERVERINFO | CVAR_ROM);
     com_gamename = Cvar_Get("com_gamename", GAMENAME_FOR_MASTER, CVAR_SERVERINFO | CVAR_INIT);
 
@@ -2858,7 +2858,7 @@ void Com_Init( char *commandLine, cb_context_t *after )
         Sys_Error ("Error during initialization");
     }
 
-    Com_Printf("Compiled version: %s\n", GIT_HASH);
+    Com_Printf("Compiled version: %s\n", VERSION_STRING);
 
     // Clear queues
     ::memset( &eventQueue[ 0 ], 0, MAX_QUEUED_EVENTS * sizeof( sysEvent_t ) );
