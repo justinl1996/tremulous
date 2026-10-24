@@ -4599,7 +4599,9 @@ void CL_GetPing(int n, char *buf, int buflen, int *pingtime)
         }
     }
 
-    CL_SetServerInfoByAddress(cl_pinglist[n].adr, cl_pinglist[n].info, cl_pinglist[n].time);
+    // a server that has not answered has an empty info string; passing it would blank the stored host name,
+    // so an unanswered favorite lost its name and was then dropped from the list as having invalid info
+    CL_SetServerInfoByAddress(cl_pinglist[n].adr, cl_pinglist[n].info[0] ? cl_pinglist[n].info : NULL, cl_pinglist[n].time);
 
     *pingtime = time;
 }
