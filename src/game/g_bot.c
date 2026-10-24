@@ -42,8 +42,8 @@ Console commands:
 Cvars:
   bot_minplayers  keep at least this many players on each team, using bots
   bot_skill       default skill for new bots (1-5)
-  bot_humanAimHandicap  skill levels taken off a human bot's aim and reaction
-                  when its target is a real player, not another bot
+  bot_humanAimHandicap  skill levels (0-10) taken off a human bot's aim and
+                  reaction when its target is a real player, not another bot
   bot_builders    bots on each team that build and repair the base
   bot_debug       print where and how bots die or get stuck, to find map problems
   bot_navBudget   msec per frame spent building the navigation graph
@@ -123,6 +123,7 @@ typedef struct
 
   // aim
   vec3_t    aimError;       // degrees
+  vec3_t    aimMiss;        // units right and up of the target, real players only
   int       nextAimErrorTime;
 
   // movement
@@ -1966,9 +1967,11 @@ static void BotSetMovement( gentity_t *self, usercmd_t *cmd, const vec3_t viewAn
 Aiming
 ===============
 */
-static void BotTurn( botState_t *bs, vec3_t view, const vec3_t desired, float msec )
+// turnScale slows the turn below what the bot's skill allows
+static void BotTurn( botState_t *bs, vec3_t view, const vec3_t desired, float msec,
+                     float turnScale )
 {
-  float maxTurn = ( 200.0f + bs->skill * 80.0f ) * msec / 1000.0f;
+  float maxTurn = ( 200.0f + bs->skill * 80.0f ) * turnScale * msec / 1000.0f;
   float delta;
   int   i;
 
@@ -2521,17 +2524,21 @@ static float BotPreferredRange( weapon_t weapon )
   }
 }
 
-// skill used for aiming and reacting. Human bots aim worse at real players
-// than at other bots, so bot against bot stays as balanced as it was
-static float BotAimSkill( gentity_t *self, botState_t *bs, gentity_t *enemy )
+// Human bots aim worse at real players than at other bots, so bot against
+// bot stays as balanced as it was. The handicap comes off the skill used for
+// aiming and reacting, and can take it below 1 for an even worse aim
+static float BotAimHandicap( gentity_t *self, gentity_t *enemy )
 {
-  float skill = bs->skill;
-
   if( self->client->pers.teamSelection == TEAM_HUMANS &&
       enemy && enemy->client && !( enemy->r.svFlags & SVF_BOT ) )
-    skill -= bot_humanAimHandicap.value;
+    return Com_Clamp( 0.0f, 10.0f, bot_humanAimHandicap.value );
 
-  return MAX( skill, 0.0f );
+  return 0.0f;
+}
+
+static float BotAimSkill( gentity_t *self, botState_t *bs, gentity_t *enemy )
+{
+  return bs->skill - BotAimHandicap( self, enemy );
 }
 
 static void BotAttack( gentity_t *self, botState_t *bs, usercmd_t *cmd,
@@ -3755,7 +3762,7 @@ static void BotThinkBuilder( gentity_t *self, botState_t *bs, usercmd_t *cmd, in
     }
   }
 
-  BotTurn( bs, view, desired, msec );
+  BotTurn( bs, view, desired, msec, 1.0f );
   BotMove( self, bs, cmd, view, moveDir, moving, moveFlags, 0.0f, qtrue, msec );
 }
 
@@ -4089,7 +4096,8 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
 
   if( enemy )
   {
-    float aimSkill = BotAimSkill( self, bs, enemy );
+    float handicap = BotAimHandicap( self, enemy );
+    float aimSkill = bs->skill - handicap;
 
     BotEyes( self, eye );
     BotEntityCenter( enemy, aimPoint );
@@ -4111,6 +4119,19 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
 
       bs->nextAimErrorTime = level.time + 300 + rand( ) % 400;
       VectorSet( bs->aimError, crandom( ) * spread * 0.5f, crandom( ) * spread, 0.0f );
+
+      // an angle is only a few units off up close, where a dretch fights,
+      // so handicapped bots also aim a distance to the side of the target
+      if( handicap > 0.0f )
+      {
+        float missAngle = random( ) * 2.0f * M_PI;
+        float missDist = handicap * 3.0f * ( 0.5f + 0.5f * random( ) );
+
+        VectorSet( bs->aimMiss, cos( missAngle ) * missDist,
+                   sin( missAngle ) * missDist, 0.0f );
+      }
+      else
+        VectorClear( bs->aimMiss );
     }
 
     // react to movement late, so fast targets are hard to track. Aliens
@@ -4119,6 +4140,17 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
       VectorMA( aimPoint, -( BOT_MAX_SKILL + 1 - aimSkill ) *
                           ( team == TEAM_HUMANS ? 0.029f : 0.06f ),
                 enemy->client->ps.velocity, aimPoint );
+
+    if( handicap > 0.0f )
+    {
+      vec3_t right, up;
+
+      VectorSubtract( aimPoint, eye, toEnemy );
+      vectoangles( toEnemy, desired );
+      AngleVectors( desired, NULL, right, up );
+      VectorMA( aimPoint, bs->aimMiss[ 0 ], right, aimPoint );
+      VectorMA( aimPoint, bs->aimMiss[ 1 ], up, aimPoint );
+    }
 
     VectorSubtract( aimPoint, eye, toEnemy );
     dist = VectorNormalize( toEnemy );
@@ -4131,7 +4163,8 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
                              client->ps.weapon == WP_ALEVEL3_UPG ) )
       desired[ PITCH ] = AngleMod( desired[ PITCH ] - 15.0f );
 
-    BotTurn( bs, view, desired, msec );
+    // and turn slower, so a fast or close target is hard to keep up with
+    BotTurn( bs, view, desired, msec, 1.0f / ( 1.0f + handicap * 0.15f ) );
 
     // movement in combat
     VectorSubtract( enemy->r.currentOrigin, self->r.currentOrigin, dir );
@@ -4149,7 +4182,7 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
       if( running )
       {
         BotFaceMove( self, bs, moveDir, moveFlags, desired );
-        BotTurn( bs, view, desired, msec );
+        BotTurn( bs, view, desired, msec, 1.0f );
       }
     }
     else if( team == TEAM_ALIENS )
@@ -4288,7 +4321,7 @@ static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int 
     if( moving && VectorLength( moveDir ) > 0.1f )
     {
       BotFaceMove( self, bs, moveDir, moveFlags, desired );
-      BotTurn( bs, view, desired, msec );
+      BotTurn( bs, view, desired, msec, 1.0f );
     }
   }
 
