@@ -3118,6 +3118,14 @@ void Com_Frame( void )
     if ( setjmp(abortframe) )
         return; // an ERR_DROP was thrown
 
+#ifdef EMSCRIPTEN
+    // In the browser FS_Restart is asynchronous (IndexedDB sync, manifest check) and the main loop keeps
+    // running while it waits. With the search paths gone any file access from a frame (the menu music
+    // stream, the config write, ...) is ERR_FATAL and the game closes. Skip frames until the FS is back.
+    if ( !FS_Initialized() )
+        return;
+#endif
+
     timeBeforeFirstEvents =0;
     timeBeforeServer =0;
     timeBeforeEvents =0;
