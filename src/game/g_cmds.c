@@ -836,7 +836,7 @@ void Cmd_Team_f( gentity_t *ent )
         force = qtrue;
 
       if( !force && g_teamForceBalance.integer && aliens > humans &&
-          !G_BotMakeRoom( TEAM_ALIENS, oldteam ) )
+          ( ent->client->pers.isBot || !G_BotMakeRoom( TEAM_ALIENS, oldteam ) ) )
       {
         G_TriggerMenu( ent - g_entities, MN_A_TEAMFULL );
         return;
@@ -855,7 +855,7 @@ void Cmd_Team_f( gentity_t *ent )
         force = qtrue;
 
       if( !force && g_teamForceBalance.integer && humans > aliens &&
-          !G_BotMakeRoom( TEAM_HUMANS, oldteam ) )
+          ( ent->client->pers.isBot || !G_BotMakeRoom( TEAM_HUMANS, oldteam ) ) )
       {
         G_TriggerMenu( ent - g_entities, MN_H_TEAMFULL );
         return;
