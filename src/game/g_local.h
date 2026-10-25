@@ -1110,6 +1110,7 @@ void      G_BotRunFrame( int msec );
 void      G_BotConnect( int clientNum );
 void      G_BotDisconnect( int clientNum );
 qboolean  G_AddBot( const char *name, team_t team, int skill );
+qboolean  G_BotMakeRoom( team_t team, team_t oldteam );
 void      Svcmd_AddBot_f( void );
 void      Svcmd_KickBots_f( void );
 void      Svcmd_BotStatus_f( void );

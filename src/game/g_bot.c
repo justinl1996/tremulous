@@ -4669,6 +4669,42 @@ static void G_KickBots( team_t team )
   }
 }
 
+/*
+===============
+G_BotMakeRoom
+
+Make room on a full team for a real player by swapping one of its bots onto
+the team the player is leaving, so the teams stay as even as they were.
+Returns qfalse if the team has no bots to swap.
+===============
+*/
+qboolean G_BotMakeRoom( team_t team, team_t oldteam )
+{
+  int i, skill;
+
+  if( team == oldteam )
+    return qfalse;
+
+  for( i = level.maxclients - 1; i >= 0; i-- )
+  {
+    if( level.clients[ i ].pers.isBot &&
+        level.clients[ i ].pers.connected != CON_DISCONNECTED &&
+        botStates[ i ].team == team )
+      break;
+  }
+
+  if( i < 0 )
+    return qfalse;
+
+  skill = botStates[ i ].skill;
+  trap_DropClient( i, "was swapped out for a player" );
+
+  if( oldteam == TEAM_ALIENS || oldteam == TEAM_HUMANS )
+    G_AddBot( NULL, oldteam, skill );
+
+  return qtrue;
+}
+
 // add or remove bots so each team has bot_minplayers players
 static void BotCheckMinPlayers( void )
 {
