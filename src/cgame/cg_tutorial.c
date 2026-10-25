@@ -739,7 +739,18 @@ const char *CG_TutorialText( void )
 
   if( !cg.demoPlayback )
   {
-    Q_strcat( text, MAX_TUTORIAL_TEXT, "Press ESC for the menu" );
+    char menuKeys[ MAX_CVAR_VALUE_STRING ];
+    char tutorialKey[ MAX_CVAR_VALUE_STRING ];
+
+    // the web client opens the menu with more keys than escape, and has a
+    // key to hide this text
+    trap_Cvar_VariableStringBuffer( "cl_menuKeys", menuKeys, sizeof( menuKeys ) );
+    trap_Cvar_VariableStringBuffer( "cl_tutorialKey", tutorialKey, sizeof( tutorialKey ) );
+    Q_strcat( text, MAX_TUTORIAL_TEXT,
+        va( "Press %s for the menu", menuKeys[ 0 ] ? menuKeys : "ESC" ) );
+    if( tutorialKey[ 0 ] )
+      Q_strcat( text, MAX_TUTORIAL_TEXT,
+          va( "\nPress %s to hide these hints", tutorialKey ) );
   }
 
   return text;

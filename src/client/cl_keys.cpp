@@ -1329,6 +1329,21 @@ static void CL_KeyDownEvent( int key, unsigned time )
 		}
 	}
 
+#ifdef EMSCRIPTEN
+	// browsers also take escape to leave fullscreen and pointer lock, so the
+	// web client opens the menu with F10 too, and with P while in play so it
+	// can still be typed into menus
+	if ( key == K_F10 ||
+		( key == 'p' && clc.state == CA_ACTIVE && !Key_GetCatcher( ) ) )
+		key = K_ESCAPE;
+
+	// O shows or hides the tutorial text, also only while in play
+	if ( key == 'o' && clc.state == CA_ACTIVE && !Key_GetCatcher( ) ) {
+		Cvar_SetValue( "cg_tutorial", !Cvar_VariableIntegerValue( "cg_tutorial" ) );
+		return;
+	}
+#endif
+
 	// escape is always handled special
 	if ( key == K_ESCAPE ) {
 		if ( clc.netchan.alternateProtocol == 2 &&

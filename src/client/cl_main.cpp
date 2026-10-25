@@ -5230,6 +5230,11 @@ void CL_Init(void)
     Cvar_Get("cg_viewsize", "100", CVAR_ARCHIVE);
     // Make sure cg_stereoSeparation is zero as that variable is deprecated and should not be used anymore.
     Cvar_Get("cg_stereoSeparation", "0", CVAR_ROM);
+#ifdef EMSCRIPTEN
+    // tells the cgame tutorial text which keys open the menu (see CL_KeyDownEvent)
+    Cvar_Get("cl_menuKeys", "ESC, P or F10", CVAR_ROM);
+    Cvar_Get("cl_tutorialKey", "O", CVAR_ROM);
+#endif
 
     //
     // register our commands
