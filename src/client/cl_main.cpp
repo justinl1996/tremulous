@@ -1906,6 +1906,12 @@ static void CL_DownloadsComplete(void)
     if (clc.XHRUsed)
     {
         clc.XHRUsed = false;
+        // the news, not a game download
+        if (clc.activeXHRNotGameRelated)
+        {
+            clc.downloadRestart = false;
+            return;
+        }
         if (clc.XHRDisconnected)
         {
             if (clc.downloadRestart)
@@ -2225,6 +2231,12 @@ void CL_NextDownload(void)
                     "allow download redirection "
                     "(sv_allowDownload is %d)\n",
                     clc.sv_allowDownload);
+            }
+            else if (clc.sv_wsDownload)
+            {
+                // straight from the game server
+                CL_XHR_StartDownload(localName, va("%s/%s", CL_XHR_ServerURL(), remoteName));
+                useXHR = true;
             }
             else if (!*clc.sv_dlURL)
             {
@@ -3181,9 +3193,7 @@ void CL_Frame(int msec)
 #ifdef EMSCRIPTEN
     if (clc.downloadXHR)
     {
-        //Auriga: We don't really have anything to do but just wait for a callback
-        //since the XHR request runs asyncronously
-
+        CL_XHR_PerformDownload();
         // we can't process frames normally when in disconnected download mode
         // since the ui vm expects clc.state to be CA_CONNECTED
         if (clc.XHRDisconnected)

@@ -461,6 +461,7 @@ static void CL_ParseServerInfo(void)
 #ifdef EMSCRIPTEN
 	Q_strncpyz(clc.fs_cdn, Info_ValueForKey(serverInfo, "fs_cdn"), sizeof(clc.fs_cdn));
 	Q_strncpyz(clc.fs_manifest, Info_ValueForKey(serverInfo, "fs_manifest"), sizeof(clc.fs_manifest));
+	clc.sv_wsDownload = atoi(Info_ValueForKey(serverInfo, "sv_wsDownload")) ? true : false;
 #endif
 }
 

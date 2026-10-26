@@ -30,6 +30,11 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 // websocketpp runs asio on its own thread: received packets are queued for
 // the main thread, which a pipe in NET_Sleep's select() wakes, and packets
 // for the browsers are posted back to the websocket thread.
+//
+// The same port answers plain HTTP GETs for the paks clients may download
+// (net_wsDownload), so the web client can fetch a server's maps from the
+// server itself. The main thread decides which file a request gets, and the
+// websocket thread reads and sends it.
 
 #include "net_ws.h"
 
@@ -48,6 +53,9 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <fstream>
+#include <sstream>
+
 #include <atomic>
 #include <chrono>
 #include <deque>
@@ -57,6 +65,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include <thread>
 
 #include "cvar.h"
+#include "files.h"
 #include "msg.h"
 #include "q_shared.h"
 #include "qcommon.h"
@@ -65,6 +74,7 @@ static cvar_t *net_websocket;
 static cvar_t *net_wsPort;
 static cvar_t *net_wsCert;
 static cvar_t *net_wsKey;
+static cvar_t *net_wsDownload;
 
 namespace
 {
@@ -72,17 +82,19 @@ const int WS_MAX_CONNS = 256;
 const int WS_MAX_PER_IP = 16;
 const int WS_IDLE_TIMEOUT = 60;  // seconds without a message from the browser
 const size_t WS_MAX_BUFFERED = 256 * 1024;  // drop packets for browsers that can't keep up
+const int WS_MAX_HTTP = 32;  // HTTP requests waiting for the main thread
 
 typedef websocketpp::connection_hdl Hdl;
 typedef std::chrono::steady_clock Clock;
 
-enum EventType { EV_PACKET, EV_OPEN, EV_CLOSE };
+enum EventType { EV_PACKET, EV_OPEN, EV_CLOSE, EV_HTTP };
 
 // handed from the websocket thread to the main thread
 struct Event {
     EventType type;
     netadr_t adr;
-    std::string data;
+    std::string data;  // the packet, or the path an HTTP request asks for
+    Hdl hdl;  // the HTTP request's connection
 };
 
 std::string BaseAdrKey(const netadr_t &a)
@@ -165,6 +177,12 @@ class Server
     virtual void Stop() = 0;
     virtual bool Send(const netadr_t &to, const void *data, int length) = 0;
 
+    // answers an HTTP request with the file at ospath, or with status when
+    // ospath is empty
+    virtual void Respond(Hdl hdl, const std::string &ospath, int status) = 0;
+
+    bool serveFiles = false;
+
     int WakeFd() const { return wakeFds[0]; }
 
     void Drain()
@@ -187,12 +205,12 @@ class Server
     }
 
    protected:
-    void Push(EventType type, const netadr_t &adr, std::string data = std::string())
+    void Push(EventType type, const netadr_t &adr, std::string data = std::string(), Hdl hdl = Hdl())
     {
         {
             std::lock_guard<std::mutex> guard(lock);
 
-            events.push_back(Event{type, adr, std::move(data)});
+            events.push_back(Event{type, adr, std::move(data), hdl});
         }
 
         if (write(wakeFds[1], "", 1) < 0)
@@ -244,6 +262,7 @@ class ServerImpl : public Server
         endpoint.set_close_handler(websocketpp::lib::bind(&ServerImpl::OnClose, this, _1));
         endpoint.set_fail_handler(websocketpp::lib::bind(&ServerImpl::OnClose, this, _1));
         endpoint.set_message_handler(websocketpp::lib::bind(&ServerImpl::OnMessage, this, _1, _2));
+        endpoint.set_http_handler(websocketpp::lib::bind(&ServerImpl::OnHttp, this, _1));
 
         endpoint.listen(ep, ec);
         if (ec)
@@ -327,6 +346,42 @@ class ServerImpl : public Server
         });
 
         return true;
+    }
+
+    void Respond(Hdl hdl, const std::string &ospath, int status) override
+    {
+        asio::post(endpoint.get_io_service(), [this, hdl, ospath, status]() {
+            websocketpp::lib::error_code ec;
+            auto it = deferred.find(hdl);
+
+            if (it == deferred.end()) return;
+
+            typename Endpoint::connection_ptr con = it->second;
+
+            deferred.erase(it);
+
+            std::ifstream file;
+
+            if (!ospath.empty()) file.open(ospath, std::ios::binary);
+
+            if (file.is_open())
+            {
+                std::ostringstream body;
+
+                body << file.rdbuf();
+                con->set_status(websocketpp::http::status_code::ok);
+                con->set_body(body.str());
+                con->replace_header("Content-Type", "application/octet-stream");
+            }
+            else
+            {
+                con->set_status(ospath.empty() ? (websocketpp::http::status_code::value)status
+                                               : websocketpp::http::status_code::not_found);
+                con->set_body("");
+            }
+
+            con->send_http_response(ec);
+        });
     }
 
    private:
@@ -473,6 +528,48 @@ class ServerImpl : public Server
         Push(EV_PACKET, c.adr, std::move(payload));
     }
 
+    void OnHttp(Hdl hdl)
+    {
+        websocketpp::lib::error_code ec;
+        asio::error_code aec;
+        typename Endpoint::connection_ptr con = endpoint.get_con_from_hdl(hdl, ec);
+
+        if (ec) return;
+
+        // the web client is served from another origin
+        con->append_header("Access-Control-Allow-Origin", "*");
+
+        if (!serveFiles)
+        {
+            con->set_status(websocketpp::http::status_code::not_found);
+            return;
+        }
+
+        if (con->get_request().get_method() != "GET")
+        {
+            con->set_status(websocketpp::http::status_code::method_not_allowed);
+            return;
+        }
+
+        if (deferred.size() >= (size_t)WS_MAX_HTTP)
+        {
+            con->set_status(websocketpp::http::status_code::service_unavailable);
+            return;
+        }
+
+        asio::ip::tcp::endpoint remote = con->get_raw_socket().remote_endpoint(aec);
+        netadr_t adr;
+
+        if (aec) return;
+
+        AddressToAdr(remote.address(), remote.port(), &adr);
+
+        if (con->defer_http_response()) return;
+
+        deferred[hdl] = con;
+        Push(EV_HTTP, adr, con->get_resource(), hdl);
+    }
+
     // closes the connections of browsers that went quiet, such as ones that
     // only asked for the server's info from the server browser
     void CheckIdle()
@@ -501,6 +598,10 @@ class ServerImpl : public Server
 
     // only touched on the websocket thread
     std::map<Hdl, Conn, std::owner_less<Hdl>> conns;
+
+    // HTTP requests waiting for the main thread, which nothing else keeps
+    // alive while they wait
+    std::map<Hdl, typename Endpoint::connection_ptr, std::owner_less<Hdl>> deferred;
 
     // guarded by lock, so the main thread can tell which addresses are browsers
     std::map<std::string, Hdl> byAdr;
@@ -541,6 +642,68 @@ static Server *ws_server;
 
 /*
 ====================
+NET_WS_DownloadPath
+
+The file an HTTP request for resource may have, or "" with the status to send
+instead. Like UDP downloads, only paks the server references can be had.
+====================
+*/
+static std::string NET_WS_DownloadPath(std::string resource, int *status)
+{
+    int allow = Cvar_VariableIntegerValue("sv_allowDownload");
+    size_t query = resource.find_first_of("?#");
+
+    *status = 404;
+
+    if (query != std::string::npos) resource.erase(query);
+
+    while (!resource.empty() && resource[0] == '/')
+        resource.erase(0, 1);
+
+    if (!(allow & DLF_ENABLE) || (allow & DLF_NO_REDIRECT))
+    {
+        *status = 403;
+        return "";
+    }
+
+    if (resource.size() <= 4 || resource.size() >= MAX_QPATH || Q_stricmp(resource.c_str() + resource.size() - 4, ".pk3") ||
+        resource.find("..") != std::string::npos || resource.find_first_of("\\:%") != std::string::npos)
+        return "";
+
+    std::string pak = resource.substr(0, resource.size() - 4);
+    std::istringstream referenced(std::string(Cvar_VariableString("sv_referencedPakNames")) + " " +
+                                  Cvar_VariableString("sv_referencedAlternatePakNames"));
+    std::string name;
+    bool found = false;
+
+    while (referenced >> name)
+    {
+        if (!FS_FilenameCompare(name.c_str(), pak.c_str()))
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) return "";
+
+    const char *bases[] = {Cvar_VariableString("fs_homepath"), Cvar_VariableString("fs_basepath")};
+
+    for (const char *base : bases)
+    {
+        std::string ospath = FS_BuildOSPath(base, resource.c_str(), "");
+
+        // remove the trailing slash
+        ospath.erase(ospath.size() - 1);
+
+        if (access(ospath.c_str(), R_OK) == 0) return ospath;
+    }
+
+    return "";
+}
+
+/*
+====================
 NET_WS_GetCvars
 ====================
 */
@@ -566,6 +729,12 @@ bool NET_WS_GetCvars(void)
     net_wsKey = Cvar_Get("net_wsKey", "", CVAR_LATCH);
     modified += net_wsKey->modified;
     net_wsKey->modified = false;
+
+    // serve the paks clients may download over HTTP(S) on the same port, so
+    // web clients download from this server rather than sv_dlURL
+    net_wsDownload = Cvar_Get("net_wsDownload", "1", CVAR_LATCH);
+    modified += net_wsDownload->modified;
+    net_wsDownload->modified = false;
 
     return modified ? true : false;
 }
@@ -627,6 +796,8 @@ void NET_WS_Open(const char *ip, const char *ip6, int enabled, int udpPort)
     else
         server = new ServerImpl<websocketpp::config::asio>();
 
+    server->serveFiles = net_wsDownload->integer ? true : false;
+
     if (server->WakeFd() == -1 || !server->Start(asio::ip::tcp::endpoint(addr, port), err))
     {
         Com_Printf("WARNING: NET_WS_Open: couldn't listen on %s port %d: %s\n", addr.to_string().c_str(), port,
@@ -637,6 +808,10 @@ void NET_WS_Open(const char *ip, const char *ip6, int enabled, int udpPort)
 
     Com_Printf("Opening websocket listener (%s): %s:%d\n", tls ? "wss" : "ws", addr.to_string().c_str(), port);
     ws_server = server;
+
+    // tells the web clients to download from here
+    Cvar_Get("sv_wsDownload", "0", CVAR_SERVERINFO | CVAR_ROM);
+    Cvar_Set2("sv_wsDownload", server->serveFiles ? "1" : "0", true);
 }
 
 /*
@@ -648,6 +823,8 @@ void NET_WS_Close(void)
 {
     delete ws_server;
     ws_server = NULL;
+
+    if (Cvar_VariableIntegerValue("sv_wsDownload")) Cvar_Set2("sv_wsDownload", "0", true);
 }
 
 /*
@@ -696,6 +873,20 @@ bool NET_WS_GetPacket(netadr_t *from, msg_t *msg)
         if (ev.type == EV_CLOSE)
         {
             Com_DPrintf("websocket: %s disconnected\n", NET_AdrToStringwPort(ev.adr));
+            continue;
+        }
+
+        if (ev.type == EV_HTTP)
+        {
+            int status;
+            std::string ospath = NET_WS_DownloadPath(ev.data, &status);
+
+            if (!ospath.empty())
+                Com_Printf("websocket: %s downloading %s\n", NET_AdrToString(ev.adr), ev.data.c_str());
+            else
+                Com_DPrintf("websocket: %s can't download %s (%d)\n", NET_AdrToString(ev.adr), ev.data.c_str(), status);
+
+            ws_server->Respond(ev.hdl, ospath, status);
             continue;
         }
 

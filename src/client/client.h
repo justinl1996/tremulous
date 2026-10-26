@@ -274,6 +274,8 @@ struct clientConnection_t {
 	char fs_cdn[MAX_OSPATH];
 	char fs_manifest[BIG_INFO_STRING];
 
+    bool sv_wsDownload;  // the server serves its downloads from its websocket port
+
     bool downloadXHR;
     bool XHRUsed;
     bool XHRDisconnected;
@@ -734,7 +736,9 @@ int CL_ScaledMilliseconds(void);
 // cl_xhr.c
 //
 #ifdef EMSCRIPTEN
+const char *CL_XHR_ServerURL(void);
 void CL_XHR_StartDownload(const char *localName, const char *remoteURL);
+void CL_XHR_PerformDownload(void);
 #endif
 
 #endif

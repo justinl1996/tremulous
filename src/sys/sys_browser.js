@@ -143,7 +143,7 @@ var LibrarySys = {
 				var err = null;
 				var data = req.response;
 				if (!(req.status >= 200 && req.status < 300 || req.status === 304)) {
-					err = new Error('Couldn\'t load ' + url + '. Status: ' + req.statusCode);
+					err = new Error('Couldn\'t load ' + url + '. Status: ' + req.status);
 				} else {
 					// manually parse out a request expecting a JSON response
 					if (opts.dataType === 'json') {
@@ -160,13 +160,11 @@ var LibrarySys = {
 				}
 			};
 			req.onerror = function () {
-				//var err = new Error();
+				var err = new Error('Couldn\'t load ' + url + ' (network error, or the server doesn\'t allow cross-origin requests)');
 
-				if (opts.onload)
-					opts.onload(-1, null); //Auriga: Not good error handling, but it'll work for now
-
-				if (opts.onerror)
-					opts.onerror(-1);
+				if (opts.onload) {
+					opts.onload(err, null);
+				}
 			}
 			req.send(null);
 		},

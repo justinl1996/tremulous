@@ -33,6 +33,12 @@ extern "C"
 		void (*onprogress)(int loaded, int total), void (*onassetend)(int err));
 }
 
+// the download finishes in a browser callback, outside of any frame, where a
+// Com_Error has nothing to unwind to, so it's only noted here and handled in
+// CL_XHR_PerformDownload
+static bool xhrFinished;
+static int xhrError;
+
 /*
 =================
 CL_XHR_ProgressCallback
@@ -54,16 +60,43 @@ CL_XHR_FinishedCallback
 */
 void CL_XHR_FinishedCallback(int err)
 {
-	if(err != 0) {
-		Com_Error(ERR_DROP, "CL_XHR_Download failed with err code %d", err);
-		clc.XHRUsed = false;
-	}
-	else {
-		clc.downloadRestart = true;
-		CL_NextDownload();
-	}
+	xhrError = err;
+	xhrFinished = true;
+}
 
-	return;
+/*
+=================
+CL_XHR_ServerURL
+
+The game server's own address as an https:// URL, for servers that serve
+their downloads from their websocket port (sv_wsDownload)
+=================
+*/
+const char *CL_XHR_ServerURL(void)
+{
+	static char url[MAX_OSPATH];
+	const char *host = clc.servername;
+	const char *colon = strchr(host, ':');
+
+	if (*host == '[')
+	{
+		// [ipv6] or [ipv6]:port
+		if (strstr(host, "]:"))
+			Com_sprintf(url, sizeof(url), "https://%s", host);
+		else
+			Com_sprintf(url, sizeof(url), "https://%s:%d", host, PORT_SERVER);
+	}
+	else if (colon && strchr(colon + 1, ':'))
+	{
+		// bare ipv6 address, without a port
+		Com_sprintf(url, sizeof(url), "https://[%s]:%d", host, PORT_SERVER);
+	}
+	else if (colon)
+		Com_sprintf(url, sizeof(url), "https://%s", host);
+	else
+		Com_sprintf(url, sizeof(url), "https://%s:%d", host, PORT_SERVER);
+
+	return url;
 }
 
 /*
@@ -74,6 +107,9 @@ CL_XHR_StartDownload
 void CL_XHR_StartDownload(const char *localName, const char *remoteURL)
 {
 	clc.XHRUsed = true;
+	clc.downloadXHR = true;
+	xhrFinished = false;
+	xhrError = 0;
 
     Com_Printf("URL: %s\n", remoteURL);
 	Com_DPrintf("***** CL_XHR_StartDownload *****\n"
@@ -95,7 +131,9 @@ void CL_XHR_StartDownload(const char *localName, const char *remoteURL)
 
     Sys_DownloadAndSaveAsset(clc.downloadName, clc.downloadURL, CL_XHR_ProgressCallback, CL_XHR_FinishedCallback);
 
-	if(!(clc.sv_allowDownload & DLF_NO_DISCONNECT) && !clc.XHRDisconnected)
+	// only game downloads leave the server (the news isn't one)
+	if(!clc.activeXHRNotGameRelated && clc.state >= CA_CONNECTED &&
+		!(clc.sv_allowDownload & DLF_NO_DISCONNECT) && !clc.XHRDisconnected)
     {
 		CL_AddReliableCommand("disconnect", true);
 		CL_WritePacket();
@@ -105,5 +143,32 @@ void CL_XHR_StartDownload(const char *localName, const char *remoteURL)
 	}
 
 	return;
+}
+
+/*
+=================
+CL_XHR_PerformDownload
+
+Called every frame while an XHR download is running
+=================
+*/
+void CL_XHR_PerformDownload(void)
+{
+	if (!xhrFinished)
+		return;
+
+	xhrFinished = false;
+	clc.downloadXHR = false;
+
+	if (xhrError)
+	{
+		clc.XHRUsed = false;
+		clc.activeXHRNotGameRelated = false;
+		Com_Error(ERR_DROP, "Download Error: code %d URL: %s", xhrError, clc.downloadURL);
+		return;
+	}
+
+	clc.downloadRestart = true;
+	CL_NextDownload();
 }
 #endif

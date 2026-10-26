@@ -109,7 +109,7 @@ var LibrarySysCommon = {
 		],*/
 		paks: [
 			{ src: 'data-web-1.3.1.pk3', dest: 'gpp/data-web-1.3.1.pk3', checksum: 3282924353 },
-			{ src: 'vms-gpp-v1.3.0.pk3', dest: 'gpp/vms-gpp-v1.3.0.pk3', checksum: 3666425834 },
+			{ src: 'vms-gpp-v1.3.0.pk3', dest: 'gpp/vms-gpp-v1.3.0.pk3', checksum: 1306190105 },
 			{ src: 'data-1.1.0.pk3', dest: 'gpp/data-1.1.0.pk3', checksum: 2303441261 },
 			{ src: 'data-gpp1.pk3', dest: 'gpp/data-gpp1.pk3', checksum: 3984856731 },
 			{ src: 'map-arachnid2-1.1.0.pk3', dest: 'gpp/map-arachnid2-1.1.0.pk3', checksum: 1982762733 },
@@ -122,9 +122,9 @@ var LibrarySysCommon = {
 			{ src: 'map-uncreation-1.1.0.pk3', dest: 'gpp/map-uncreation-1.1.0.pk3', checksum: 29654410 },
 			{ src: 'map-atcszalpha.pk3', dest: 'gpp/map-atcszalpha.pk3', checksum: 4133546162 },
 			{ src: 'map-treecannon_b4.pk3', dest: 'gpp/map-treecannon_b4.pk3', checksum: 1151549188 },
-			{ src: 'map-atcshd-gpp.pk3', dest: 'gpp/map-atcshd-gpp.pk3', checksum: 2833692283 },
-			{ src: 'map-spacelab_b2.pk3', dest: 'gpp/map-spacelab_b2.pk3', checksum: 3262686861 },
-			{ src: 'map-base-a51_b2.pk3', dest: 'gpp/map-base-a51_b2.pk3', checksum: 213743857 },
+			//{ src: 'map-atcshd-gpp.pk3', dest: 'gpp/map-atcshd-gpp.pk3', checksum: 2833692283 },
+			//{ src: 'map-spacelab_b2.pk3', dest: 'gpp/map-spacelab_b2.pk3', checksum: 3262686861 },
+			//{ src: 'map-base-a51_b2.pk3', dest: 'gpp/map-base-a51_b2.pk3', checksum: 213743857 },
 		],
 		manifest: null,
 		Print: function (str) {
@@ -474,6 +474,30 @@ var LibrarySysCommon = {
 				return asset.name.indexOf('.pk3') !== -1 && !SYSC.ValidatePak(asset);
 			});
 		},*/
+		DownloadedPaksPath: function () {
+			var fs_homepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_homepath'), ALLOC_STACK)));
+			return PATH.join(fs_homepath, 'downloads.json');
+		},
+		DownloadedPaks: function () {
+			try {
+				var list = JSON.parse(FS.readFile(SYSC.DownloadedPaksPath(), { encoding: 'utf8' }));
+				return Array.isArray(list) ? list : [];
+			} catch (e) {
+				return [];
+			}
+		},
+		AddDownloadedPak: function (name) {
+			var list = SYSC.DownloadedPaks();
+			if (list.indexOf(name) !== -1) {
+				return;
+			}
+			list.push(name);
+			try {
+				FS.writeFile(SYSC.DownloadedPaksPath(), JSON.stringify(list), { encoding: 'utf8' });
+			} catch (e) {
+				SYSC.Print('failed to record downloaded pak ' + name + ': ' + e.message);
+			}
+		},
 		ClearBaseDir: function () {
 			var fs_basepath = Module.UTF8ToString(_Cvar_VariableString(Module.allocate(intArrayFromString('fs_basepath'), ALLOC_STACK)));
 			var localPath = PATH.join(fs_basepath, "gpp"); //FIXME: replace gpp with where we get our basename string
@@ -501,6 +525,9 @@ var LibrarySysCommon = {
 			if(!pk3files.length) //Directory is clean
 				return;
 
+			// paks downloaded from game servers aren't on the CDN, but stay
+			var downloaded = SYSC.DownloadedPaks();
+
 			for (var i = 0; i < pk3files.length; i++) {
 				var inList = false;
 				filePath = PATH.join("gpp", pk3files[i]); //FIXME: replace gpp with where we get our basename string
@@ -515,7 +542,7 @@ var LibrarySysCommon = {
 					}
 				}
 
-				if (!inList) {
+				if (!inList && downloaded.indexOf(filePath) === -1) {
 					console.log("Removing unused asset ", pk3files[i]);
 					absDir = PATH.join(localPath, pk3files[i]); // fs_basepath/gpp + filename
 					FS.unlink(absDir);
@@ -713,28 +740,38 @@ var LibrarySysCommon = {
 		return 0;
 		//Auriga: Need to check for format of .so.1.2.3..., but I don't have the skill to do that :P
 	},
+	Sys_DownloadAndSaveAsset__deps: ['$DNS'],
 	Sys_DownloadAndSaveAsset: function (localName, remoteName, onprogress, onassetend) {
 		const localNameStr = Module.UTF8ToString(localName);
-		const remoteNameStr = Module.UTF8ToString(remoteName);
+		// emscripten resolves hostnames to stand-in 172.29.x.x addresses, so a
+		// URL built from the server's address needs its real name back
+		const remoteNameStr = Module.UTF8ToString(remoteName).replace(/^(https?:\/\/)(172\.29\.\d+\.\d+)(?=[:\/]|$)/, function (match, scheme, addr) {
+			return scheme + (DNS.lookup_addr(addr) || addr);
+		});
 
-		SYS.DoXHR( remoteNameStr, {
+		SYS.DoXHR(remoteNameStr, {
 			dataType: 'arraybuffer',
-			onprogress: function(loaded, total) {
+			onprogress: function (loaded, total) {
 				{{{ makeDynCall('vii', 'onprogress') }}}(loaded, total);
 			},
-			onload: function(err, data) {
+			onload: function (err, data) {
 				if (err) {
-					{{{ makeDynCall('vi', 'onassetend') }}}(err);
+					SYSC.Print('download of ' + remoteNameStr + ' failed: ' + (err.message || err));
+					{{{ makeDynCall('vi', 'onassetend') }}}(typeof err === 'number' ? err : 1);
 					return;
 				}
 				SYSC.LogChecksum(localNameStr + ' (downloaded from ' + remoteNameStr + ')', SYSC.CRC32Buffer(data));
-				SYSC.SaveFile(localNameStr, data, true, 0);
-				{{{ makeDynCall('vi', 'onassetend') }}}(0);
-				return;
-			},
-			onerror: function(err) {
-				{{{ makeDynCall('vi', 'onassetend') }}}(err);
-				return;
+				if (/\.pk3$/i.test(localNameStr)) {
+					SYSC.AddDownloadedPak(localNameStr);
+				}
+				// wait for the save to reach IndexedDB, as the FS_Restart that
+				// follows a download reloads the filesystem from it
+				SYSC.SaveFile(localNameStr, data, true, function (err) {
+					if (err) {
+						SYSC.Print('saving ' + localNameStr + ' failed: ' + (err.message || err));
+					}
+					{{{ makeDynCall('vi', 'onassetend') }}}(err ? 1 : 0);
+				});
 			}
 		});
 	}
