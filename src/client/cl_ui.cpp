@@ -242,6 +242,9 @@ static int LAN_AddServer(int source, const char *name, const char *address)
         }
         if (i >= *count)
         {
+            // start from a clean slot: LAN_RemoveServer leaves the removed entry's data behind, and the new
+            // server would show that entry's map and player count until it answers (or forever if it never does)
+            memset(&servers[*count], 0, sizeof(servers[*count]));
             servers[*count].adr = adr;
             Q_strncpyz(servers[*count].hostName, name, sizeof(servers[*count].hostName));
             servers[*count].visible = true;
@@ -294,6 +297,8 @@ static void LAN_RemoveServer(int source, const char *addr)
                     j++;
                 }
                 (*count)--;
+                // the shift above left a copy of the last entry in the vacated slot
+                memset(&servers[*count], 0, sizeof(servers[*count]));
                 break;
             }
         }
