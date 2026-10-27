@@ -83,6 +83,10 @@ const int WS_MAX_PER_IP = 16;
 const int WS_IDLE_TIMEOUT = 60;  // seconds without a message from the browser
 const size_t WS_MAX_BUFFERED = 256 * 1024;  // drop packets for browsers that can't keep up
 const int WS_MAX_HTTP = 32;  // HTTP requests waiting for the main thread
+// A closed browser's client slot lives on until the game times it out (sv_timeout, 200 s by default) and the engine
+// keeps sending its snapshots. Without this, they would leave as UDP to the browser's address.
+const int WS_GONE_SECONDS = 300;
+const size_t WS_GONE_MAX = 4096;  // most remembered addresses; the oldest go first
 
 typedef websocketpp::connection_hdl Hdl;
 typedef std::chrono::steady_clock Clock;
@@ -329,7 +333,17 @@ class ServerImpl : public Server
             std::lock_guard<std::mutex> guard(lock);
             auto it = byAdr.find(AdrKey(to));
 
-            if (it == byAdr.end()) return false;
+            if (it == byAdr.end())
+            {
+                // a browser that has gone: swallow, never fall back to UDP towards its address
+                Clock::time_point now = Clock::now();
+
+                PruneGone(now);
+
+                auto g = gone.find(AdrKey(to));
+
+                return g != gone.end() && g->second > now;
+            }
 
             hdl = it->second;
         }
@@ -471,6 +485,7 @@ class ServerImpl : public Server
             std::lock_guard<std::mutex> guard(lock);
 
             byAdr[AdrKey(it->second.adr)] = hdl;
+            gone.erase(AdrKey(it->second.adr));
         }
 
         open++;
@@ -493,6 +508,15 @@ class ServerImpl : public Server
             {
                 byAdr.erase(b);
                 wasOpen = true;
+
+                Clock::time_point now = Clock::now();
+                std::string key = AdrKey(it->second.adr);
+
+                PruneGone(now);
+                gone[key] = now + std::chrono::seconds(WS_GONE_SECONDS);
+                goneOrder.emplace_back(key, gone[key]);
+
+                while (goneOrder.size() > WS_GONE_MAX) DropOldestGone();
             }
         }
 
@@ -605,6 +629,27 @@ class ServerImpl : public Server
 
     // guarded by lock, so the main thread can tell which addresses are browsers
     std::map<std::string, Hdl> byAdr;
+
+    // guarded by lock: addresses of browsers that closed in the last WS_GONE_SECONDS, and until when
+    std::map<std::string, Clock::time_point> gone;
+
+    // guarded by lock: the same entries in the order they were added, so expired ones leave from the front.
+    // An entry whose time no longer matches the map was replaced or cleared by a reconnect, and is just dropped.
+    std::deque<std::pair<std::string, Clock::time_point>> goneOrder;
+
+    void DropOldestGone()
+    {
+        auto g = gone.find(goneOrder.front().first);
+
+        if (g != gone.end() && g->second == goneOrder.front().second) gone.erase(g);
+
+        goneOrder.pop_front();
+    }
+
+    void PruneGone(Clock::time_point now)
+    {
+        while (!goneOrder.empty() && goneOrder.front().second <= now) DropOldestGone();
+    }
 };
 
 #ifdef USE_WEBSOCKET_TLS
