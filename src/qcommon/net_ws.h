@@ -45,6 +45,7 @@ int NET_WS_FillFdSet(fd_set *fdr, int highestfd);
 void NET_WS_Frame(fd_set *fdr);
 bool NET_WS_GetPacket(struct netadr_t *from, struct msg_t *msg);
 bool NET_WS_SendPacket(int length, const void *data, const struct netadr_t *to);
+const char *NET_WS_UserAgent(const struct netadr_t *adr);
 
 #endif
 

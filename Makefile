@@ -307,6 +307,7 @@ ZDIR=$(EXTERNAL_DIR)/zlib
 LUADIR=$(EXTERNAL_DIR)/lua-5.3.3/src
 RESTDIR=$(EXTERNAL_DIR)/restclient
 NETTLEDIR=$(EXTERNAL_DIR)/nettle-3.3
+SQLITEDIR=$(EXTERNAL_DIR)/sqlite-3.46.1
 SEMVERDIR=$(EXTERNAL_DIR)/semver
 WEBSOCKETPPDIR=$(EXTERNAL_DIR)/websocketpp-0.8.2
 ASIODIR=$(EXTERNAL_DIR)/asio-1.30.2
@@ -2520,6 +2521,14 @@ endif
 
 Q3DOBJ += $(LUAOBJ) $(SCRIPTOBJ) $(NETTLEOBJ)
 
+# native dedicated servers log real players' visits to an SQLite database
+# (sv_playerLog)
+ifneq ($(PLATFORM),js)
+  Q3DOBJ += $(B)/ded/sv_playerlog.o $(B)/ded/sqlite3.o
+
+  $(B)/ded/sv_playerlog.o: DED_CC_FLAGS += -I$(SQLITEDIR)
+endif
+
 # native dedicated servers take the web client's websocket connections
 # themselves when net_websocket is set, so they don't need websockify
 ifneq ($(PLATFORM),js)
@@ -2913,6 +2922,13 @@ $(B)/ded/%.o: $(ASMDIR)/%.s
 # k8 so inline assembler knows about SSE
 $(B)/ded/%.o: $(ASMDIR)/%.c
 	$(DO_DED_CC) -march=k8
+
+# only the server's main thread uses SQLite; it won't build with OPTIMIZE's
+# -ffast-math
+$(B)/ded/sqlite3.o: $(SQLITEDIR)/sqlite3.c
+	$(echo_cmd) "DED_CC $<"
+	$(Q)$(CC) -O2 $(filter -m32 -m64,$(CFLAGS)) -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION \
+		-w -c -o $@ $<
 
 $(B)/ded/%.o: $(SDIR)/%.c
 	$(DO_DED_CC)

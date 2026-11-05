@@ -476,10 +476,15 @@ gotnewcl:
 
 		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", str );
 		Com_DPrintf ("Game rejected a connection: %s.\n", str);
+
+		// a rejected reconnect has lost the slot it was in
+		SV_PlayerLogLeave( newcl, va( "rejected on reconnect: %s", str ) );
 		return;
 	}
 
 	SV_UserinfoChanged( newcl );
+
+	SV_PlayerLogJoin( newcl );
 
 	// send the connect packet to the client
 	NET_OutOfBandPrint(NS_SERVER, from, "connectResponse %d", challenge);
@@ -562,6 +567,10 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 				break;
 			}
 		}
+	}
+
+	if ( !isBot ) {
+		SV_PlayerLogLeave( drop, reason );
 	}
 
 	// Free all allocated data on the client structure

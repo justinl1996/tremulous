@@ -387,6 +387,7 @@ class ServerImpl : public Server
    private:
     struct Conn {
         netadr_t adr;
+        std::string userAgent;
         bool first;
         Clock::time_point lastRecv;
     };
@@ -457,7 +458,10 @@ class ServerImpl : public Server
             }
         }
 
-        conns[hdl] = Conn{adr, true, Clock::now()};
+        // kept for the player log; a browser's is well under this
+        std::string userAgent = con->get_request_header("User-Agent").substr(0, 512);
+
+        conns[hdl] = Conn{adr, userAgent, true, Clock::now()};
         return true;
     }
 
@@ -474,7 +478,7 @@ class ServerImpl : public Server
         }
 
         open++;
-        Push(EV_OPEN, it->second.adr);
+        Push(EV_OPEN, it->second.adr, it->second.userAgent);
     }
 
     void OnClose(Hdl hdl)
@@ -639,6 +643,9 @@ ContextPtr TLSContext(const char *cert, const char *key, std::string &err)
 }  // namespace
 
 static Server *ws_server;
+
+// User-Agent of each open websocket connection, by AdrKey; main thread only
+static std::map<std::string, std::string> ws_userAgents;
 
 /*
 ====================
@@ -823,6 +830,7 @@ void NET_WS_Close(void)
 {
     delete ws_server;
     ws_server = NULL;
+    ws_userAgents.clear();
 
     if (Cvar_VariableIntegerValue("sv_wsDownload")) Cvar_Set2("sv_wsDownload", "0", true);
 }
@@ -867,12 +875,14 @@ bool NET_WS_GetPacket(netadr_t *from, msg_t *msg)
         if (ev.type == EV_OPEN)
         {
             Com_DPrintf("websocket: %s connected\n", NET_AdrToStringwPort(ev.adr));
+            ws_userAgents[AdrKey(ev.adr)] = ev.data;
             continue;
         }
 
         if (ev.type == EV_CLOSE)
         {
             Com_DPrintf("websocket: %s disconnected\n", NET_AdrToStringwPort(ev.adr));
+            ws_userAgents.erase(AdrKey(ev.adr));
             continue;
         }
 
@@ -904,6 +914,21 @@ bool NET_WS_GetPacket(netadr_t *from, msg_t *msg)
     }
 
     return false;
+}
+
+/*
+====================
+NET_WS_UserAgent
+
+The User-Agent the browser at this address connected with, "" if it sent
+none, or NULL if the address isn't a websocket connection
+====================
+*/
+const char *NET_WS_UserAgent(const netadr_t *adr)
+{
+    auto it = ws_userAgents.find(AdrKey(*adr));
+
+    return it == ws_userAgents.end() ? NULL : it->second.c_str();
 }
 
 /*

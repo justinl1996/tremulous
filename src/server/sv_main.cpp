@@ -1227,6 +1227,8 @@ void SV_Frame( int msec ) {
 		return;
 	}
 
+	SV_PlayerLogFrame();
+
 	// the game isn't loaded yet while an asynchronous FS_Restart is
 	// still running for SV_SpawnServer
 	if ( !sv.gvm ) {

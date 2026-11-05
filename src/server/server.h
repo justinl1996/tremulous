@@ -39,6 +39,7 @@ along with Tremulous; if not, see <https://www.gnu.org/licenses/>
 #include "../qcommon/qcommon.h"
 #include "../qcommon/vm.h"
 #include "../sys/sys_shared.h"
+#include "sv_playerlog.h"
 
 //=============================================================================
 

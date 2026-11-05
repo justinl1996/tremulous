@@ -932,6 +932,8 @@ void SV_Init(void)
 	sv_protectLog = Cvar_Get("sv_protectLog", "sv_protect.log", CVAR_ARCHIVE);
 	SV_InitAttackLog();
 
+    SV_PlayerLogInit();
+
     for (int a = 0; a < 3; ++a)
     {
         sv_masters[a][0] = Cvar_Get(va("sv_%smaster1", (a == 2 ? "alt2" : a == 1 ? "alt1" : "")), MASTER_SERVER_NAME, 0);
@@ -1011,6 +1013,8 @@ void SV_Shutdown(const char *finalmsg)
     {
         SV_FinalMessage(finalmsg);
     }
+
+    SV_PlayerLogShutdown(finalmsg);
 
     SV_RemoveOperatorCommands();
     SV_MasterShutdown();
