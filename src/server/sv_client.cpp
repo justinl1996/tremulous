@@ -427,6 +427,22 @@ void SV_DirectConnect( netadr_t from ) {
 		}
 	}
 
+	// bots only fill slots nobody else wants: when they've taken them all,
+	// one makes way and the game evens the teams out again for the slots
+	// that are left
+	if ( !newcl ) {
+		for ( i = sv_maxclients->integer - 1; i >= startIndex; i-- ) {
+			cl = &svs.clients[i];
+			if ( cl->state != CS_FREE && cl->netchan.remoteAddress.type == NA_BOT ) {
+				SV_DropClient( cl, "made room for a player" );
+				if ( cl->state == CS_FREE ) {
+					newcl = cl;
+				}
+				break;
+			}
+		}
+	}
+
 	if ( !newcl ) {
 		if ( NET_IsLocalAddress( from ) ) {
 			Com_Error( ERR_FATAL, "server is full on local connect" );

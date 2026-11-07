@@ -134,6 +134,7 @@ typedef struct
   int       nextStuckTime;
   int       stuckCount;
   int       unstuckUntil;
+  int       hopUntil;         // aliens: jump onto our own barricade in the way until then
   float     strafeDir;
   int       nextStrafeTime;
 
@@ -168,6 +169,9 @@ typedef struct
   vec3_t    trapOrigin;
   int       trapStart;
   int       trapCount;
+  vec3_t    unreachOrigin;    // and where goals keep turning out to be out of reach
+  int       unreachStart;
+  int       unreachCount;
 
   // moving about but getting nowhere, like pacing round an alcove
   vec3_t    progressOrigin;
@@ -348,6 +352,16 @@ static gentity_t *BotNearestBuildable( gentity_t *self, team_t team,
   }
 
   return best;
+}
+
+// respawning wouldn't get us anywhere else
+static qboolean BotNearSpawn( gentity_t *self )
+{
+  team_t    team = self->client->pers.teamSelection;
+  gentity_t *spawn = BotNearestBuildable( self, team,
+                                          team == TEAM_HUMANS ? BA_H_SPAWN : BA_A_SPAWN );
+
+  return spawn && Distance( spawn->r.currentOrigin, self->r.currentOrigin ) < 400.0f;
 }
 
 static qboolean BotIsBuilderWeapon( weapon_t weapon );
@@ -1420,7 +1434,11 @@ static qboolean BotPathDirection( gentity_t *self, botState_t *bs,
       ( ( flags & NAVLINK_CROUCH ) || ( ( flags & NAVLINK_SIZE_MASK ) >> NAVLINK_SIZE_SHIFT ) <= 2 ) )
     bs->tunnelTime = level.time;
 
-  if( ( flags & NAVLINK_CLIMB ) && query.climb )
+  // the route starts up on a ledge, or we've fallen off it, and only claws
+  // or a jetpack get us back up
+  if( ( ( flags & NAVLINK_CLIMB ) ||
+        ( dir[ 2 ] > ( bs->pathIndex == 0 ? 40.0f : 56.0f ) &&
+          dir[ 0 ] * dir[ 0 ] + dir[ 1 ] * dir[ 1 ] < Square( 96.0f ) ) ) && query.climb )
   {
     *moveFlags |= BOT_MOVE_CLIMB;
     return qtrue;
@@ -1513,10 +1531,10 @@ static void BotReportStuck( gentity_t *self, botState_t *bs, int blocker, const 
       link = G_BotNavLinkFlags( bs->path[ bs->pathIndex - 1 ], bs->path[ bs->pathIndex ], NULL );
   }
 
-  G_Printf( "botstuck: %s %s at (%.0f %.0f %.0f) goal %d path %d/%d near %s %.0f "
+  G_Printf( "botstuck: %s %s %s at (%.0f %.0f %.0f) goal %d path %d/%d near %s %.0f "
             "hit %s normal %.1f %.1f %.1f to (%.0f %.0f %.0f) end %.0f away%s "
             "move %d %d %d node (%.0f %.0f %.0f) link %d vel %.0f ground %d\n",
-            BG_TeamName( self->client->pers.teamSelection ),
+            self->client->pers.netname, BG_TeamName( self->client->pers.teamSelection ),
             BG_Class( self->client->ps.stats[ STAT_CLASS ] )->name,
             self->r.currentOrigin[ 0 ], self->r.currentOrigin[ 1 ], self->r.currentOrigin[ 2 ],
             bs->goal, bs->pathIndex, bs->pathLength,
@@ -1557,6 +1575,27 @@ static qboolean BotCrouchFits( gentity_t *self, const vec3_t dir )
 }
 
 // decide how to get going again from what's in the way
+static qboolean BotOwnBarricadeNear( gentity_t *self, gentity_t *blocker )
+{
+  int i;
+
+  if( blocker && blocker->s.eType == ET_BUILDABLE && blocker->s.modelindex == BA_A_BARRICADE &&
+      blocker->buildableTeam == TEAM_ALIENS )
+    return qtrue;
+
+  for( i = 0; i < botNumBuildables; i++ )
+  {
+    gentity_t *ent = botBuildables[ i ];
+
+    if( ent->s.modelindex == BA_A_BARRICADE && ent->buildableTeam == TEAM_ALIENS &&
+        fabs( ent->r.currentOrigin[ 2 ] - self->r.currentOrigin[ 2 ] ) < 64.0f &&
+        DistanceSquared( ent->r.currentOrigin, self->r.currentOrigin ) < Square( 100.0f ) )
+      return qtrue;
+  }
+
+  return qfalse;
+}
+
 static void BotUnstick( gentity_t *self, botState_t *bs, int blocker )
 {
   gentity_t *ent = ( blocker != ENTITYNUM_NONE && blocker != ENTITYNUM_WORLD ) ?
@@ -1575,6 +1614,17 @@ static void BotUnstick( gentity_t *self, botState_t *bs, int blocker )
     bs->enemyLastSeen = level.time;
     bs->enemySightTime = level.time - 1000;
     BotEntityCenter( ent, bs->enemyLastPos );
+    return;
+  }
+
+  // our own barricades shrink when an alien gets on top, so jump rather
+  // than try to climb them. Maps put them in doorways, where what we bump
+  // into is as often the wall beside one
+  if( team == TEAM_ALIENS && BotOwnBarricadeNear( self, ent ) )
+  {
+    bs->hopUntil = level.time + 1000;
+    bs->wallUntil = 0;
+    bs->noWallUntil = level.time + 1500;
     return;
   }
 
@@ -1695,7 +1745,7 @@ static void BotCheckProgress( gentity_t *self, botState_t *bs, qboolean moving )
   VectorCopy( self->r.currentOrigin, bs->progressOrigin );
   bs->progressTime = level.time;
 
-  if( bs->trapCount >= 20 && level.time - bs->trapStart > 40000 )
+  if( bs->trapCount >= 15 && level.time - bs->trapStart > 25000 )
   {
     if( bot_debug.integer )
       G_Printf( "bottrapped: %s at (%.0f %.0f %.0f), respawning\n", self->client->pers.netname,
@@ -1761,7 +1811,7 @@ static void BotCheckStuck( gentity_t *self, botState_t *bs, qboolean moving )
         bs->wallUntil = bs->wanderUntil;
     }
 
-    if( bs->trapCount >= 20 && level.time - bs->trapStart > 40000 )
+    if( bs->trapCount >= 15 && level.time - bs->trapStart > 25000 )
     {
       if( bot_debug.integer )
         G_Printf( "bottrapped: %s at (%.0f %.0f %.0f), respawning\n", self->client->pers.netname,
@@ -2064,6 +2114,7 @@ static void BotAvoid( gentity_t *self, botState_t *bs, vec3_t moveDir, qboolean 
   trace_t             tr;
   gentity_t           *ent;
   vec3_t              flat, side;
+  float               sideSign;
   int                 blocker, i, j;
 
   if( level.time < bs->avoidUntil )
@@ -2081,6 +2132,10 @@ static void BotAvoid( gentity_t *self, botState_t *bs, vec3_t moveDir, qboolean 
 
   ent = &g_entities[ blocker ];
 
+  // doors open as we walk up to them, keep going
+  if( ent->s.eType == ET_MOVER && ent->classname && !Q_stricmpn( ent->classname, "func_door", 9 ) )
+    return;
+
   // enemy structures are in the way to be destroyed
   if( ent->s.eType == ET_BUILDABLE && ent->buildableTeam != self->client->pers.teamSelection )
   {
@@ -2093,18 +2148,21 @@ static void BotAvoid( gentity_t *self, botState_t *bs, vec3_t moveDir, qboolean 
   VectorSet( flat, moveDir[ 0 ], moveDir[ 1 ], 0.0f );
   VectorNormalize( flat );
 
-  // the first way round that's clear, trying our favoured side first
+  // the first way round that's clear, trying our favoured side first. Two
+  // players coming at each other in a corridor both keep right, or picking
+  // sides at random they step the same way, come back and meet again
+  sideSign = ent->client ? -1.0f : bs->strafeDir;
   for( i = 0; i < ARRAY_LEN( turns ); i++ )
   {
     for( j = 0; j < 2; j++ )
     {
-      BotRotateYaw( flat, turns[ i ] * bs->strafeDir * ( j ? -1.0f : 1.0f ), side );
+      BotRotateYaw( flat, turns[ i ] * sideSign * ( j ? -1.0f : 1.0f ), side );
       if( BotBlockerAhead( self, side, 48.0f, &tr ) != ENTITYNUM_NONE )
         continue;
 
       VectorCopy( side, bs->avoidDir );
       VectorCopy( side, moveDir );
-      bs->avoidUntil = level.time + 300 + i * 150;
+      bs->avoidUntil = level.time + ( ent->client ? 500 : 300 ) + i * 150;
       return;
     }
   }
@@ -2389,7 +2447,7 @@ static void BotMove( gentity_t *self, botState_t *bs, usercmd_t *cmd, const vec3
   else
     bs->wallCheckTime = 0;
 
-  wall = BotWantsWall( self, bs, moveFlags );
+  wall = BotWantsWall( self, bs, moveFlags ) && level.time >= bs->hopUntil;
 
   // never let go of a wall over a pit
   if( !wall && BotOnWall( self ) && !BotSafeToDrop( self ) )
@@ -2416,7 +2474,7 @@ static void BotMove( gentity_t *self, botState_t *bs, usercmd_t *cmd, const vec3
   }
   crouch = client->pers.teamSelection == TEAM_HUMANS &&
            ( ( moveFlags & BOT_MOVE_CROUCH ) || level.time < bs->crouchUntil );
-  jump = ( moveFlags & BOT_MOVE_JUMP ) != 0;
+  jump = ( moveFlags & BOT_MOVE_JUMP ) != 0 || level.time < bs->hopUntil;
 
   BotCheckStuck( self, bs, moving );
   bs->groundFail = 0;
@@ -3959,8 +4017,8 @@ static void BotGoalUnreachable( gentity_t *self, botState_t *bs )
     return;
 
   if( bot_debug.integer )
-    G_Printf( "botunreachable: %s %s at (%.0f %.0f %.0f) goal %d to (%.0f %.0f %.0f)\n",
-              BG_TeamName( self->client->pers.teamSelection ),
+    G_Printf( "botunreachable: %s %s %s at (%.0f %.0f %.0f) goal %d to (%.0f %.0f %.0f)\n",
+              self->client->pers.netname, BG_TeamName( self->client->pers.teamSelection ),
               BG_Class( self->client->ps.stats[ STAT_CLASS ] )->name,
               self->r.currentOrigin[ 0 ], self->r.currentOrigin[ 1 ], self->r.currentOrigin[ 2 ],
               bs->goal, bs->goalOrigin[ 0 ], bs->goalOrigin[ 1 ], bs->goalOrigin[ 2 ] );
@@ -3991,6 +4049,25 @@ static void BotGoalUnreachable( gentity_t *self, botState_t *bs )
     BotChooseRoam( self, bs );
 
   bs->goalFailTime = level.time;
+
+  // nothing can be reached from round here: somewhere we fell or flew
+  // into and can't get out of, so respawn
+  if( Distance( self->r.currentOrigin, bs->unreachOrigin ) > 300.0f )
+  {
+    VectorCopy( self->r.currentOrigin, bs->unreachOrigin );
+    bs->unreachStart = level.time;
+    bs->unreachCount = 0;
+  }
+  if( ++bs->unreachCount >= 6 && level.time - bs->unreachStart > 20000 &&
+      !BotNearSpawn( self ) )
+  {
+    if( bot_debug.integer )
+      G_Printf( "bottrapped: %s at (%.0f %.0f %.0f) can't reach anything, respawning\n",
+                self->client->pers.netname,
+                self->r.currentOrigin[ 0 ], self->r.currentOrigin[ 1 ], self->r.currentOrigin[ 2 ] );
+    bs->unreachCount = 0;
+    BotCommand( self, "kill" );
+  }
 }
 
 static void BotThinkAlive( gentity_t *self, botState_t *bs, usercmd_t *cmd, int msec )
@@ -4709,7 +4786,7 @@ qboolean G_BotMakeRoom( team_t team, team_t oldteam )
 static void BotCheckMinPlayers( void )
 {
   team_t      team;
-  int         i, players, bots;
+  int         i, players, bots, capacity, target;
 
   // after a map change or restart the existing bots reconnect a few frames
   // after the level starts, so don't count until they are back
@@ -4721,18 +4798,47 @@ static void BotCheckMinPlayers( void )
   if( bot_minplayers.integer <= 0 )
     return;
 
+  // bots can only have the public slots real players aren't in. When there
+  // aren't enough for bot_minplayers on both teams, fill both to the same
+  // size instead so neither is left short
+  capacity = 0;
+  for( i = trap_Cvar_VariableIntegerValue( "sv_privateClients" ); i < level.maxclients; i++ )
+  {
+    if( level.clients[ i ].pers.connected == CON_DISCONNECTED || level.clients[ i ].pers.isBot )
+      capacity++;
+  }
+
+  for( target = bot_minplayers.integer; target > 0; target-- )
+  {
+    int needed = 0;
+
+    for( team = TEAM_ALIENS; team <= TEAM_HUMANS; team++ )
+      needed += MAX( 0, target - BotCountTeam( team, qfalse ) );
+
+    if( needed <= capacity )
+      break;
+  }
+
   for( team = TEAM_ALIENS; team <= TEAM_HUMANS; team++ )
   {
     players = BotCountTeam( team, qfalse );
     bots = BotCountTeam( team, qtrue );
 
-    if( players + bots < bot_minplayers.integer )
+    // make room on the other team before adding here
+    if( players + bots < target )
     {
+      team_t other = ( team == TEAM_ALIENS ) ? TEAM_HUMANS : TEAM_ALIENS;
+      int    otherPlayers = BotCountTeam( other, qfalse );
+      int    otherBots = BotCountTeam( other, qtrue );
+
+      if( otherBots > 0 && otherPlayers + otherBots > target )
+        continue;
+
       G_AddBot( NULL, team, -1 );
       return;
     }
 
-    if( bots > 0 && players + bots > bot_minplayers.integer )
+    if( bots > 0 && players + bots > target )
     {
       for( i = level.maxclients - 1; i >= 0; i-- )
       {
