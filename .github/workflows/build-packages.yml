@@ -22,7 +22,7 @@ on:
 
 jobs:
   set-version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -38,7 +38,7 @@ jobs:
     
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: set-version
     container: debian:oldstable-slim
     strategy:
@@ -47,10 +47,7 @@ jobs:
         release:
           - file: release-linux-x86_64
             name: Linux64
-          - file: release-mingw32-x86_64
-            name: Windows32
-            platform: mingw32
-            
+
     env:
       VERSION: ${{ needs.set-version.outputs.version }}
           
@@ -62,7 +59,6 @@ jobs:
           make \
           build-essential \
           libgl1-mesa-dev \
-          mingw-w64 \
           libsdl2-dev \
           libopenal-dev \
           libfreetype6-dev \
@@ -77,9 +73,6 @@ jobs:
     #    fetch-tags: true 
     #- name: Git unsafe
     #  run: git config --global --add safe.directory /__w/tremulous/tremulous
-    - name: platform
-      if: ${{ matrix.release.platform }}
-      run: echo "PLATFORM="${{ matrix.release.PLATFORM }} >> $GITHUB_ENV
     - name: make
       run: USE_RESTCLIENT=1 USE_INTERNAL_LUA=1 USE_CURL_DLOPEN=0 make -j
     - name: extract pak

@@ -1,0 +1,61 @@
+name: Build Web Port
+
+concurrency:
+  group: build-web-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    env:
+      EMSDK_VERSION: 4.0.21
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y -qq build-essential libssl-dev zip
+
+    - name: cache emsdk
+      uses: actions/cache@v4
+      with:
+        path: emsdk-cache
+        key: emsdk-${{ env.EMSDK_VERSION }}-${{ runner.os }}
+
+    - name: emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: ${{ env.EMSDK_VERSION }}
+        actions-cache-folder: emsdk-cache
+
+    - name: build
+      # web client + pk3s (with refreshed checksums) and the native web dedicated server
+      run: scripts/build-web.sh
+
+    - name: collect web client
+      run: |
+        mkdir -p dist/web/gpp
+        cp build/release-js-js/tremulous.js build/release-js-js/tremulous.wasm dist/web/
+        cp build/release-js-js/gpp/*.pk3 dist/web/gpp/
+
+    - name: upload web client
+      uses: actions/upload-artifact@v4
+      with:
+        name: tremulous-web-client-${{ github.sha }}
+        path: dist/web
+
+    - name: upload web dedicated server
+      uses: actions/upload-artifact@v4
+      with:
+        name: tremulous-web-server-${{ github.sha }}
+        path: build/webserver/release-linux-x86_64/tremded
