@@ -3273,7 +3273,17 @@ qboolean BG_RotateAxis( vec3_t surfNormal, vec3_t inAxis[ 3 ],
   //can't rotate with no rotation vector
   if( VectorLength( xNormal ) != 0.0f )
   {
-    rotAngle = RAD2DEG( acos( DotProduct( localNormal, refNormal ) ) );
+    float dot = DotProduct( localNormal, refNormal );
+
+    // map plane normals can be a hair longer than 1, e.g. (0 -0.000015
+    // -1.0000001) on a ceiling, and acos past +-1 is NaN, which made the
+    // view angles NaN and hung the server in PM_UpdateViewAngles
+    if( dot > 1.0f )
+      dot = 1.0f;
+    else if( dot < -1.0f )
+      dot = -1.0f;
+
+    rotAngle = RAD2DEG( acos( dot ) );
 
     if( inverse )
       rotAngle = -rotAngle;

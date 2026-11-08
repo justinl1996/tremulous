@@ -729,12 +729,56 @@ void SDLVersionCheck()
 }
 #endif
 
+#if defined(DEDICATED) && !defined(_WIN32) && !defined(EMSCRIPTEN)
+/*
+=================
+Hang watchdog
+
+A server stuck in an endless loop keeps its process alive, so nothing
+restarts it and players only see it vanish from the server list. Every frame
+re-arms an alarm; if one frame runs longer than sys_hangTimeout seconds the
+alarm fires and the process exits with status 3 so Docker restarts it.
+The handler exits directly instead of shutting the server down, because a
+shutdown runs game code, which may be the thing that is stuck
+=================
+*/
+static void Sys_HangHandler( int signal )
+{
+    static const char msg[] =
+        "Server hang: a frame ran longer than sys_hangTimeout seconds, exiting\n";
+
+    (void)signal;
+    if( write( STDERR_FILENO, msg, sizeof( msg ) - 1 ) < 0 ) { }
+    _exit( 3 );
+}
+
+static void Sys_HangWatchdog( void )
+{
+    static cvar_t *sys_hangTimeout;
+
+    if( !sys_hangTimeout )
+    {
+        sys_hangTimeout = Cvar_Get( "sys_hangTimeout", "60", 0 );
+        Cvar_SetDescription( sys_hangTimeout, "Exit if one server frame takes longer than this many seconds, so the server can be restarted (0 disables)" );
+        signal( SIGALRM, Sys_HangHandler );
+    }
+
+    if( com_dedicated && com_dedicated->integer && sys_hangTimeout->integer > 0 )
+        alarm( sys_hangTimeout->integer );
+    else
+        alarm( 0 );
+}
+#endif
+
 /*
 =================
 Sys_Frame
 =================
 */
 void Sys_Frame() {
+#if defined(DEDICATED) && !defined(_WIN32) && !defined(EMSCRIPTEN)
+    Sys_HangWatchdog( );
+#endif
     try
     {
         Com_Frame( );

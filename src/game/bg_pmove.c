@@ -3510,6 +3510,12 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd )
   //convert the new axis back to angles
   AxisToAngles( rotaxis, tempang );
 
+  //a bad surface normal can still leave NaN here. The x86 QVM compiler treats
+  //NaN < -180 as true, so the loops below would never end; keep the unrotated
+  //view instead. Q_isnan only looks at the bits, so it works under the QVM
+  if( Q_isnan( tempang[ 0 ] ) || Q_isnan( tempang[ 1 ] ) || Q_isnan( tempang[ 2 ] ) )
+    AxisToAngles( axis, tempang );
+
   //force angles to -180 <= x <= 180
   for( i = 0; i < 3; i++ )
   {

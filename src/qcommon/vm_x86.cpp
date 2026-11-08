@@ -1465,39 +1465,50 @@ void VM_Compile(vm_t *vm, vmHeader_t *header)
 		case OP_LEF:
 		case OP_GTF:
 		case OP_GEF:
+			// fcomp sets C0 (ah 0x01) for less, C3 (ah 0x40) for equal, and
+			// C0, C2 (ah 0x04) and C3 all at once when either side is NaN.
+			// Every compare must come out false for NaN (only != is true),
+			// as in C. Testing C0 alone made NaN < x true, and a game loop
+			// like while( a < -180 ) a += 360; then hung the server forever.
+			// a < b and a <= b are done as b > a and b >= a, which are the
+			// forms that already reject NaN
 			EmitCommand(LAST_COMMAND_SUB_BL_2);		// sub bl, 2
-			EmitString("D9 44 9F 04");			// fld dword ptr 4[edi + ebx * 4]
-			EmitString("D8 5C 9F 08");			// fcomp dword ptr 8[edi + ebx * 4]
+			if(op == OP_LTF || op == OP_LEF)
+			{
+				EmitString("D9 44 9F 08");		// fld dword ptr 8[edi + ebx * 4]
+				EmitString("D8 5C 9F 04");		// fcomp dword ptr 4[edi + ebx * 4]
+			}
+			else
+			{
+				EmitString("D9 44 9F 04");		// fld dword ptr 4[edi + ebx * 4]
+				EmitString("D8 5C 9F 08");		// fcomp dword ptr 8[edi + ebx * 4]
+			}
 			EmitString("DF E0");				// fnstsw ax
 
 			switch(op)
 			{
 			case OP_EQF:
-				EmitString("F6 C4 40");			// test	ah,0x40
-				EmitJumpIns(vm, "0F 85", Constant4());	// jne 0x12345678
+				EmitString("80 E4 45");			// and ah,0x45
+				EmitString("80 FC 40");			// cmp ah,0x40
+				EmitJumpIns(vm, "0F 84", Constant4());	// je 0x12345678
 			break;
 			case OP_NEF:
-				EmitString("F6 C4 40");			// test	ah,0x40
-				EmitJumpIns(vm, "0F 84", Constant4());	// je 0x12345678
-			break;
-			case OP_LTF:
-				EmitString("F6 C4 01");			// test	ah,0x01
+				EmitString("80 E4 45");			// and ah,0x45
+				EmitString("80 FC 40");			// cmp ah,0x40
 				EmitJumpIns(vm, "0F 85", Constant4());	// jne 0x12345678
 			break;
-			case OP_LEF:
-				EmitString("F6 C4 41");			// test	ah,0x41
-				EmitJumpIns(vm, "0F 85", Constant4());	// jne 0x12345678
-			break;
+			case OP_LTF:						// b > a
 			case OP_GTF:
-				EmitString("F6 C4 41");			// test	ah,0x41
+				EmitString("F6 C4 45");			// test	ah,0x45
 				EmitJumpIns(vm, "0F 84", Constant4());	// je 0x12345678
 			break;
+			case OP_LEF:						// b >= a
 			case OP_GEF:
-				EmitString("F6 C4 01");			// test	ah,0x01
+				EmitString("F6 C4 05");			// test	ah,0x05
 				EmitJumpIns(vm, "0F 84", Constant4());	// je 0x12345678
 			break;
 			}
-		break;			
+		break;
 		case OP_NEGI:
 			EmitMovEAXStack(vm, 0);
 			EmitString("F7 D8");				// neg eax
