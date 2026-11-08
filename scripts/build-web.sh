@@ -27,7 +27,8 @@ echo "=== Updating pk3 checksums in src/sys/sys_common.js"
 for dest in $(sed -n "s/.*dest: '\([^']*\.pk3\)', checksum: [0-9]*.*/\1/p" src/sys/sys_common.js); do
     [ -f "$RELEASE_JS/$dest" ] || continue
 
-    crc=$(cksum -a crc32b "$RELEASE_JS/$dest" | cut -d' ' -f1)
+    # zlib's CRC32 (cksum -a crc32b needs coreutils 9.6+)
+    crc=$(python3 -c 'import sys, zlib; print(zlib.crc32(open(sys.argv[1], "rb").read()))' "$RELEASE_JS/$dest")
     printf '  %-28s %s\n' "$dest" "$crc"
     sed -i "s|\(dest: '$dest', checksum: \)[0-9]*|\1$crc|" src/sys/sys_common.js
 done
