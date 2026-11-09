@@ -4599,7 +4599,9 @@ void CL_GetPing(int n, char *buf, int buflen, int *pingtime)
         }
     }
 
-    CL_SetServerInfoByAddress(cl_pinglist[n].adr, cl_pinglist[n].info, cl_pinglist[n].time);
+    // a server that has not answered has an empty info string; passing it would blank the stored host name,
+    // so an unanswered favorite lost its name and was then dropped from the list as having invalid info
+    CL_SetServerInfoByAddress(cl_pinglist[n].adr, cl_pinglist[n].info[0] ? cl_pinglist[n].info : NULL, cl_pinglist[n].time);
 
     *pingtime = time;
 }
@@ -4762,6 +4764,9 @@ static void CL_Ping_f(void)
     memcpy(&pingptr->adr, &to, sizeof(netadr_t));
     pingptr->start = Sys_Milliseconds();
     pingptr->time = 0;
+    // a reused slot still holds the previous server's reply: if this server never answers, CL_GetPing hands
+    // that old info to its list entry (map, players and game of another server)
+    pingptr->info[0] = '\0';
 
     CL_SetServerInfoByAddress(pingptr->adr, NULL, 0);
 
@@ -4847,6 +4852,7 @@ bool CL_UpdateVisiblePings_f(int source)
                         memcpy(&cl_pinglist[j].adr, &server[i].adr, sizeof(netadr_t));
                         cl_pinglist[j].start = Sys_Milliseconds();
                         cl_pinglist[j].time = 0;
+                        cl_pinglist[j].info[0] = '\0'; // see CL_Ping_f
                         NET_OutOfBandPrint(NS_CLIENT, cl_pinglist[j].adr, "getinfo xxx");
                         slots++;
                     }
