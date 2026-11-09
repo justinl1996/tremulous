@@ -3194,6 +3194,10 @@ void CL_Frame(int msec)
     if (clc.downloadXHR)
     {
         CL_XHR_PerformDownload();
+        // a finished download restarts the file system, which in the browser
+        // takes several frames; nothing in this frame may read a file (the
+        // menu music in S_Update would) until it is back
+        if (!FS_Initialized()) return;
         // we can't process frames normally when in disconnected download mode
         // since the ui vm expects clc.state to be CA_CONNECTED
         if (clc.XHRDisconnected)
