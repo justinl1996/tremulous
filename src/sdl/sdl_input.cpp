@@ -313,6 +313,15 @@ static keyNum_t IN_TranslateSDLToQ3Key( SDL_Keysym *keysym, bool down )
 	if( in_keyboardDebug->integer )
 		IN_PrintKey( keysym, key, down );
 
+	// The key left of 1 opens the console on every layout, not only where it
+	// types ~ or ` (it is a section sign, ^, 2 squared and so on elsewhere).
+	// A layout that puts a letter or digit there keeps it.
+	if( keysym->scancode == SDL_SCANCODE_GRAVE &&
+		!( ( key >= '0' && key <= '9' ) || ( key >= 'a' && key <= 'z' ) ) )
+	{
+		key = K_CONSOLE;
+	}
+
 	if( IN_IsConsoleKey( key, 0 ) )
 	{
 		// Console keys can't be bound or generate characters
